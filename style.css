@@ -1,0 +1,300 @@
+/* ==========================================================
+   My Course Library — style.css
+   طبقة التنسيق المخصصة فوق Tailwind CSS (Dark فقط)
+   ========================================================== */
+
+:root {
+  --bg:   #0a0a0d;
+  --panel:#101015;
+  --raise:#16161d;
+  --edge: #212129;
+  --edge2:#2e2e39;
+  --ink:  #ececf1;
+  --mut:  #9c9cab;
+  --dim:  #66666f;
+  --acc:  #f0b53e;
+  --red:  #e5484d;
+
+  color-scheme: dark; /* يجعل عناصر النظام (select / scrollbar) داكنة */
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: rgba(240, 181, 62, .28); }
+
+/* ---------- Scrollbar رفيع ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #26262f; border-radius: 8px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #33333f; }
+* { scrollbar-width: thin; scrollbar-color: #26262f transparent; }
+
+/* ---------- تركيز لوحة المفاتيح ---------- */
+:focus-visible { outline: 2px solid rgba(240, 181, 62, .6); outline-offset: 2px; }
+.field:focus-visible { outline: none; }
+
+/* ---------- Skip link (وصولية) ---------- */
+.skip-link {
+  position: fixed; top: -60px; inset-inline-end: 16px; z-index: 100;
+  background: var(--acc); color: #161204;
+  font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+  transition: top .2s ease;
+}
+.skip-link:focus { top: 12px; }
+
+/* ---------- الشعار ---------- */
+.logo-mark {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: rgba(240, 181, 62, .1);
+  border: 1px solid rgba(240, 181, 62, .28);
+  color: var(--acc); font-size: 15px;
+}
+
+/* ---------- التنقل الجانبي ---------- */
+.nav-item {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 10px; border-radius: 10px;
+  font-size: 12.5px; color: var(--mut);
+  transition: background .15s, color .15s;
+}
+.nav-item:hover { background: var(--raise); color: var(--ink); }
+.nav-item.nav-active { background: var(--raise); color: var(--ink); font-weight: 500; }
+.nav-item.nav-active::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 3px; background: var(--acc);
+}
+.nav-label { padding: 16px 10px 6px; font-size: 10.5px; font-weight: 600; color: var(--dim); }
+
+/* ---------- شريط الإحصائيات ---------- */
+.stat {
+  background: var(--panel); padding: 13px 15px; min-width: 0;
+  display: flex; flex-direction: column; gap: 7px; text-align: start;
+  transition: background .15s;
+}
+button.stat { cursor: pointer; }
+button.stat:hover { background: var(--raise); }
+.stat-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 21px; font-weight: 600; line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10.5px; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stat-label i { font-size: 11px; }
+.stat-label .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.stat-active { background: var(--raise) !important; box-shadow: inset 0 0 0 1px rgba(240, 181, 62, .35); }
+.stat-active .stat-num { color: var(--acc); }
+
+/* ---------- حقول النماذج والبحث ---------- */
+.field {
+  width: 100%; height: 38px; padding: 0 12px;
+  background: var(--bg); border: 1px solid var(--edge); border-radius: 10px;
+  font-size: 12.5px; color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
+}
+textarea.field { height: auto; min-height: 74px; padding: 9px 12px; resize: vertical; line-height: 1.7; }
+.field::placeholder { color: var(--dim); }
+.field:focus { border-color: rgba(240, 181, 62, .55); box-shadow: 0 0 0 3px rgba(240, 181, 62, .12); }
+.field.invalid { border-color: rgba(229, 72, 77, .6); }
+select.field { cursor: pointer; }
+
+.field-label { display: block; font-size: 11.5px; font-weight: 500; color: var(--mut); margin-bottom: 6px; }
+.field-err { font-size: 11px; color: #f4636e; margin-top: 6px; }
+
+/* ---------- أزرار ---------- */
+.btn-accent {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 14px; border-radius: 10px;
+  background: var(--acc); color: #161204;
+  font-size: 12.5px; font-weight: 700; transition: background .15s, transform .1s;
+}
+.btn-accent:hover { background: #f7c85f; }
+.btn-accent:active { transform: translateY(1px); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 13px; border-radius: 10px;
+  border: 1px solid var(--edge); background: transparent;
+  color: var(--mut); font-size: 12px; font-weight: 500;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.btn-ghost:hover { color: var(--ink); border-color: var(--edge2); background: var(--raise); }
+
+.btn-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 34px; padding: 0 14px; border-radius: 10px;
+  background: var(--red); color: #fff;
+  font-size: 12px; font-weight: 700; transition: background .15s;
+}
+.btn-danger:hover { background: #f2555c; }
+
+.btn-danger-o {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 13px; border-radius: 10px;
+  border: 1px solid rgba(229, 72, 77, .4); color: #f4636e;
+  font-size: 12px; font-weight: 600; transition: background .15s, border-color .15s;
+}
+.btn-danger-o:hover { background: rgba(229, 72, 77, .12); border-color: rgba(229, 72, 77, .7); }
+
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px; border-radius: 8px;
+  color: var(--dim); font-size: 13px; transition: background .15s, color .15s;
+}
+.icon-btn:hover { background: var(--raise); color: var(--ink); }
+
+.open-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px; border-radius: 8px;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--acc); background: rgba(240, 181, 62, .1);
+  transition: background .15s;
+}
+.open-btn:hover { background: rgba(240, 181, 62, .2); }
+
+.seg-btn {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 8px;
+  color: var(--dim); font-size: 13.5px;
+  transition: background .15s, color .15s;
+}
+.seg-btn:hover { color: var(--ink); }
+.seg-btn[aria-pressed="true"] { background: var(--raise); color: var(--ink); }
+
+/* ---------- كروت ---------- */
+.source-tile {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--bg); border: 1px solid var(--edge); flex-shrink: 0;
+}
+.cat-chip {
+  display: inline-flex; align-items: center;
+  font-size: 10.5px; font-weight: 500; line-height: 1.5;
+  padding: 2.5px 9px; border-radius: 999px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.icon-tile {
+  display: inline-grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--edge);
+  color: var(--mut); font-size: 16px; flex-shrink: 0;
+}
+
+/* بديل احتياطي لقصّ الأسطر (إن لم تتوفر أدوات Tailwind) */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- شارات ---------- */
+.docx-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .08em;
+  color: #7fb0f5; background: rgba(101, 150, 235, .12);
+  border: 1px solid rgba(101, 150, 235, .3);
+  padding: 2.5px 7px; border-radius: 6px;
+}
+
+/* ---------- kbd ---------- */
+kbd {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; line-height: 1;
+  color: var(--dim); background: var(--raise);
+  border: 1px solid var(--edge2); border-bottom-width: 2px;
+  border-radius: 5px; padding: 3px 6px;
+}
+
+/* ---------- inline code ---------- */
+code {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  background: var(--raise); border: 1px solid var(--edge);
+  border-radius: 5px; padding: 1px 6px; color: var(--mut);
+}
+
+/* ---------- المودالات ---------- */
+.modal:not(.hidden) .modal-panel { animation: modalIn .24s cubic-bezier(.16, 1, .3, 1) backwards; }
+.modal:not(.hidden) .modal-backdrop { animation: fadeIn .2s ease backwards; }
+@keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } }
+
+/* ---------- التوستات ---------- */
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--panel); border: 1px solid var(--edge2);
+  border-radius: 12px; padding: 11px 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  animation: toastIn .3s cubic-bezier(.16, 1, .3, 1) backwards;
+}
+.toast.toast-out { animation: toastOut .18s ease forwards; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(6px) scale(.97); } }
+.toast-x { color: var(--dim); padding: 2px; margin-top: 1px; transition: color .15s; }
+.toast-x:hover { color: var(--ink); }
+
+/* ---------- حركات دقيقة ---------- */
+.card-enter { animation: fadeUp .3s ease backwards; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+.no-anim .card-enter { animation: none; }
+
+.fav-pop { animation: pop .35s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+.pulse-dot { animation: softPulse 1.8s ease-in-out infinite; }
+@keyframes softPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* ---------- Dropzone ---------- */
+#dropZone.drag { border-color: rgba(240, 181, 62, .7); background: rgba(240, 181, 62, .05); }
+
+/* ---------- احترام تقليل الحركة ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  html { scroll-behavior: auto; }
+}
+/* ---------- قفل كورسات Google Drive ---------- */
+.lock-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 12px; border-radius: 10px;
+  font-size: 11.5px; font-weight: 600;
+  border: 1px solid var(--edge); color: var(--mut);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.lock-chip:hover { color: var(--ink); border-color: var(--edge2); }
+.lock-chip.locked {
+  color: var(--acc);
+  border-color: rgba(240, 181, 62, .35);
+  background: rgba(240, 181, 62, .07);
+}
+.lock-chip.unlocked {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, .3);
+  background: rgba(74, 222, 128, .07);
+}
+.lock-overlay {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11.5px; font-weight: 600; color: var(--acc);
+  background: rgba(10, 10, 13, .75); backdrop-filter: blur(4px);
+  border: 1px solid rgba(240, 181, 62, .35);
+  padding: 7px 13px; border-radius: 999px;
+}
+.shake { animation: shake .4s cubic-bezier(.36, .07, .19, .97); }
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
