@@ -1,6 +1,6 @@
 /* ==========================================================
-   My Course Library — app.js (v10)
-   نواة المكتبة — الحماية والاشتراكات في gate.js (v10)
+   My Course Library — app.js (v14)
+   نواة المكتبة — الحماية في gate.js — المزامنة السحابية في cloud.js
    ========================================================== */
 
 'use strict';
@@ -32,6 +32,8 @@ const CATEGORY_HUES = {
   'Other': null
 };
 
+/* ملاحظة: من إضافة Firebase، الكورسات بتنشر من الواجهة (وضع المالك)
+   وبتتزامن سحابيًا — القايمة دي نقطة بداية للأجهزة الجديدة بس. */
 const INITIAL_CREATED_AT = '2025-01-15T09:00:00.000Z';
 
 const INITIAL_RESOURCES = (() => {
@@ -65,7 +67,8 @@ const INITIAL_RESOURCES = (() => {
     ['Photoshop',                        'Graphic Design',   'YouTube',      'https://youtu.be/yD66BBLtcM8?si=Tjb9KHtZxzLUHWHw'],
     ['Photoshop 2',                      'Graphic Design',   'YouTube',      'https://youtu.be/va-MZOPrJ0s?si=91f15UigdzCr_iB8'],
     ['Illustrator',                      'Graphic Design',   'YouTube',      'https://youtu.be/Fe_oEDD8Kus?si=Yy5gTWPG2NyVGrdV'],
-    ['CS50 - Computer Science Fundamentals', 'Computer Science', 'YouTube',  'https://youtube.com/playlist?list=PLknwEmKsW8OvMsFbU9zo8oJCprAsgc4LO&si=EIeS-4HGd_CX778k']
+    ['CS50 - Computer Science Fundamentals', 'Computer Science', 'YouTube', 'https://youtube.com/playlist?list=PLknwEmKsW8OvMsFbU9zo8oJCprAsgc4LO&si=EIeS-4HGd_CX778k'],
+    ['إنجليزية للمبتدئين',               'Other',            'YouTube',      'https://youtu.be/9ayf1XuXrVg'],
   ];
   return rows.map(([title, category, source, url], i) => ({
     id: 'res-' + String(i + 1).padStart(3, '0'),
@@ -121,8 +124,8 @@ function timeAgo(iso) {
   const rtf = new Intl.RelativeTimeFormat('ar-EG-u-nu-latn', { numeric: 'auto' });
   if (diff < 3600)     return rtf.format(-Math.round(diff / 60), 'minute');
   if (diff < 86400)    return rtf.format(-Math.round(diff / 3600), 'hour');
-  if (diff < 604800)   return rtf.format(-Math.round(diff / 86400), 'day');
-  if (diff < 2629800)  return rtf.format(-Math.round(diff / 604800), 'week');
+  if (diff < 604800)   return rtf.format(-Math.round(diff / 604800), 'week');
+  if (diff < 2629800)  return rtf.format(-Math.round(diff / 2629800), 'month');
   if (diff < 31557600) return rtf.format(-Math.round(diff / 2629800), 'month');
   return fmtDate(iso);
 }
@@ -158,7 +161,7 @@ function statusBadge(status) {
     <span class="w-1.5 h-1.5 rounded-full ${m.pulse ? 'pulse-dot' : ''}" style="background:${m.color}"></span>${m.label}</span>`;
 }
 
-/* ---------- روابط مساعدة لـ gate.js ---------- */
+/* ---------- روابط مساعدة لـ gate.js و cloud.js ---------- */
 function protectedResources() {
   return state.resources.filter((r) => MCL.isProtected(r));
 }
@@ -181,7 +184,7 @@ function loadResources() {
     } catch { /* بيانات تالفة */ }
     state.resources = cloneInitial();
     saveResources();
-    showToast('كانت البيانات المحفوظة تالفة — تمت استعادة الـ30 مورد الأصلية.', 'warn');
+    showToast('كانت البيانات المحفوظة تالفة — تمت استعادة القايمة الأصلية.', 'warn');
   } else {
     state.resources = cloneInitial();
     saveResources();
@@ -261,7 +264,7 @@ function createResource(data) {
   state.resources.push(resource);
   saveResources();
   renderAll();
-  showToast(`تمت إضافة «${resource.title}» إلى المكتبة.`, 'success');
+  showToast(`تمت إضافة «${resource.title}» — هيتزامن سحابيًا مع كل الأجهزة.`, 'success');
   return resource;
 }
 
@@ -280,7 +283,7 @@ function deleteResource(id) {
   if (!resource) return;
   openConfirm({
     title: 'حذف المورد',
-    message: `سيتم حذف «${resource.title}» نهائيًا من مكتبتك.`,
+    message: `سيتم حذف «${resource.title}» نهائيًا من المكتبة (وسيتحذف من كل الأجهزة بعد المزامنة).`,
     confirmLabel: 'حذف نهائي',
     danger: true,
     onConfirm() {
@@ -873,7 +876,7 @@ function importData(file) {
       }
       openConfirm({
         title: 'استيراد واستبدال البيانات',
-        message: `تم التحقق من الملف: ${result.resources.length} مورد سليم. سيتم استبدال الموارد الحالية (${state.resources.length} مورد) بالكامل. لا يمكن التراجع بعد التأكيد.`,
+        message: `تم التحقق من الملف: ${result.resources.length} مورد سليم. سيتم استبدال الموارد الحالية (${state.resources.length} مورد) بالكامل، وستنشر على السحابة تلقائيًا. لا يمكن التراجع بعد التأكيد.`,
         confirmLabel: 'استبدال البيانات',
         danger: true,
         onConfirm() {
@@ -893,14 +896,14 @@ function restoreInitialResources() {
   MCL.requireAdmin(() => {
     openConfirm({
       title: 'استرجاع الموارد الأصلية',
-      message: `سيتم حذف جميع البيانات الحالية (${state.resources.length} مورد) نهائيًا واستبدالها بالـ30 مورد الأصلية. يُنصح بتصدير نسخة احتياطية قبل المتابعة. هل أنت متأكد؟`,
+      message: `سيتم حذف جميع البيانات الحالية (${state.resources.length} مورد) نهائيًا واستبدالها بالقايمة الأصلية، وستنشر التغييرات على السحابة. هل أنت متأكد؟`,
       confirmLabel: 'نعم، استرجاع البيانات الأصلية',
       danger: true,
       onConfirm() {
         state.resources = cloneInitial();
         saveResources();
         switchView('library');
-        showToast('تمت استعادة الـ30 مورد الأصلية.', 'success');
+        showToast('تمت استعادة القايمة الأصلية.', 'success');
       }
     });
   });
@@ -1142,7 +1145,7 @@ function wireEvents() {
 
 /* ---------- الإقلاع ---------- */
 function init() {
-  console.log('%c My Course Library — v10 ', 'background:#f0b53e;color:#161204;font-weight:bold');
+  console.log('%c My Course Library — v14 ', 'background:#f0b53e;color:#161204;font-weight:bold');
 
   /* فحص التكامل مع gate.js */
   const required = ['isAdminActive', 'isProtected', 'isResourceLocked',
@@ -1154,7 +1157,7 @@ function init() {
   if (missing.length) {
     console.error('%c[GATE] gate.js ناقص أو نسخة قديمة! الغائب: ' + missing.join(', '),
       'background:#e5484d;color:#fff;font-weight:bold;padding:4px 8px');
-    showToast('خطأ: gate.js ناقص أو قديم — حدّث الملفين على نفس الرقم.', 'error', { duration: 10000 });
+    showToast('خطأ: gate.js ناقص أو قديم — حدّث الملفات على نفس الرقم.', 'error', { duration: 10000 });
   }
 
   /* ربط الواجهتين */
@@ -1165,13 +1168,16 @@ function init() {
     if (view === 'subs' && typeof window.renderSubsViewGate === 'function') window.renderSubsViewGate();
   };
 
-  /* شارة الإصدار في الفوتر — للتأكد إن التليفون شايف أحدث نسخة */
+  /* تطبيق الكورسات القادمة من السحابة (cloud.js بيناديها عند أي تحديث لحظي) */
+  window.__applyCloudResources = (arr) => { state.resources = arr; renderAll(); };
+
+  /* شارة الإصدار في الفوتر */
   const fp = qs('footer p');
   if (fp && !qs('#mclVersionBadge')) {
     const b = document.createElement('span');
     b.id = 'mclVersionBadge';
     b.className = 'text-accent font-mono';
-    b.textContent = ' — v10';
+    b.textContent = ' — v14';
     fp.appendChild(b);
   }
 

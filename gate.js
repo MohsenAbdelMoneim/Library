@@ -1,12 +1,13 @@
 /* ==========================================================
-   gate.js — v12
-   بوابة الحماية + واتساب وفودافون كاش + باسورد مالك بحروف
+   gate.js — v14
+   بوابة الحماية + واتساب وفودافون كاش + إدارة المشتركين
+   (يوتيوب مفتوح للجميع — Drive للمشتركين فقط)
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v12 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+  console.log('%c MCL Gate — v14 ', 'background:#4ade80;color:#052e12;font-weight:bold');
 
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
@@ -14,7 +15,7 @@
   const SUBS_EXPORTED_KEY = 'my-course-library:subs-exported';
 
   const MCL = window.MCL = {
-    version: '12',
+    version: '14',
     ADMIN_PASSWORD: '01096295395mo',
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
@@ -447,7 +448,7 @@
     if (pending && pending.run) pending.run();
   }
 
-  /* ---------- الاشتراكات ---------- */
+  /* ---------- الاشتراكات (احتياطي — cloud.js بيستبدلها بالمزامنة السحابية) ---------- */
   function validateSubsPayload(data) {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
     if (!('subscriptions' in data) || typeof data.subscriptions !== 'object' || data.subscriptions === null) return null;
@@ -539,7 +540,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     try { localStorage.setItem(SUBS_EXPORTED_KEY, sortSnapshot(MCL.subscriptions)); } catch { /* تجاهل */ }
     renderSubsView();
-    notify('نزّل الملف وارفعه مكان subscriptions.json في الاستضافة — لحد ما ترفعه، العملاء هيشوفوا النسخة القديمة.', 'success', 7000);
+    notify('نزّلت نسخة احتياطية — مع المزامنة السحابية مش محتاج ترفعها، خزّنها عندك كأمان.', 'success', 7000);
   }
   MCL.exportSubscriptions = exportSubscriptions;
 
@@ -603,15 +604,15 @@
     section.className = 'hidden space-y-4';
     section.setAttribute('aria-label', 'إدارة المشتركين');
     section.innerHTML = `
-    <div id="subsSyncBanner" class="hidden rounded-2xl border border-red/40 bg-red/10 px-5 py-4 flex items-start gap-2.5 text-[12.5px] leading-relaxed text-ink">
-      <i class="bi bi-cloud-arrow-up-fill text-red mt-0.5 shrink-0" aria-hidden="true"></i>
+    <div id="subsSyncBanner" class="hidden rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 flex items-start gap-2.5 text-[12.5px] leading-relaxed text-ink">
+      <i class="bi bi-cloud-check-fill text-accent mt-0.5 shrink-0" aria-hidden="true"></i>
       <p id="subsSyncText"></p>
     </div>
     <div class="rounded-2xl border border-accent/30 bg-accent/5 px-5 py-4 flex items-start gap-2.5 text-[12px] leading-relaxed text-ink">
       <i class="bi bi-info-circle-fill text-accent mt-0.5 shrink-0" aria-hidden="true"></i>
-      <p>خطوات تفعيل اشتراك عميل: أضف رقمه وعلّم على كورساته ← جرّب الدخول برقمه على جهازك ←
-      <b class="text-accent">«تصدير ملف الاشتراكات»</b> ← ارفع الملف مكان <code>subscriptions.json</code> في الاستضافة ←
-      ابعت لعميلك إنه يكتب رقمه.</p>
+      <p>طريقة تفعيل اشتراك عميل: أضف رقمه وعلّم على كورساته ← لو ظهرت رسالة
+      <b class="text-accent">«متصل بالسحابة»</b> في الـConsole فالتعديل بينشر تلقائيًا ←
+      ابعت لعميلك إنه يكتب رقمه. لو مفيش اتصال سحابي، استخدم التصدير كنسخة احتياطية.</p>
     </div>
     <div class="grid gap-4 lg:grid-cols-2 items-start">
       <div class="rounded-2xl border border-edge bg-panel p-5">
@@ -637,11 +638,11 @@
       <div class="rounded-2xl border border-edge bg-panel overflow-hidden">
         <div class="px-5 py-3.5 border-b border-edge flex items-center justify-between gap-2">
           <h2 class="text-[13.5px] font-semibold">المشتركون (<span id="subsCount">0</span>)</h2>
-          <button type="button" id="subsReloadBtn" class="text-[11px] text-mut hover:text-ink transition" title="تجاهل تعديلاتك المحلية وتحميل نسخة السيرفر">تحميل نسخة السيرفر</button>
+          <button type="button" id="subsReloadBtn" class="text-[11px] text-mut hover:text-ink transition" title="تجاهل تعديلاتك المحلية وتحميل نسخة السحابة">تحميل نسخة السحابة</button>
         </div>
         <ul id="subsList" class="max-h-[420px] overflow-y-auto"></ul>
         <div class="px-5 py-4 border-t border-edge flex flex-wrap items-center gap-2">
-          <button type="button" id="subsExportBtn" class="btn-accent"><i class="bi bi-download text-[13px]"></i>تصدير ملف الاشتراكات</button>
+          <button type="button" id="subsExportBtn" class="btn-ghost"><i class="bi bi-download text-[12px]"></i>نسخة احتياطية</button>
           <button type="button" id="subsImportBtn" class="btn-ghost"><i class="bi bi-upload text-[12px]"></i>استيراد ملف</button>
           <input type="file" id="subsImportFile" accept=".json,application/json" class="hidden">
         </div>
@@ -674,10 +675,11 @@
     const banner = qs('#subsSyncBanner');
     if (!banner) return;
     const diff = unsyncedCount();
-    if (diff > 0) {
+    const cloudOk = window.CloudSync && CloudSync.authed;
+    if (diff > 0 && !cloudOk) {
       qs('#subsSyncText').innerHTML =
-        `<b>${diff}</b> تعديل على المشتركين محفوظ على جهازك ومش منشور لسه — العميل مش هيقدر يدخل بالأرقام الجديدة
-         غير بعد ما تضغط <b>«تصدير ملف الاشتراكات»</b> وترفع الملف مكان <code>subscriptions.json</code>.`;
+        `<b>${diff}</b> تعديل محلي ومش متزامن مع السحابة (وضع المالك مش متصل سحابيًا).
+         لو ظهرت رسالة اتصال سحابية في الـConsole هيتبعتوا تلقائيًا، أو استخدم التصدير كنسخة احتياطية.`;
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
@@ -773,8 +775,8 @@
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
     resetSubsForm();
     notify(isEdit
-      ? `تم تحديث اشتراك ${phone} — متنساش التصدير والرفع.`
-      : `تمت إضافة ${phone} محليًا. جرّب الدخول برقمه دلوقتي، وبعدين صدّر الملف وارفعه لتفعيله عنده.`,
+      ? `تم تحديث اشتراك ${phone} — بينشر على السحابة تلقائيًا.`
+      : `تمت إضافة ${phone} — بينشر على السحابة تلقائيًا. ابعت لعميلك إنه يكتب رقمه.`,
       'success', 6000);
   }
 
@@ -807,7 +809,7 @@
   function deleteSubscriber(phone) {
     appConfirm({
       title: 'إلغاء اشتراك',
-      message: `سيتم إلغاء اشتراك الرقم ${phone} محليًا. العميل هيتقفل منه بعد ما ترفع الملف المحدّث.`,
+      message: `سيتم إلغاء اشتراك الرقم ${phone} — وبينشر على السحابة تلقائيًا بعد ثواني.`,
       confirmLabel: 'إلغاء الاشتراك',
       danger: true,
       onConfirm() {
@@ -816,16 +818,16 @@
         renderSubsView();
         emit();
         if (typeof MCL.renderAll === 'function') MCL.renderAll();
-        notify(`تم إلغاء اشتراك ${phone} محليًا — صدّر الملف وارفعه.`, 'warn', 5500);
+        notify(`تم إلغاء اشتراك ${phone} — بينشر على السحابة تلقائيًا.`, 'warn', 5500);
       }
     });
   }
 
   function reloadFromServer() {
     appConfirm({
-      title: 'تحميل نسخة السيرفر',
-      message: 'سيتم تجاهل كل تعديلاتك المحلية غير المنشورة وتحميل محتوى subscriptions.json من السيرفر. متأكد؟',
-      confirmLabel: 'تحميل من السيرفر',
+      title: 'تحميل نسخة السحابة',
+      message: 'سيتم تجاهل كل تعديلاتك المحلية وتحميل نسخة الاشتراكات من السحابة. متأكد؟',
+      confirmLabel: 'تحميل من السحابة',
       danger: true,
       onConfirm() {
         try {
@@ -834,7 +836,7 @@
         } catch { /* تجاهل */ }
         loadSubscriptions();
         resetSubsForm();
-        notify('تم تحميل نسخة السيرفر ومسح التعديلات المحلية.', 'info');
+        notify('تم تحميل نسخة السحابة ومسح التعديلات المحلية.', 'info');
       }
     });
   }
@@ -848,7 +850,7 @@
         if (!subs) { notify('ملف الاشتراكات غير صالح — البنية المطلوبة { version, updatedAt, subscriptions }.', 'error', 6000); return; }
         appConfirm({
           title: 'استيراد الاشتراكات',
-          message: `سيتم تحميل ${Object.keys(subs).length} اشتراك من الملف بدل القايمة الحالية (${Object.keys(MCL.subscriptions).length}).`,
+          message: `سيتم تحميل ${Object.keys(subs).length} اشتراك من الملف بدل القايمة الحالية (${Object.keys(MCL.subscriptions).length})، وينشر على السحابة تلقائيًا.`,
           confirmLabel: 'استيراد',
           onConfirm() {
             MCL.subscriptions = subs;
@@ -856,7 +858,7 @@
             renderSubsView();
             emit();
             if (typeof MCL.renderAll === 'function') MCL.renderAll();
-            notify('تم استيراد الاشتراكات — صدّرها من جديد بعد أي تعديل.', 'success');
+            notify('تم استيراد الاشتراكات — بينشروا على السحابة تلقائيًا.', 'success');
           }
         });
       } catch { notify('الملف ليس JSON صالحًا.', 'error'); }
