@@ -1,15 +1,16 @@
 /* ==========================================================
-   My Course Library — app.js (v4)
-   باسورد مستقل لكل كورس Drive + مسار تحقق مقوّى ضد الضياع
+   My Course Library — app.js (v5)
+   باسورد مستقل لكل كورس Drive + وضع المالك للأدوات الإدارية
    ========================================================== */
 
 'use strict';
 
-console.log('%c My Course Library — v4 (hardened lock) ', 'background:#f0b53e;color:#161204;font-weight:bold');
+console.log('%c My Course Library — v5 (owner mode) ', 'background:#f0b53e;color:#161204;font-weight:bold');
 
 /* ---------- الثوابت ---------- */
 const STORAGE_KEY = 'my-course-library:resources:v1';
 const SETTINGS_KEY = 'my-course-library:settings:v1';
+const ADMIN_KEY = 'my-course-library:admin';
 
 /* ---------- كلمات المرور ---------- */
 const LOCK = {
@@ -181,8 +182,7 @@ function isTypingTarget(el) {
   return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 }
 
-/* تحويل الأرقام العربية/الفارسية إلى إنجليزية + إزالة المسافات
-   (عشان لو اتكتب الباسورد بكيبورد عربي: ٧٤٨٢٠١ → 748201) */
+/* تحويل الأرقام العربية/الفارسية إلى إنجليزية + إزالة المسافات */
 function normalizePassword(s) {
   return String(s ?? '')
     .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
@@ -219,12 +219,39 @@ function statusBadge(status) {
 }
 
 /* ==========================================================
+   وضع المالك (Admin)
+   ========================================================== */
+
+let adminMem = false;
+
+function isAdminActive() {
+  try { return sessionStorage.getItem(ADMIN_KEY) === '1'; }
+  catch { return adminMem; }
+}
+
+function setAdminMode(on) {
+  adminMem = on;
+  try {
+    if (on) sessionStorage.setItem(ADMIN_KEY, '1');
+    else sessionStorage.removeItem(ADMIN_KEY);
+  } catch { /* التخزين غير متاح */ }
+}
+
+/* بوابة المالك: لو مش أدمن يطلب كلمة المرور الأول ثم ينفّذ العملية */
+function requireAdmin(run) {
+  if (isAdminActive()) { run(); return; }
+  pendingSecureAction = { run };
+  openLockModal({ mode: 'login' });
+  showToast('هذه العملية لوضع المالك — أدخل كلمة مرور المالك.', 'info');
+}
+
+/* ==========================================================
    القفل: كلمة مرور مستقلة لكل كورس Drive
    ========================================================== */
 
 let memUnlocked = new Set();
 let pendingSecureAction = null;
-let lockAdminMode = false;
+let lockMode = null; // 'course' | 'login'
 
 function getUnlockedIds() {
   try {
@@ -260,8 +287,9 @@ function isProtected(r) {
   return !!r && r.source === 'Google Drive' && getPasswordFor(r) !== null;
 }
 
+/* المالك يتخطى أقفال الكورسات كلها طالما وضع المالك مفعّل */
 function isResourceLocked(r) {
-  return isProtected(r) && !getUnlockedIds().includes(r.id);
+  return isProtected(r) && !isAdminActive() && !getUnlockedIds().includes(r.id);
 }
 
 function protectedResources() {
@@ -269,23 +297,23 @@ function protectedResources() {
 }
 
 function lockedCount() {
-  return protectedResources().filter((r) => !getUnlockedIds().includes(r.id)).length;
+  return protectedResources().filter((r) => !isResourceLocked(r) === false).length;
 }
 
 function requireUnlock(resource, run) {
   if (!isResourceLocked(resource)) { run(); return; }
   pendingSecureAction = { resource, run };
-  openLockModal({ resource });
+  openLockModal({ mode: 'course', resource });
 }
 
-function openLockModal({ adminMode = false, resource = null } = {}) {
-  lockAdminMode = adminMode;
+function openLockModal({ mode = 'course', resource = null } = {}) {
+  lockMode = mode;
   const courseEl = qs('#lockCourse');
   const descEl = qs('#lockDesc');
-  if (adminMode) {
-    if (qs('#lockTitle')) qs('#lockTitle').textContent = 'عملية إدارة محمية';
+  if (mode === 'login') {
+    if (qs('#lockTitle')) qs('#lockTitle').textContent = 'دخول المالك';
     if (courseEl) courseEl.classList.add('hidden');
-    if (descEl) descEl.textContent = 'تصدير النسخة الاحتياطية يكشف روابط الكورسات المقفلة. أدخل كلمة مرور المالك للمتابعة.';
+    if (descEl) descEl.textContent = 'ادخل كلمة مرور المالك لتفعيل أدوات الإضافة والتعديل والحذف والتصدير.';
   } else {
     if (qs('#lockTitle')) qs('#lockTitle').textContent = 'الكورس محمي بكلمة مرور';
     if (courseEl) {
@@ -299,13 +327,13 @@ function openLockModal({ adminMode = false, resource = null } = {}) {
   hideLockError();
   resetLockToggle();
   openModal(qs('#lockModal'), qs('#lockPassword'));
-  console.info('[LOCK] نافذة كلمة المرور فتحت —', adminMode ? 'وضع المالك' : (resource ? resource.title : '—'));
+  console.info('[LOCK] نافذة كلمة المرور فتحت — الوضع:', mode, resource ? '| ' + resource.title : '');
 }
 
 function closeLockModal() {
   closeModal(qs('#lockModal'));
   pendingSecureAction = null;
-  lockAdminMode = false;
+  lockMode = null;
 }
 
 function hideLockError() {
@@ -361,32 +389,52 @@ function renderLockStatus() {
   chip.setAttribute('aria-label', chip.title);
 }
 
-/* ---------- المعالج المركزي لكلمة المرور ----------
-   يُستدعى من submit (Enter أو زرار) عبر توزيع الأحداث على الصفحة،
-   فمستحيل يضيع حتى لو فيه أكثر من نسخة من النافذة في الـDOM. */
+function renderAdminUI() {
+  const admin = isAdminActive();
+  const addBtn = qs('#addResourceBtn');
+  if (addBtn) addBtn.classList.toggle('hidden', !admin);
+  const qExp = qs('#quickExportBtn');
+  if (qExp) qExp.classList.toggle('hidden', !admin);
+
+  const chip = qs('#adminChip');
+  if (chip) {
+    chip.classList.toggle('unlocked', admin);
+    const ic = chip.querySelector('i');
+    if (ic) ic.className = (admin ? 'bi bi-shield-check' : 'bi bi-shield-lock') + ' text-[12px]';
+    const txt = qs('#adminChipText');
+    if (txt) txt.textContent = admin ? 'وضع المالك' : 'دخول المالك';
+    chip.title = admin ? 'انقر للخروج من وضع المالك' : 'دخول وضع المالك (إضافة · تعديل · حذف · تصدير)';
+    chip.setAttribute('aria-label', chip.title);
+  }
+}
+
+/* ---------- المعالج المركزي لكلمة المرور ---------- */
 function handleLockSubmit(formEl) {
   try {
     const input = (formEl && formEl.querySelector('#lockPassword')) || qs('#lockPassword');
     const raw = input ? input.value : '';
     const val = normalizePassword(raw);
-    console.info('[LOCK] استلمت كلمة مرور — عدد الأحرف:', val.length, '| وضع المالك:', lockAdminMode);
+    const adminPass = normalizePassword(LOCK.adminPassword);
+    console.info('[LOCK] استلمت كلمة مرور — عدد الأحرف:', val.length, '| الوضع:', lockMode);
 
     const pending = pendingSecureAction;
     let ok = false, msg = '';
 
-    if (lockAdminMode) {
-      if (val === normalizePassword(LOCK.adminPassword)) {
-        unlockAllLocked();
+    if (lockMode === 'login') {
+      // دخول المالك: يفتح الأدوات الإدارية فقط
+      if (val === adminPass) {
+        setAdminMode(true);
         ok = true;
-        msg = 'وضع المالك: تم فتح كل الكورسات المقفلة.';
+        msg = 'وضع المالك مفعّل — كل أدوات الإدارة متاحة الآن.';
       }
     } else {
+      // وضع الكورس: كلمة الكورس تفتحه هو فقط، وكلمة المالك تفتح الكل
       const r = pending && pending.resource ? getResourceById(pending.resource.id) : null;
       if (r && val === normalizePassword(getPasswordFor(r))) {
         unlockResource(r.id);
         ok = true;
         msg = `تم فتح «${r.title}» حتى نهاية الجلسة.`;
-      } else if (val === normalizePassword(LOCK.adminPassword)) {
+      } else if (val === adminPass) {
         unlockAllLocked();
         ok = true;
         msg = 'وضع المالك: تم فتح كل الكورسات المقفلة.';
@@ -394,19 +442,20 @@ function handleLockSubmit(formEl) {
     }
 
     if (!ok) {
-      console.warn('[LOCK] كلمة مرور غير مطابقة. الكورس المطلوب:',
-        pending && pending.resource ? pending.resource.title : '(لا يوجد كورس معلّق)');
+      console.warn('[LOCK] كلمة مرور غير مطابقة. الوضع:', lockMode,
+        '| الكورس:', pending && pending.resource ? pending.resource.title : '—');
       showLockError();
       return;
     }
 
+    const runPending = pending && pending.run ? pending.run : null;
     pendingSecureAction = null;
-    lockAdminMode = false;
+    lockMode = null;
     closeModal(qs('#lockModal'));
     renderAll();
     showToast(msg, 'success');
-    console.info('[LOCK] نجح الفتح:', msg);
-    if (pending && pending.run) pending.run();
+    console.info('[LOCK] نجح:', msg);
+    if (runPending) runPending();
   } catch (err) {
     console.error('[LOCK] خطأ أثناء التحقق:', err);
     showToast('حدث خطأ غير متوقع — افتح الـConsole وأرسل لي الخطأ.', 'error');
@@ -414,7 +463,7 @@ function handleLockSubmit(formEl) {
 }
 
 /* ==========================================================
-   ضمان وجود عناصر القفل (إصلاح تلقائي + منع التكرار)
+   ضمان وجود عناصر القفل والأدمن (إصلاح تلقائي)
    ========================================================== */
 
 const LOCK_STYLES = `
@@ -442,18 +491,18 @@ function buildLockModalHTML() {
           </div>
         </div>
         <form id="lockForm" novalidate class="mt-4">
-          <label for="lockPassword" class="field-label">كلمة مرور هذا الكورس</label>
+          <label for="lockPassword" class="field-label">كلمة المرور</label>
           <div class="relative">
             <input id="lockPassword" type="password" class="field pe-10" autocomplete="off"
                    placeholder="أدخل كلمة المرور…" aria-describedby="lockError">
             <button type="button" id="lockToggle" class="icon-btn absolute end-1.5 top-1/2 -translate-y-1/2"
                     aria-label="إظهار كلمة المرور"><i class="bi bi-eye"></i></button>
           </div>
-          <p id="lockError" class="field-err hidden mt-1.5">كلمة المرور غير صحيحة لهذا الكورس — حاول مرة أخرى.</p>
+          <p id="lockError" class="field-err hidden mt-1.5">كلمة المرور غير صحيحة — حاول مرة أخرى.</p>
           <div class="mt-4 flex items-center justify-end gap-2">
             <button type="button" class="btn-ghost" data-close-lock>إلغاء</button>
             <button type="submit" class="btn-accent">
-              <i class="bi bi-unlock text-[12px]" aria-hidden="true"></i>فتح هذا الكورس
+              <i class="bi bi-unlock text-[12px]" aria-hidden="true"></i>تأكيد
             </button>
           </div>
         </form>
@@ -463,7 +512,6 @@ function buildLockModalHTML() {
 }
 
 function ensureLockDOM() {
-  /* الأنماط */
   if (!document.getElementById('lockExtraStyles')) {
     const st = document.createElement('style');
     st.id = 'lockExtraStyles';
@@ -471,7 +519,7 @@ function ensureLockDOM() {
     document.head.appendChild(st);
   }
 
-  /* نافذة كلمة المرور: تُبنى دائمًا نسخة نظيفة واحدة — تمسح أي نسخ قديمة/مكررة/المتوغلة في الهيدر */
+  /* نافذة القفل: نسخة نظيفة واحدة دائمًا */
   qsa('#lockModal').forEach((m) => m.remove());
   const modal = document.createElement('div');
   modal.id = 'lockModal';
@@ -482,26 +530,45 @@ function ensureLockDOM() {
   modal.innerHTML = buildLockModalHTML();
   document.body.appendChild(modal);
 
-  /* زر حالة القفل: نسخة واحدة فقط في الهيدر */
-  qsa('#lockChip').forEach((c, i) => { if (i > 0 || !c.closest('header')) c.remove(); });
-  let chip = qs('#lockChip');
-  if (!chip) {
-    chip = document.createElement('button');
-    chip.id = 'lockChip';
-    chip.type = 'button';
-    chip.className = 'lock-chip locked';
-    chip.innerHTML = '<i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>' +
-                     '<span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>';
-    const host = qs('header .ms-auto');
-    if (host) host.insertBefore(chip, host.firstChild);
-    else (qs('header') || document.body).appendChild(chip);
-  }
-  if (!qs('#lockChipText')) {
-    const span = document.createElement('span');
-    span.id = 'lockChipText';
-    span.className = 'hidden sm:inline';
-    span.textContent = 'Drive مقفل';
-    chip.appendChild(span);
+  const host = qs('header .ms-auto') || qs('header');
+  if (host) {
+    /* زر حالة القفل */
+    let chip = qs('#lockChip');
+    if (!chip) {
+      chip = document.createElement('button');
+      chip.id = 'lockChip';
+      chip.type = 'button';
+      chip.className = 'lock-chip locked';
+      chip.innerHTML = '<i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>' +
+                       '<span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>';
+      host.insertBefore(chip, host.firstChild);
+    }
+    if (!qs('#lockChipText')) {
+      const span = document.createElement('span');
+      span.id = 'lockChipText';
+      span.className = 'hidden sm:inline';
+      span.textContent = 'Drive مقفل';
+      chip.appendChild(span);
+    }
+
+    /* زر دخول المالك */
+    let adminChip = qs('#adminChip');
+    if (!adminChip) {
+      adminChip = document.createElement('button');
+      adminChip.id = 'adminChip';
+      adminChip.type = 'button';
+      adminChip.className = 'lock-chip';
+      adminChip.innerHTML = '<i class="bi bi-shield-lock text-[12px]" aria-hidden="true"></i>' +
+                            '<span id="adminChipText" class="hidden sm:inline">دخول المالك</span>';
+      chip.after(adminChip);
+    }
+    if (!qs('#adminChipText')) {
+      const span = document.createElement('span');
+      span.id = 'adminChipText';
+      span.className = 'hidden sm:inline';
+      span.textContent = 'دخول المالك';
+      adminChip.appendChild(span);
+    }
   }
 }
 
@@ -783,7 +850,10 @@ function renderSidebar() {
 
   html += `<div class="my-2.5 border-t border-edge"></div>`;
   html += navItem({ nav: 'view:files', icon: 'bi-file-earmark-word', label: 'ملفات مهمة', active: state.view === 'files' });
-  html += navItem({ nav: 'view:data',  icon: 'bi-database',        label: 'إدارة البيانات', active: state.view === 'data' });
+  /* إدارة البيانات لوضع المالك فقط */
+  if (isAdminActive()) {
+    html += navItem({ nav: 'view:data', icon: 'bi-database', label: 'إدارة البيانات', active: state.view === 'data' });
+  }
 
   qs('#sideNav').innerHTML = html;
 }
@@ -831,13 +901,21 @@ function updateDashboard() {
 }
 
 function lockStateChip(r) {
-  if (isResourceLocked(r)) {
-    return `<span class="cat-chip" style="color:#f0b53e;background:rgba(240,181,62,.1);border-color:rgba(240,181,62,.28)"><i class="bi bi-lock-fill" aria-hidden="true"></i>مقفل</span>`;
-  }
   if (isProtected(r)) {
+    if (isResourceLocked(r)) {
+      return `<span class="cat-chip" style="color:#f0b53e;background:rgba(240,181,62,.1);border-color:rgba(240,181,62,.28)"><i class="bi bi-lock-fill" aria-hidden="true"></i>مقفل</span>`;
+    }
     return `<span class="cat-chip" style="color:#4ade80;background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.25)"><i class="bi bi-unlock-fill" aria-hidden="true"></i>مفتوح</span>`;
   }
   return '';
+}
+
+/* أزرار التعديل والحذف — لوضع المالك فقط */
+function adminBtnsHTML() {
+  if (!isAdminActive()) return '';
+  return `
+    <button type="button" data-action="edit" class="icon-btn" aria-label="تعديل" title="تعديل"><i class="bi bi-pencil-square"></i></button>
+    <button type="button" data-action="delete" class="icon-btn hover:!text-[#f4636e]" aria-label="حذف" title="حذف"><i class="bi bi-trash3"></i></button>`;
 }
 
 function cardHTML(r) {
@@ -891,8 +969,7 @@ function cardHTML(r) {
         <div class="flex items-center gap-0.5">
           ${openBtn}
           <button type="button" data-action="copy" class="icon-btn" aria-label="نسخ الرابط" title="نسخ الرابط"><i class="bi bi-clipboard"></i></button>
-          <button type="button" data-action="edit" class="icon-btn" aria-label="تعديل" title="تعديل"><i class="bi bi-pencil-square"></i></button>
-          <button type="button" data-action="delete" class="icon-btn hover:!text-[#f4636e]" aria-label="حذف" title="حذف"><i class="bi bi-trash3"></i></button>
+          ${adminBtnsHTML()}
         </div>
       </div>
       <div class="flex items-center gap-3 text-[10.5px] text-dim">
@@ -932,8 +1009,7 @@ function rowHTML(r) {
               class="icon-btn ${r.favorite ? '!text-accent' : ''}"><i class="bi ${favIcon} text-[13px]"></i></button>
       ${openBtn}
       <button type="button" data-action="copy" class="icon-btn" aria-label="نسخ الرابط" title="نسخ الرابط"><i class="bi bi-clipboard"></i></button>
-      <button type="button" data-action="edit" class="icon-btn" aria-label="تعديل" title="تعديل"><i class="bi bi-pencil-square"></i></button>
-      <button type="button" data-action="delete" class="icon-btn hover:!text-[#f4636e]" aria-label="حذف" title="حذف"><i class="bi bi-trash3"></i></button>
+      ${adminBtnsHTML()}
     </div>
   </div>`;
 }
@@ -1011,6 +1087,7 @@ function renderAll(opts = {}) {
   applyViewVisibility();
   renderSidebar();
   renderLockStatus();
+  renderAdminUI();
   if (state.view === 'library') {
     updateDashboard();
     renderResources(opts);
@@ -1021,6 +1098,7 @@ function renderAll(opts = {}) {
 }
 
 function switchView(v) {
+  if (v === 'data' && !isAdminActive()) v = 'library'; // إدارة البيانات للمالك فقط
   state.view = v;
   renderAll();
   window.scrollTo(0, 0);
@@ -1148,11 +1226,11 @@ function openResourceModal(id = null) {
 }
 
 /* ==========================================================
-   إدارة البيانات
+   إدارة البيانات (للمالك فقط)
    ========================================================== */
 
 function exportData() {
-  const run = () => {
+  requireAdmin(() => {
     const payload = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -1167,13 +1245,7 @@ function exportData() {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     showToast('تم تصدير نسخة احتياطية JSON بنجاح.', 'success');
-  };
-  if (lockedCount() > 0) {
-    pendingSecureAction = { run };
-    openLockModal({ adminMode: true });
-    return;
-  }
-  run();
+  });
 }
 
 function validateBackupPayload(data) {
@@ -1204,48 +1276,52 @@ function validateBackupPayload(data) {
 
 function importData(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    let data;
-    try { data = JSON.parse(reader.result); }
-    catch {
-      showToast('فشل الاستيراد: الملف ليس JSON صالحًا.', 'error', { duration: 6000 });
-      return;
-    }
-    const result = validateBackupPayload(data);
-    if (!result.ok) {
-      showToast('فشل الاستيراد: ' + result.error, 'error', { duration: 7000 });
-      return;
-    }
-    openConfirm({
-      title: 'استيراد واستبدال البيانات',
-      message: `تم التحقق من الملف: ${result.resources.length} مورد سليم. سيتم استبدال مواردك الحالية (${state.resources.length} مورد) بالكامل. لا يمكن التراجع بعد التأكيد.`,
-      confirmLabel: 'استبدال البيانات',
-      danger: true,
-      onConfirm() {
-        state.resources = result.resources;
-        saveResources();
-        switchView('library');
-        showToast(`تم استيراد ${result.resources.length} مورد بنجاح.`, 'success');
+  requireAdmin(() => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); }
+      catch {
+        showToast('فشل الاستيراد: الملف ليس JSON صالحًا.', 'error', { duration: 6000 });
+        return;
       }
-    });
-  };
-  reader.onerror = () => showToast('تعذّر قراءة الملف.', 'error');
-  reader.readAsText(file);
+      const result = validateBackupPayload(data);
+      if (!result.ok) {
+        showToast('فشل الاستيراد: ' + result.error, 'error', { duration: 7000 });
+        return;
+      }
+      openConfirm({
+        title: 'استيراد واستبدال البيانات',
+        message: `تم التحقق من الملف: ${result.resources.length} مورد سليم. سيتم استبدال مواردك الحالية (${state.resources.length} مورد) بالكامل. لا يمكن التراجع بعد التأكيد.`,
+        confirmLabel: 'استبدال البيانات',
+        danger: true,
+        onConfirm() {
+          state.resources = result.resources;
+          saveResources();
+          switchView('library');
+          showToast(`تم استيراد ${result.resources.length} مورد بنجاح.`, 'success');
+        }
+      });
+    };
+    reader.onerror = () => showToast('تعذّر قراءة الملف.', 'error');
+    reader.readAsText(file);
+  });
 }
 
 function restoreInitialResources() {
-  openConfirm({
-    title: 'استرجاع الموارد الأصلية',
-    message: `سيتم حذف جميع بياناتك الحالية (${state.resources.length} مورد) نهائيًا واستبدالها بالـ30 مورد الأصلية. يُنصح بتصدير نسخة احتياطية قبل المتابعة. هل أنت متأكد؟`,
-    confirmLabel: 'نعم، استرجاع البيانات الأصلية',
-    danger: true,
-    onConfirm() {
-      state.resources = cloneInitial();
-      saveResources();
-      switchView('library');
-      showToast('تمت استعادة الـ30 مورد الأصلية.', 'success');
-    }
+  requireAdmin(() => {
+    openConfirm({
+      title: 'استرجاع الموارد الأصلية',
+      message: `سيتم حذف جميع بياناتك الحالية (${state.resources.length} مورد) نهائيًا واستبدالها بالـ30 مورد الأصلية. يُنصح بتصدير نسخة احتياطية قبل المتابعة. هل أنت متأكد؟`,
+      confirmLabel: 'نعم، استرجاع البيانات الأصلية',
+      danger: true,
+      onConfirm() {
+        state.resources = cloneInitial();
+        saveResources();
+        switchView('library');
+        showToast('تمت استعادة الـ30 مورد الأصلية.', 'success');
+      }
+    });
   });
 }
 
@@ -1280,7 +1356,7 @@ function wireEvents() {
   qs('#menuBtn').addEventListener('click', openDrawer);
   qs('#closeSidebarBtn').addEventListener('click', closeDrawer);
   qs('#overlay').addEventListener('click', closeDrawer);
-  qs('#addResourceBtn').addEventListener('click', () => openResourceModal());
+  qs('#addResourceBtn').addEventListener('click', () => requireAdmin(() => openResourceModal()));
   qs('#quickExportBtn').addEventListener('click', exportData);
 
   matchMedia('(min-width: 1024px)').addEventListener('change', (mq) => { if (mq.matches) closeDrawer(); });
@@ -1372,10 +1448,10 @@ function wireEvents() {
         else copyResourceUrl(id, actionEl);
         break;
       case 'edit':
-        openResourceModal(id);
+        requireAdmin(() => openResourceModal(id));
         break;
       case 'delete':
-        deleteResource(id);
+        requireAdmin(() => deleteResource(id));
         break;
     }
   });
@@ -1445,9 +1521,7 @@ function wireEvents() {
   qs('#confirmCancel').addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
   qs('#confirmModal [data-close-confirm]').addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
 
-  /* ----- القفل: توزيع أحداث على مستوى الصفحة كلها -----
-     مفيش ربط مباشر بنافذة معينة — أي submit لأي form اسمه lockForm
-     وأي كليك على زرار الفتح جوه نافذة القفل يوصل هنا. مستحيل يضيع. */
+  /* ----- القفل: توزيع أحداث على مستوى الصفحة ----- */
   document.addEventListener('submit', (e) => {
     if (e.target && e.target.id === 'lockForm') {
       e.preventDefault();
@@ -1479,6 +1553,18 @@ function wireEvents() {
     lockAll();
     renderAll();
     showToast('تمت إعادة قفل كل كورسات Google Drive.', 'info');
+  });
+
+  /* ----- دخول / خروج المالك ----- */
+  qs('#adminChip').addEventListener('click', () => {
+    if (isAdminActive()) {
+      setAdminMode(false);
+      if (state.view === 'data') state.view = 'library';
+      renderAll();
+      showToast('تم الخروج من وضع المالك — العودة لوضع الزائر.', 'info');
+    } else {
+      openLockModal({ mode: 'login' });
+    }
   });
 
   qs('#lockPassword').addEventListener('input', hideLockError);
@@ -1536,7 +1622,7 @@ function wireEvents() {
    ========================================================== */
 
 function init() {
-  ensureLockDOM(); // نافذة قفل نظيفة واحدة + زر قفل واحد — مهما كان وضع الـHTML
+  ensureLockDOM();
 
   qs('#f-category').insertAdjacentHTML('beforeend',
     CATEGORIES.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(''));
