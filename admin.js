@@ -1,14 +1,15 @@
 /* ==========================================================
-   admin.js — v15.1
+   admin.js — v16
    لوحة إدارة Nexora: الطلاب + الاشتراكات + حالة الدفع
+   ✅ v16: إصلاح watchAdminGuard + قراءة الكتالوج من Firestore
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Admin — v15.1 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Admin — v16 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
-  const firebaseConfig = {
+  const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
     projectId: "gymzone-f53f1",
@@ -17,23 +18,29 @@
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
 
-  /* تهيئة آمنة — متكررة لو cloud.js أو student.js مهيئينها قبل كده */
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  const PAID_CATALOG = {
-    'frontend-diploma':  'Frontend Diploma',
-    'backend-course':    'Backend Course',
-    'uiux-course':       'UI/UX Course',
-    'mobile-app-course': 'Mobile App Course',
-    'data-diploma':      'Data Analysis Diploma',
-    'ai-ds-ml':          'AI / Data Science / ML',
-    'cyber-course':      'Cyber Security Course',
-    'media-buying':      'Media Buying Course',
-    'fullstack-diploma': 'Full Stack Diploma',
-    'git-github':        'Git & GitHub'
-  };
+  /* ✅ الكتالوج بقى ييجي من Firestore */
+  function getCatalogMap() {
+    const src = window.__NEXORA_CATALOG__ || { courses: [] };
+    const map = {};
+    (src.courses || []).forEach((c) => {
+      if (c && c.id && c.title) map[c.id] = c.title;
+    });
+    return map;
+  }
+  let PAID_CATALOG = getCatalogMap();
+
+  window.addEventListener('nexora:catalog-ready', () => {
+    PAID_CATALOG = getCatalogMap();
+    console.info('[ADMIN] تم تحديث الكتالوج من Firestore:', Object.keys(PAID_CATALOG).length);
+    renderAdmin();
+  });
+  window.addEventListener('nexora:catalog-update', () => {
+    PAID_CATALOG = getCatalogMap();
+  });
 
   const PHONE = '01096295395';
   const qs  = (s) => document.querySelector(s);
@@ -42,22 +49,20 @@
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('ar-EG-u-nu-latn') : '—';
 
-  /* ---------- الحالة ---------- */
   const adminState = {
     students: [],
     enrollments: [],
     filter: ''
   };
 
-  /* ---------- أنماط ---------- */
   const STYLES = `
 .admin-wrap{max-width:1100px;margin:0 auto}
-.admin-tabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:2px}
-.admin-tab{white-space:nowrap;padding:10px 18px;border-radius:12px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+.admin-tabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.admin-tab{white-space:nowrap;padding:10px 18px;border-radius:12px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation}
 .admin-tab:hover{color:var(--ink,#ececf1)}
 .admin-tab.active{background:linear-gradient(135deg,#f0b53e,#e8961e);border-color:transparent;color:#161204}
 .admin-panel{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:20px;margin-bottom:16px}
-.admin-h{font-size:14.5px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.admin-h{font-size:14.5px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .admin-search{width:100%;height:44px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);border-radius:12px;color:var(--ink,#ececf1);font-size:13.5px;padding:0 14px;font-family:inherit;margin-bottom:14px}
 .admin-search:focus{outline:none;border-color:rgba(240,181,62,.5)}
 .stu-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:13px 14px;border:1px solid var(--edge,#212129);border-radius:14px;margin-bottom:10px;background:var(--bg,#0a0a0d)}
@@ -66,13 +71,13 @@
 .stu-name{font-size:13.5px;font-weight:700}
 .stu-meta{font-size:11px;color:var(--mut,#9c9cab);margin-top:2px;direction:ltr;text-align:right}
 .stu-count{font-size:11px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);padding:3px 10px;border-radius:999px}
-.stu-manage{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.stu-manage{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .enr-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:14px;border:1px solid var(--edge,#212129);border-radius:14px;margin-bottom:12px;background:var(--bg,#0a0a0d)}
 .enr-fld{display:flex;flex-direction:column;gap:5px}
 .enr-fld label{font-size:10.5px;color:var(--mut,#9c9cab);font-weight:600}
 .enr-fld select,.enr-fld input{height:40px;background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:10px;color:var(--ink,#ececf1);font-size:12.5px;padding:0 10px;font-family:inherit}
 .enr-fld select:focus,.enr-fld input:focus{outline:none;border-color:rgba(240,181,62,.5)}
-.enr-btn{height:40px;padding:0 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.enr-btn{height:40px;padding:0 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .enr-btn.danger{background:rgba(229,72,77,.15);border:1px solid rgba(229,72,77,.4);color:#f4636e}
 .enr-status{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px}
 .enr-status.active{color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
@@ -85,6 +90,8 @@
   .enr-fld{flex:1 1 100%}
   .enr-btn{width:100%}
   .stu-row{align-items:flex-start}
+  .stu-info{min-width:0}
+  .stu-manage{width:100%;justify-content:center}
 }
 `;
 
@@ -103,7 +110,7 @@
     section.id = 'view-admin';
     section.className = 'hidden';
     section.setAttribute('aria-label', 'لوحة الإدارة');
-    section.innerHTML = `<div class="admin-wrap" id="adminInner"></div>`;
+    section.innerHTML = '<div class="admin-wrap" id="adminInner"></div>';
     main.appendChild(section);
   }
 
@@ -183,6 +190,9 @@
         <p class="enr-meta" style="flex-basis:100%">مسجّل: ${fmtDate(e.enrolledAt)}</p>
       </div>`).join('');
 
+    const courseOpts = Object.entries(PAID_CATALOG).map(([id, t]) =>
+      `<option value="${esc(id)}">${esc(t)}</option>`).join('');
+
     return `
     <div class="admin-panel" data-student-panel="${esc(s.uid)}" style="display:none">
       <h3 class="admin-h"><i class="bi bi-mortarboard"></i>اشتراكات ${esc(s.name || 'الطالب')} <span class="stu-meta" dir="ltr">(${esc(s.phone)})</span></h3>
@@ -192,7 +202,7 @@
         <div class="enr-fld" style="flex:1;min-width:200px">
           <label>إضافة اشتراك جديد — الكورس</label>
           <select id="newEnrCourse-${esc(s.uid)}">
-            ${Object.entries(PAID_CATALOG).map(([id, t]) => `<option value="${esc(id)}">${esc(t)}</option>`).join('')}
+            ${courseOpts}
           </select>
         </div>
         <div class="enr-fld">
@@ -252,13 +262,12 @@
         : '<p class="admin-empty">مفيش طلاب لسه.</p>'}
     </div>`;
 
-    /* الأحداث */
-    qs('#adminSearch').addEventListener('input', debounceAdmin((e) => {
+    const searchEl = qs('#adminSearch');
+    if (searchEl) searchEl.addEventListener('input', debounceAdmin((e) => {
       adminState.filter = e.target.value;
       renderAdmin();
       const inp = qs('#adminSearch');
-      inp.focus();
-      inp.setSelectionRange(inp.value.length, inp.value.length);
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     }, 300));
 
     qsa('[data-admin-tab]').forEach((t) => t.addEventListener('click', () => {
@@ -290,12 +299,11 @@
 
   /* ---------- عمليات الاشتراكات ---------- */
   async function addEnrollment(uid) {
-    const courseId = qs(`#newEnrCourse-${uid}`).value;
-    const paymentType = qs(`#newEnrPay-${uid}`).value;
-    const paymentStatus = qs(`#newEnrStatus-${uid}`).value;
-    const expiresAt = qs(`#newEnrExp-${uid}`).value || null;
+    const courseId = qs(`#newEnrCourse-${uid}`)?.value;
+    const paymentType = qs(`#newEnrPay-${uid}`)?.value;
+    const paymentStatus = qs(`#newEnrStatus-${uid}`)?.value;
+    const expiresAt = qs(`#newEnrExp-${uid}`)?.value || null;
 
-    /* منع التكرار: اشتراك فعّال لنفس الطالب في نفس الكورس */
     const dup = adminState.enrollments.find(
       (e) => e.userId === uid && e.courseId === courseId && e.status === 'active'
     );
@@ -316,7 +324,7 @@
         paidInstallments: paymentType === 'installment' ? 1 : 0,
         notes: ''
       });
-      console.info('[ADMIN] ✅ الاشتراك اتفعّل — هيوصل للطالب خلال ثواني');
+      console.info('[ADMIN] ✅ الاشتراك اتفعّل');
       await loadAll();
     } catch (e) {
       console.error('[ADMIN]', e.code);
@@ -354,7 +362,7 @@
     }
   }
 
-  /* ---------- بند القايمة + العرض (للمالك فقط) ---------- */
+  /* ---------- بند القايمة ---------- */
   function ensureNavEntry() {
     const nav = qs('#sideNav');
     if (!nav || qs('[data-nav="view:admin"]')) return;
@@ -369,55 +377,70 @@
     dataBtn.after(btn);
   }
 
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-nav="view:admin"]');
-    if (!b) return;
-    e.stopPropagation();
-    e.preventDefault();
-    if (!(window.MCL && MCL.isAdminActive())) return;
-    qsa('main#content > section:not(#view-admin)').forEach((s) => s.classList.add('hidden'));
-    qs('#view-admin')?.classList.remove('hidden');
-    qs('#pageTitle').textContent = 'لوحة الإدارة';
-    qs('#pageSub').textContent = 'الطلاب والاشتراكات والدفع';
-    window.scrollTo(0, 0);
-    loadAll();
-    qs('#sidebar')?.classList.remove('open');
-    qs('#overlay')?.classList.add('hidden');
-  }, true);
-
-   /* ---------- تشغيل ---------- */
-  ensureAdminDOM();
-  ensureNavEntry();
-  if (!window.__admSidebarHooked) {
-    const orig = window.renderSidebar;
-    if (typeof orig === 'function') {
-      window.__admSidebarHooked = true;
-      window.renderSidebar = function () {
-        orig();
-        ensureNavEntry();
-      };
-    }
-  }
-  auth.onAuthStateChanged((user) => { if (user) ensureNavEntry(); });{
-    window.renderSidebar = function () {
-      origRenderSidebar();
-      ensureNavEntry();
-    };
+  /* ✅ listener على #sideNav بس */
+  function bindAdminNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__adminNavBound) return;
+    nav.__adminNavBound = true;
+    nav.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav="view:admin"]');
+      if (!b) return;
+      e.preventDefault();
+      if (!(window.MCL && MCL.isAdminActive())) return;
+      qsa('main#content > section:not(#view-admin)').forEach((s) => s.classList.add('hidden'));
+      const v = qs('#view-admin'); if (v) v.classList.remove('hidden');
+      const pt = qs('#pageTitle'); if (pt) pt.textContent = 'لوحة الإدارة';
+      const ps = qs('#pageSub');  if (ps) ps.textContent = 'الطلاب والاشتراكات والدفع';
+      window.scrollTo(0, 0);
+      loadAll();
+      const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
+      const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
+    });
   }
 
-  /* ---------- حماية عرض اللوحة: امسح المحتوى لو وضع المالك اتقفل ---------- */
-  setInterval(() => {
-    const sec = qs('#view-admin');
-    if (sec && window.MCL && !MCL.isAdminActive()) {
-      const inner = qs('#adminInner');
-      if (inner && inner.innerHTML.length > 50) {
-        inner.innerHTML = '<p class="admin-empty">اللوحة متاحة لوضع المالك فقط — ادخل من 🛡️ فوق.</p>';
+  /* ✅ حماية: قفل الأدمن لما المستخدم يخرج من Firebase */
+  function watchAdminGuard() {
+    auth.onAuthStateChanged((user) => {
+      if (!user && window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive()) {
+        try {
+          sessionStorage.removeItem('my-course-library:admin');
+          console.info('[ADMIN] تم قفل وضع المالك تلقائيًا (خروج Firebase)');
+        } catch (e) { /* تجاهل */ }
       }
-    }
-  }, 3000);
+    });
+  }
 
   /* ---------- تشغيل ---------- */
-  ensureAdminDOM();
-  ensureNavEntry();
-  auth.onAuthStateChanged((user) => { if (user) ensureNavEntry(); });
+  function boot() {
+    ensureAdminDOM();
+    watchAdminGuard();
+    ensureNavEntry();
+    bindAdminNav();
+
+    let waited = 0;
+    const readyTimer = setInterval(() => {
+      waited++;
+      const ready = typeof window.renderSidebar === 'function' && qs('#sideNav')?.children.length;
+      if (ready || waited > 100) {
+        clearInterval(readyTimer);
+        ensureNavEntry();
+        bindAdminNav();
+        if (!window.__admSidebarHooked && typeof window.renderSidebar === 'function') {
+          const orig = window.renderSidebar;
+          window.__admSidebarHooked = true;
+          window.renderSidebar = function () {
+            orig();
+            ensureNavEntry();
+            bindAdminNav();
+          };
+        }
+      }
+    }, 100);
+
+    auth.onAuthStateChanged((user) => {
+      if (user) { ensureNavEntry(); bindAdminNav(); }
+    });
+  }
+
+  boot();
 })();

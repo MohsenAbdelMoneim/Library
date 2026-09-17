@@ -1,7 +1,8 @@
 /* ==========================================================
-   My Course Library — app.js (v15)
-   نواة المكتبة — الحماية في gate.js — المزامنة السحابية في cloud.js
-   كتالوج الكورسات المدفوعة + الباقات + الأسعار
+   My Course Library — app.js (v17)
+   نواة المكتبة — الحماية في gate.js — المزامنة في cloud.js
+   ✅ v17: الكتالوج بقى من window.__NEXORA_CATALOG__ (Firestore)
+   ✅ v17: showToast بيتعامل مع #toasts المفقود
    ========================================================== */
 
 'use strict';
@@ -9,35 +10,66 @@
 const STORAGE_KEY = 'my-course-library:resources:v1';
 const SETTINGS_KEY = 'my-course-library:settings:v1';
 
-/* ---------- Nexora: نظام الكورسات المجانية والمدفوعة ---------- */
-const CATALOG_KEY = 'nexora:catalog:v1';
-const PACKAGES_KEY = 'nexora:packages:v1';
+/* ---------- Nexora: الكتالوج من Firestore ---------- */
+function getCatalogSource() {
+  return window.__NEXORA_CATALOG__ || {
+    courses: [], packages: [], byId: {}, packById: {}
+  };
+}
 
-/* الكورسات المدفوعة بالأسعار الرسمية — متغيرش أي رقم */
-const PAID_CATALOG = [
-  { id: 'frontend-diploma',   title: 'Frontend Diploma',        category: 'Frontend',      accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تعلم تطوير واجهات المواقع باحتراف من الصفر للاحتراف.' },
-  { id: 'backend-course',     title: 'Backend Course',          category: 'Backend',       accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'ابنِ الخدمات الخلفية وقواعد البيانات باحتراف.' },
-  { id: 'uiux-course',        title: 'UI/UX Course',            category: 'UI/UX',         accessType: 'paid', cashPrice: 1500, installmentAmount: 400,  installmentCount: 4, installmentTotal: 1600, description: 'تصميم تجارب وواجهات استخدام عصرية.' },
-  { id: 'mobile-app-course',  title: 'Mobile App Course',       category: 'Mobile App',    accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تطوير تطبيقات الموبايل خطوة بخطوة.' },
-  { id: 'data-diploma',       title: 'Data Analysis Diploma',   category: 'Data Analysis', accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تحليل البيانات واتخاذ القرار بالأرقام.' },
-  { id: 'ai-ds-ml',           title: 'AI / Data Science / ML',  category: 'AI',            accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'الذكاء الاصطناعي وعلم البيانات وتعلم الآلة.' },
-  { id: 'cyber-course',       title: 'Cyber Security Course',   category: 'Cyber Security',accessType: 'paid', cashPrice: 2999, installmentAmount: 775,  installmentCount: 4, installmentTotal: 3100, description: 'أساسيات وعمق الأمن السيبراني.' },
-  { id: 'media-buying',       title: 'Media Buying Course',     category: 'Other',         accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'الإعلانات الممولة وإدارة الحملات.' },
-  { id: 'fullstack-diploma',  title: 'Full Stack Diploma',      category: 'Full Stack',    accessType: 'paid', cashPrice: 4500, installmentAmount: 1150, installmentCount: 4, installmentTotal: 4600, description: 'الواجهة والخلفية في دبلومة واحدة شاملة.' }
-];
+/* ✅ wrapper يبني PAID_CATALOG و PACKAGES بنفس شكل app.js القديم */
+let PAID_CATALOG = [];
+let PACKAGES = [];
 
-/* الباقات الرسمية — متغيرش أي رقم */
-const PACKAGES = [
-  { id: 'starter-pack',      title: 'Starter Pack',      courseIds: ['frontend-diploma','uiux-course'],              cashPrice: 3500, installmentAmount: 875,  installmentCount: 4, installmentTotal: 3500,  featured: false },
-  { id: 'developer-pack',    title: 'Developer Pack',    courseIds: ['frontend-diploma','backend-course','uiux-course','git-github'], cashPrice: 6000, installmentAmount: 1500, installmentCount: 4, installmentTotal: 6000,  featured: false },
-  { id: 'professional-pack', title: 'Professional Pack', courseIds: ['frontend-diploma','backend-course','mobile-app-course','data-diploma','uiux-course','media-buying'], cashPrice: 7999, installmentAmount: 2000, installmentCount: 4, installmentTotal: 8000,  featured: false },
-  { id: 'tech-master-pack',  title: 'Tech Master Pack',  courseIds: ['frontend-diploma','backend-course','fullstack-diploma','mobile-app-course','data-diploma','ai-ds-ml','cyber-course','uiux-course','media-buying'], cashPrice: 9999, installmentAmount: 2500, installmentCount: 4, installmentTotal: 10000, featured: true }
-];
+function rebuildCatalogFromFirestore() {
+  const src = getCatalogSource();
+  PAID_CATALOG = (src.courses || []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    category: c.category || '',
+    accessType: c.accessType || 'paid',
+    cashPrice: c.cashPrice,
+    installmentAmount: c.installmentAmount,
+    installmentCount: c.installmentCount,
+    installmentTotal: c.installmentTotal,
+    description: c.description || ''
+  }));
 
+  PACKAGES = (src.packages || []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    courseIds: p.courseIds || [],
+    cashPrice: p.cashPrice,
+    installmentAmount: p.installmentAmount,
+    installmentCount: p.installmentCount,
+    installmentTotal: p.installmentTotal,
+    featured: !!p.featured
+  }));
+}
+
+/* نسخة أولية من البيانات */
+rebuildCatalogFromFirestore();
+
+/* ✅ نعيد البناء لما Firestore يجيب البيانات */
+window.addEventListener('nexora:catalog-ready', () => {
+  rebuildCatalogFromFirestore();
+  console.info('[APP] تم تحديث الكتالوج من Firestore:', PAID_CATALOG.length, 'كورس،', PACKAGES.length, 'باقة');
+  if (typeof renderAll === 'function') renderAll();
+});
+
+window.addEventListener('nexora:catalog-update', () => {
+  rebuildCatalogFromFirestore();
+});
+
+/* ---------- أدوات الكتالوج ---------- */
 const fmtEGP = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
-function getPaidCourse(id) { return PAID_CATALOG.find((c) => c.id === id) || null; }
+
+function getPaidCourse(id) {
+  return PAID_CATALOG.find((c) => c.id === id) || null;
+}
+
 function renderPriceBlock(c, compact) {
-  if (c.accessType !== 'paid') return '';
+  if (!c || c.accessType !== 'paid') return '';
   const cash = `
     <div class="price-cash">
       <span class="price-label">دفع كاش</span>
@@ -769,7 +801,14 @@ function showToast(message, type = 'success', { duration = 3800, action = null }
   const actBtn = el.querySelector('.toast-action');
   if (actBtn) actBtn.addEventListener('click', () => { clearTimeout(timer); remove(); action.onClick(); });
 
-  const box = qs('#toasts');
+  let box = qs('#toasts');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toasts';
+    box.className = 'fixed bottom-4 left-4 right-4 sm:right-auto z-[70] flex flex-col gap-2 w-auto sm:w-[330px] sm:max-w-[calc(100vw-2rem)]';
+    box.setAttribute('aria-live', 'polite');
+    document.body.appendChild(box);
+  }
   box.appendChild(el);
   while (box.children.length > 4) box.firstElementChild.remove();
 }
@@ -1185,9 +1224,8 @@ function wireEvents() {
 
 /* ---------- الإقلاع ---------- */
 function init() {
-  console.log('%c My Course Library — v15 ', 'background:#f0b53e;color:#161204;font-weight:bold');
+  console.log('%c My Course Library — v17 ', 'background:#f0b53e;color:#161204;font-weight:bold');
 
-  /* فحص التكامل مع gate.js */
   const required = ['isAdminActive', 'isProtected', 'isResourceLocked',
                     'requireAdmin', 'requireUnlock', 'loadSubscriptions',
                     'openLockModal', 'closeLockModal'];
@@ -1200,7 +1238,6 @@ function init() {
     showToast('خطأ: gate.js ناقص أو قديم — حدّث الملفات على نفس الرقم.', 'error', { duration: 10000 });
   }
 
-  /* ربط الواجهتين */
   MCL.getCourses = () => [...new Set(state.resources.filter((r) => r.source === 'Google Drive').map((r) => r.title))];
   MCL.getView = () => state.view;
   MCL.renderAll = renderAll;
@@ -1208,15 +1245,15 @@ function init() {
     if (view === 'subs' && typeof window.renderSubsViewGate === 'function') window.renderSubsViewGate();
   };
 
-  /* تطبيق الكورسات القادمة من السحابة */
   window.__applyCloudResources = (arr) => { state.resources = arr; renderAll(); };
+  window.__nexoraState = state;
 
   const fp = qs('footer p');
   if (fp && !qs('#mclVersionBadge')) {
     const b = document.createElement('span');
     b.id = 'mclVersionBadge';
     b.className = 'text-accent font-mono';
-    b.textContent = ' — v15';
+    b.textContent = ' — v17';
     fp.appendChild(b);
   }
 
@@ -1229,9 +1266,6 @@ function init() {
   switchView('library');
   if (!missing.length) {
     MCL.loadSubscriptions();
-    if (protectedResources().length && !MCL.isAdminActive() && !MCL.getSubscriberPhone()) {
-      MCL.openLockModal({ mode: 'gate' });
-    }
   }
 }
 

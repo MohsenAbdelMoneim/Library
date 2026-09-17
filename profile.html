@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="description" content="الملف الشخصي — Nexora Academy">
+  <title>الملف الشخصي — Nexora Academy</title>
+  <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <style>
+    :root {
+      --bg: #0a0a0d; --panel: #101015; --raise: #16161d;
+      --edge: #212129; --edge2: #2e2e39;
+      --ink: #ececf1; --mut: #9c9cab; --dim: #66666f;
+      --accent: #f0b53e; --accent2: #f7c85f;
+      --blue: #4f7cff; --purple: #7c5cff;
+      --green: #4ade80; --red: #e5484d;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'IBM Plex Sans Arabic', sans-serif;
+      background: var(--bg); color: var(--ink);
+      min-height: 100vh; overflow-x: clip; line-height: 1.6;
+      background-image:
+        radial-gradient(1000px 600px at 85% -5%, rgba(79,124,255,.15), transparent 55%),
+        radial-gradient(800px 500px at 5% 30%, rgba(124,92,255,.10), transparent 55%),
+        radial-gradient(900px 500px at 50% 105%, rgba(240,181,62,.08), transparent 55%);
+      background-attachment: fixed;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    img, svg { max-width: 100%; height: auto; display: block; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,13,.85);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--edge);
+    }
+    .navbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 24px;
+      height: 64px; display: flex; align-items: center; gap: 16px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-size: 18px;
+      box-shadow: 0 6px 18px rgba(79,124,255,.35);
+    }
+    .logo-text h1 {
+      font-size: 14.5px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
+    .nav-links { display: none; gap: 4px; margin-inline-start: 20px; }
+    .nav-links a {
+      padding: 8px 14px; border-radius: 10px;
+      font-size: 13px; color: var(--mut); transition: .15s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); background: var(--raise); }
+    .nav-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+    .btn-login {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; font-size: 12.5px; font-weight: 700; transition: .15s;
+    }
+    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-menu {
+      display: grid; place-items: center;
+      width: 38px; height: 38px; border-radius: 10px;
+      border: 1px solid var(--edge); color: var(--mut);
+    }
+    .mobile-menu {
+      display: none; border-top: 1px solid var(--edge); background: var(--panel);
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 24px; font-size: 13.5px; color: var(--mut);
+      border-bottom: 1px solid var(--edge);
+    }
+    .mobile-menu a:hover { color: var(--ink); background: var(--raise); }
+    @media (min-width: 900px) {
+      .nav-links { display: flex; }
+      .btn-menu { display: none; }
+    }
+
+    /* Main */
+    main { padding: 40px 0 60px; }
+
+    /* Loading State */
+    .loading-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .loading-state i {
+      font-size: 32px;
+      display: block;
+      margin-bottom: 12px;
+      color: var(--blue);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Guest State */
+    .guest-state {
+      text-align: center;
+      padding: 80px 20px;
+      background: rgba(16,16,21,.6);
+      border: 1px dashed var(--edge2);
+      border-radius: 22px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .guest-state .gi {
+      font-size: 52px;
+      margin-bottom: 16px;
+    }
+    .guest-state h2 {
+      font-size: 22px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+    .guest-state p {
+      color: var(--mut);
+      font-size: 14px;
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+
+    /* Profile Hero */
+    .profile-hero {
+      background: linear-gradient(135deg, rgba(79,124,255,.15), rgba(124,92,255,.15));
+      border: 1px solid rgba(79,124,255,.3);
+      border-radius: 24px;
+      padding: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .profile-avatar {
+      width: 88px; height: 88px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center;
+      font-size: 34px;
+      font-weight: 900;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(79,124,255,.4);
+      flex-shrink: 0;
+    }
+    .profile-info {
+      flex-grow: 1;
+      min-width: 200px;
+    }
+    .profile-info h1 {
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+    .profile-info .phone {
+      font-size: 13.5px;
+      color: var(--mut);
+      font-family: 'IBM Plex Mono', monospace;
+      direction: ltr;
+      margin-bottom: 12px;
+    }
+    .profile-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .badge-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: rgba(74,222,128,.1);
+      border: 1px solid rgba(74,222,128,.3);
+      color: var(--green);
+    }
+    .badge-chip.warn {
+      background: rgba(240,181,62,.1);
+      border-color: rgba(240,181,62,.3);
+      color: var(--accent);
+    }
+
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-profile {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 44px;
+      padding: 0 20px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: .15s;
+    }
+    .btn-profile.primary {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff;
+    }
+    .btn-profile.primary:hover { transform: translateY(-2px); opacity: .9; }
+    .btn-profile.ghost {
+      border: 1px solid var(--edge2);
+      color: var(--ink);
+    }
+    .btn-profile.ghost:hover { background: var(--raise); border-color: var(--accent); color: var(--accent); }
+    .btn-profile.danger {
+      border: 1px solid rgba(229,72,77,.4);
+      color: #f4636e;
+    }
+    .btn-profile.danger:hover { background: rgba(229,72,77,.12); }
+
+    /* Section */
+    .section-block {
+      margin-bottom: 32px;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .section-head h2 {
+      font-size: 20px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-head h2 i { color: var(--accent); }
+    .section-head .count {
+      font-size: 12px;
+      color: var(--mut);
+      background: var(--raise);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    /* Courses Grid */
+    .courses-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .course-item {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: .2s;
+    }
+    .course-item:hover {
+      transform: translateY(-4px);
+      border-color: rgba(79,124,255,.5);
+      box-shadow: 0 12px 30px rgba(0,0,0,.3);
+    }
+    .course-status {
+      align-self: flex-start;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(74,222,128,.1);
+      border: 1px solid rgba(74,222,128,.3);
+      color: var(--green);
+    }
+    .course-status.done {
+      background: rgba(240,181,62,.1);
+      border-color: rgba(240,181,62,.3);
+      color: var(--accent);
+    }
+    .course-item h3 {
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.4;
+    }
+    .course-item .cat {
+      font-size: 11.5px;
+      color: var(--mut);
+    }
+    .course-item .cta {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--edge);
+      display: flex;
+      gap: 8px;
+    }
+    .btn-course {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 40px;
+      border-radius: 11px;
+      font-size: 12.5px;
+      font-weight: 700;
+      transition: .15s;
+    }
+    .btn-course.open {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff;
+    }
+    .btn-course.open:hover { opacity: .9; }
+    .btn-course.info {
+      background: rgba(79,124,255,.12);
+      border: 1px solid rgba(79,124,255,.35);
+      color: #7ea2ff;
+    }
+    .btn-course.info:hover { background: rgba(79,124,255,.22); }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      background: rgba(16,16,21,.6);
+      border: 1px dashed var(--edge2);
+      border-radius: 20px;
+    }
+    .empty-state .ei {
+      font-size: 48px;
+      margin-bottom: 14px;
+    }
+    .empty-state h3 {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .empty-state p {
+      font-size: 13px;
+      color: var(--mut);
+      line-height: 1.8;
+      margin-bottom: 20px;
+    }
+
+    /* Stats Row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .stat-mini {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+    }
+    .stat-mini .num {
+      font-size: 26px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--blue), var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-mini .lbl {
+      font-size: 11.5px;
+      color: var(--mut);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--edge);
+      padding: 40px 0 24px; margin-top: 60px;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 32px; margin-bottom: 32px;
+    }
+    .footer h4 {
+      font-size: 13px; font-weight: 800; margin-bottom: 14px; color: var(--ink);
+    }
+    .footer ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .footer ul a { font-size: 12.5px; color: var(--mut); transition: .15s; }
+    .footer ul a:hover { color: var(--accent); }
+    .footer-bottom {
+      border-top: 1px solid var(--edge);
+      padding-top: 24px; text-align: center;
+      color: var(--dim); font-size: 11.5px; line-height: 1.8;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 0 18px; }
+      main { padding: 24px 0 40px; }
+      .profile-hero { padding: 22px; gap: 16px; }
+      .profile-avatar { width: 70px; height: 70px; font-size: 26px; border-radius: 20px; }
+      .btn-profile { width: 100%; justify-content: center; }
+      .courses-grid { grid-template-columns: 1fr; }
+    }
+
+    .reveal {
+      opacity: 0; transform: translateY(20px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="landing.html" class="logo-wrap">
+        <span class="logo-mark">🎓</span>
+        <div class="logo-text">
+          <h1>Nexora Academy</h1>
+          <p>LEARN · BUILD · GROW</p>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="landing.html">الرئيسية</a>
+        <a href="index.html">الكورسات</a>
+        <a href="about.html">من نحن</a>
+        <a href="contact.html">اتصل بنا</a>
+      </div>
+      <div class="nav-actions">
+        <a href="auth.html" class="btn-login" id="navAuthBtn">
+          <i class="bi bi-person-circle"></i>
+          <span id="navAuthText">تسجيل الدخول</span>
+        </a>
+        <button class="btn-menu" id="menuBtn" aria-label="القائمة"><i class="bi bi-list"></i></button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="landing.html"><i class="bi bi-house"></i>الرئيسية</a>
+      <a href="index.html"><i class="bi bi-mortarboard"></i>الكورسات</a>
+      <a href="about.html"><i class="bi bi-info-circle"></i>من نحن</a>
+      <a href="contact.html"><i class="bi bi-telephone"></i>اتصل بنا</a>
+      <a href="profile.html"><i class="bi bi-person-badge"></i>حسابي</a>
+    </div>
+  </nav>
+
+  <main class="container">
+
+    <!-- Loading -->
+    <div class="loading-state" id="loadingState">
+      <i class="bi bi-arrow-clockwise"></i>
+      جاري تحميل بياناتك…
+    </div>
+
+    <!-- Guest -->
+    <div class="guest-state" id="guestState" style="display:none;">
+      <div class="gi">🔒</div>
+      <h2>لازم تسجّل دخول</h2>
+      <p>عشان تشوف ملفك الشخصي وكورساتك، سجّل دخولك الأول.</p>
+      <a href="auth.html" class="btn-login" style="display:inline-flex;height:48px;padding:0 28px;">
+        <i class="bi bi-person-plus"></i>
+        <span>تسجيل الدخول</span>
+      </a>
+    </div>
+
+    <!-- Profile Content -->
+    <div id="profileContent" style="display:none;">
+      <!-- Hero -->
+      <div class="profile-hero reveal">
+        <div class="profile-avatar" id="pAvatar">؟</div>
+        <div class="profile-info">
+          <h1 id="pName">—</h1>
+          <p class="phone" id="pPhone">—</p>
+          <div class="profile-badges">
+            <span class="badge-chip"><i class="bi bi-patch-check-fill"></i>حساب نشط</span>
+            <span class="badge-chip warn" id="pRole"><i class="bi bi-person"></i>طالب</span>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <a href="index.html" class="btn-profile primary">
+            <i class="bi bi-mortarboard"></i>
+            كورساتي
+          </a>
+          <button class="btn-profile danger" id="logoutBtn">
+            <i class="bi bi-box-arrow-left"></i>
+            خروج
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row reveal" id="statsRow">
+        <div class="stat-mini">
+          <div class="num" id="sEnrolls">0</div>
+          <div class="lbl">كورس مفعّل</div>
+        </div>
+        <div class="stat-mini">
+          <div class="num" id="sOrders">0</div>
+          <div class="lbl">حجز إجمالي</div>
+        </div>
+        <div class="stat-mini">
+          <div class="num" id="sPaths">0</div>
+          <div class="lbl">مسار</div>
+        </div>
+        <div class="stat-mini">
+          <div class="num" id="sDays">0</div>
+          <div class="lbl">يوم معانا</div>
+        </div>
+      </div>
+
+      <!-- Courses -->
+      <div class="section-block reveal">
+        <div class="section-head">
+          <h2><i class="bi bi-book"></i> كورساتي المفعّلة</h2>
+          <span class="count" id="enrollsCount">0 كورس</span>
+        </div>
+        <div class="courses-grid" id="coursesGrid">
+          <!-- تُملأ ديناميكيًا -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="logo-wrap" style="margin-bottom:12px;">
+            <span class="logo-mark">🎓</span>
+            <div class="logo-text">
+              <h1>Nexora Academy</h1>
+              <p>LEARN · BUILD · GROW</p>
+            </div>
+          </div>
+          <p style="font-size:12.5px;color:var(--mut);line-height:1.8;">
+            منصة تعليمية احترافية متخصصة في تعليم مهارات المستقبل.
+          </p>
+        </div>
+        <div>
+          <h4>روابط سريعة</h4>
+          <ul>
+            <li><a href="landing.html">الرئيسية</a></li>
+            <li><a href="index.html">الكورسات</a></li>
+            <li><a href="about.html">من نحن</a></li>
+            <li><a href="contact.html">اتصل بنا</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>حسابي</h4>
+          <ul>
+            <li><a href="auth.html">تسجيل الدخول</a></li>
+            <li><a href="profile.html">الملف الشخصي</a></li>
+            <li><a href="index.html">كورساتي</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>تواصل معنا</h4>
+          <ul>
+            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone"></i> 01096295395</a></li>
+            <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> واتساب</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© <span id="year"></span> Nexora Academy — جميع الحقوق محفوظة</p>
+        <p style="margin-top:4px;">صُنع بـ ❤️ في مصر</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="config.js?v=17"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    /* Mobile Menu */
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (menuBtn && mobileMenu) {
+      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('open'));
+      mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
+    }
+
+    /* Reveal */
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.classList.add('visible');
+          observer.unobserve(entry);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    /* Firebase Init */
+    const cfg = window.__FIREBASE_CONFIG__;
+    if (!cfg) {
+      document.getElementById('loadingState').innerHTML = '<i class="bi bi-exclamation-triangle" style="animation:none;color:var(--red)"></i>خطأ: config.js ناقص';
+    } else {
+      firebase.initializeApp(cfg);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+        (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+      const loadingState = document.getElementById('loadingState');
+      const guestState = document.getElementById('guestState');
+      const profileContent = document.getElementById('profileContent');
+
+      /* Course catalog (from Firestore later) */
+      function getCatalogMap() {
+        const src = window.__NEXORA_CATALOG__ || { courses: [], byId: {} };
+        const map = {};
+        (src.courses || []).forEach(c => { if (c.id) map[c.id] = c; });
+        return map;
+      }
+
+      /* Resolve course link from library resources */
+      function resolveCourseLink(courseId, catalogMap) {
+        const c = catalogMap[courseId];
+        if (!c) return null;
+        const libTitle = (window.__COURSE_LIBRARY_MAP__ || {})[courseId];
+        if (!libTitle) return null;
+        return libTitle;
+      }
+
+      function courseCardHTML(enroll, catalogMap) {
+        const c = catalogMap[enroll.courseId] || { title: enroll.courseId, category: '—' };
+        const done = enroll.progress === 100;
+        return `
+          <article class="course-item">
+            <span class="course-status ${done ? 'done' : ''}">
+              ${done ? 'مكتمل 🏆' : 'متاح ليك ✅'}
+            </span>
+            <h3>${esc(c.title)}</h3>
+            <p class="cat">${esc(c.category || '')}</p>
+            <div class="cta">
+              <a href="index.html" class="btn-course open">
+                <i class="bi bi-play-circle"></i>
+                ابدأ التعلم
+              </a>
+            </div>
+          </article>`;
+      }
+
+      function renderProfile(user, profileData, enrollments, orders) {
+        const catalogMap = getCatalogMap();
+        const firstName = (profileData?.name || user.displayName || 'صديقنا').split(' ')[0];
+        const fullName = profileData?.name || user.displayName || 'مستخدم';
+        const phone = profileData?.phone || (user.email || '').split('@')[0] || '—';
+
+        /* Hero */
+        document.getElementById('pAvatar').textContent = fullName.charAt(0).toUpperCase();
+        document.getElementById('pName').textContent = fullName;
+        document.getElementById('pPhone').textContent = phone;
+
+        /* Stats */
+        const totalEnrolls = enrollments.length;
+        const totalOrders = orders.length;
+        const uniquePaths = 0; /* يمكن حسابه بعدين */
+        const daysSince = profileData?.createdAt
+          ? Math.floor((Date.now() - new Date(profileData.createdAt).getTime()) / 86400000)
+          : 0;
+
+        document.getElementById('sEnrolls').textContent = totalEnrolls;
+        document.getElementById('sOrders').textContent = totalOrders;
+        document.getElementById('sPaths').textContent = uniquePaths || 0;
+        document.getElementById('sDays').textContent = daysSince;
+        document.getElementById('enrollsCount').textContent = totalEnrolls + ' كورس';
+
+        /* Courses */
+        const grid = document.getElementById('coursesGrid');
+        if (enrollments.length) {
+          grid.innerHTML = enrollments.map(e => courseCardHTML(e, catalogMap)).join('');
+        } else {
+          grid.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;">
+              <div class="ei">📚</div>
+              <h3>لسه مفيش كورسات مفعّلة</h3>
+              <p>تصفح الكورسات المتاحة واختار اللي يناسبك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس فورًا.</p>
+              <a href="index.html" class="btn-profile primary" style="display:inline-flex;">
+                <i class="bi bi-compass"></i>
+                تصفح الكورسات
+              </a>
+            </div>`;
+        }
+
+        /* Show content */
+        loadingState.style.display = 'none';
+        guestState.style.display = 'none';
+        profileContent.style.display = 'block';
+
+        /* Nav bar update */
+        const navAuthText = document.getElementById('navAuthText');
+        if (navAuthText) navAuthText.textContent = firstName;
+      }
+
+      /* Logout */
+      document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+        if (!confirm('تسجيل الخروج؟')) return;
+        await auth.signOut();
+        location.href = 'landing.html';
+      });
+
+      /* Auth state */
+      auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+          loadingState.style.display = 'none';
+          guestState.style.display = 'block';
+          profileContent.style.display = 'none';
+          return;
+        }
+
+        try {
+          /* Profile */
+          let profileData = null;
+          try {
+            const doc = await db.collection('students').doc(user.uid).get();
+            if (doc.exists) profileData = doc.data();
+          } catch (e) { console.warn('profile:', e.code); }
+
+          /* Enrollments */
+          let enrollments = [];
+          try {
+            const snap = await db.collection('enrollments')
+              .where('userId', '==', user.uid)
+              .where('status', '==', 'active')
+              .get();
+            enrollments = snap.docs.map(d => d.data());
+          } catch (e) { console.warn('enrollments:', e.code); }
+
+          /* Orders */
+          let orders = [];
+          try {
+            const snap = await db.collection('orders')
+              .where('userId', '==', user.uid)
+              .get();
+            orders = snap.docs.map(d => d.data());
+          } catch (e) { console.warn('orders:', e.code); }
+
+          renderProfile(user, profileData, enrollments, orders);
+        } catch (err) {
+          console.error('profile load:', err);
+          loadingState.innerHTML = '<i class="bi bi-exclamation-triangle" style="animation:none;color:var(--red)"></i>حصل خطأ في التحميل';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

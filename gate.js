@@ -1,21 +1,30 @@
 /* ==========================================================
-   gate.js — v14
+   gate.js — v15.2
    بوابة الحماية + واتساب وفودافون كاش + إدارة المشتركين
    (يوتيوب مفتوح للجميع — Drive للمشتركين فقط)
+   إصلاحات: كلمة السر من config، listener واحد للأحداث، حماية storage
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v15.1 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+  console.log('%c MCL Gate — v15.2 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
   const SUBS_LOCAL_KEY = 'my-course-library:subs-local';
   const SUBS_EXPORTED_KEY = 'my-course-library:subs-exported';
 
+  /* ⚠️ كلمة السر تجي من config.js خارجي — مش في الكود */
+  const ADMIN_PASSWORD = (window.__OWNER_PASSWORD__ || '').trim();
+
+  if (!ADMIN_PASSWORD) {
+    console.warn('[GATE] ⚠️ __OWNER_PASSWORD__ مش محدد في config.js — وضع المالك معطّل.');
+  }
+
   const MCL = window.MCL = {
-    version: '15.1',
-        ADMIN_PASSWORD: '01096295395mo',
+    version: '15.2',
+    get ADMIN_PASSWORD() { return ADMIN_PASSWORD; },
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
     SUBS_URL: 'subscriptions.json',
@@ -48,8 +57,8 @@
   const isEgyptPhone = (v) => /^01\d{9}$/.test(v);
 
   function maskPhone(p) {
-    p = String(p || '');
-    return p.length >= 6 ? p.slice(0, 3) + '••••' + p.slice(-2) : p;
+    const s = String(p || '');
+    return s.length >= 6 ? s.slice(0, 3) + '••••' + s.slice(-2) : s;
   }
 
   function waLink(text) {
@@ -91,25 +100,42 @@
   }
   MCL.emit = emit;
 
+  /* ---------- ✅ تخزين آمن (fallback لمتغيرات الذاكرة) ---------- */
+  function safeSessionGet(key) {
+    try { return sessionStorage.getItem(key); }
+    catch { return null; }
+  }
+  function safeSessionSet(key, val) {
+    try { sessionStorage.setItem(key, val); return true; }
+    catch { return false; }
+  }
+  function safeSessionRemove(key) {
+    try { sessionStorage.removeItem(key); }
+    catch { /* تجاهل */ }
+  }
+
   /* ---------- وضع المالك ---------- */
   let adminMem = false;
   function isAdminActive() {
-    try { return sessionStorage.getItem(ADMIN_KEY) === '1'; } catch { return adminMem; }
+    const s = safeSessionGet(ADMIN_KEY);
+    return s === '1' || adminMem;
   }
   function setAdminMode(on) {
     adminMem = on;
-    try { on ? sessionStorage.setItem(ADMIN_KEY, '1') : sessionStorage.removeItem(ADMIN_KEY); } catch { /* تجاهل */ }
+    if (on) safeSessionSet(ADMIN_KEY, '1');
+    else safeSessionRemove(ADMIN_KEY);
   }
   MCL.isAdminActive = isAdminActive;
 
   /* ---------- المشترك ---------- */
   let subMem = null;
   function getSubscriberPhone() {
-    try { return sessionStorage.getItem(SUBSCRIBER_KEY); } catch { return subMem; }
+    return safeSessionGet(SUBSCRIBER_KEY) || subMem;
   }
   function setSubscriberPhone(p) {
-    subMem = p;
-    try { p ? sessionStorage.setItem(SUBSCRIBER_KEY, p) : sessionStorage.removeItem(SUBSCRIBER_KEY); } catch { /* تجاهل */ }
+    subMem = p || null;
+    if (p) safeSessionSet(SUBSCRIBER_KEY, p);
+    else safeSessionRemove(SUBSCRIBER_KEY);
   }
   MCL.getSubscriberPhone = getSubscriberPhone;
 
@@ -139,16 +165,27 @@
 
   function requireUnlock(r, run) {
     if (!isResourceLocked(r)) { run(); return; }
+
+    /* 1) حساب مسجّل + الكورس ضمن اشتراكاته → افتح */
+    const acc = window.__accountAccess;
+    if (acc && acc.logged && acc.has(r.title)) { run(); return; }
+
+    /* 2) اشتراك بالرقم (النظام القديم) → افتح */
     const p = getSubscriberPhone();
-    if (p && !allowedFor(p, r)) {
-      notify(`«${r.title}» مش ضمن اشتراك رقمك (${maskPhone(p)}).`, 'warn', 6000, {
-        label: 'كلمنا واتساب',
-        onClick() { window.open(waLink(`أهلاً 👋 عايز أضيف كورس «${r.title}» لاشتراكي`), '_blank', 'noopener,noreferrer'); }
-      });
+    if (p && allowedFor(p, r)) { run(); return; }
+
+    /* 3) مش مسجل خالص → صفحة تسجيل الدخول */
+    if (!acc || !acc.logged) {
+      notify('سجّل دخولك أو أنشئ حساب للوصول لكورسات Drive.', 'info', 3500);
+      setTimeout(() => { location.href = 'auth.html'; }, 900);
       return;
     }
-    pendingAction = { run };
-    openLockModal({ mode: 'gate', resource: r });
+
+    /* 4) مسجل بس الكورس مش ضمن اشتراكه → واتساب */
+    notify(`«${r.title}» مش ضمن اشتراكك — كلمنا ونفعّله لحسابك.`, 'warn', 6000, {
+      label: 'واتساب',
+      onClick() { window.open(waLink(`أهلاً 👋 عايز أضيف كورس «${r.title}» لحسابي`), '_blank', 'noopener,noreferrer'); }
+    });
   }
   MCL.requireUnlock = requireUnlock;
 
@@ -162,22 +199,22 @@
 
   /* ---------- أنماط ---------- */
   const STYLES = `
-.lock-chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:10px;font-size:11.5px;font-weight:600;border:1px solid var(--edge,#212129);color:var(--mut,#9c9cab);transition:color .15s,border-color .15s,background .15s;cursor:pointer}
+.lock-chip{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:10px;font-size:11.5px;font-weight:600;border:1px solid var(--edge,#212129);color:var(--mut,#9c9cab);transition:color .15s,border-color .15s,background .15s;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .lock-chip:hover{color:var(--ink,#ececf1);border-color:var(--edge2,#2e2e39)}
 .lock-chip.locked{color:var(--acc,#f0b53e);border-color:rgba(240,181,62,.35);background:rgba(240,181,62,.07)}
 .lock-chip.unlocked{color:#4ade80;border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.07)}
-.lock-overlay{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--acc,#f0b53e);background:rgba(10,10,13,.75);backdrop-filter:blur(4px);border:1px solid rgba(240,181,62,.35);padding:7px 13px;border-radius:999px}
+.lock-overlay{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--acc,#f0b53e);background:rgba(10,10,13,.75);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);border:1px solid rgba(240,181,62,.35);padding:7px 13px;border-radius:999px}
 .shake{animation:shake .4s cubic-bezier(.36,.07,.19,.97)}
 @keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
-.subs-check{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:12px;color:var(--mut,#9c9cab);cursor:pointer;transition:background .15s,color .15s}
+.subs-check{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:12px;color:var(--mut,#9c9cab);cursor:pointer;transition:background .15s,color .15s;touch-action:manipulation}
 .subs-check:hover{background:var(--raise,#16161d);color:var(--ink,#ececf1)}
 .subs-check input{accent-color:#f0b53e;width:14px;height:14px;cursor:pointer}
 .lock-contact{margin-top:14px;padding-top:12px;border-top:1px solid var(--edge,#212129)}
 .lock-contact-title{font-size:11px;color:var(--dim,#66666f);text-align:center;margin-bottom:9px}
-.wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:10px;background:#25D366;color:#04310f;font-size:12px;font-weight:700;transition:background .15s;flex:1;text-decoration:none}
+.wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:10px;background:#25D366;color:#04310f;font-size:12px;font-weight:700;transition:background .15s;flex:1;text-decoration:none;touch-action:manipulation}
 .wa-btn:hover{background:#3ce07e}
 .wa-btn i{font-size:14px}
-.cash-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--edge,#212129);background:var(--bg,#0a0a0d);color:var(--mut,#9c9cab);font-size:11.5px;font-weight:600;transition:color .15s,border-color .15s;cursor:pointer}
+.cash-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--edge,#212129);background:var(--bg,#0a0a0d);color:var(--mut,#9c9cab);font-size:11.5px;font-weight:600;transition:color .15s,border-color .15s;cursor:pointer;touch-action:manipulation;font-family:inherit}
 .cash-btn:hover{color:var(--ink,#ececf1);border-color:var(--edge2,#2e2e39)}
 .cash-btn .num{font-family:'IBM Plex Mono',monospace;direction:ltr}
 `;
@@ -248,6 +285,30 @@
     modal.innerHTML = buildModalHTML();
     document.body.appendChild(modal);
 
+    /* ✅ listener واحد على #lockModal بدل document */
+    modal.addEventListener('submit', (e) => {
+      if (e.target && e.target.id === 'lockForm') {
+        e.preventDefault();
+        handleLockSubmit(e.target);
+      }
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target.closest('#waCopyCash')) { copyText(MCL.CONTACT_PHONE, 'تم نسخ رقم فودافون كاش.'); return; }
+      const submitBtn = e.target.closest('#lockModal button[type="submit"]');
+      if (submitBtn) { e.preventDefault(); handleLockSubmit(submitBtn.closest('form')); return; }
+      if (e.target.closest('#lockModal [data-close-lock]')) { closeLockModal(); return; }
+      if (e.target.closest('#lockToggle')) {
+        const input = qs('#lockPassword');
+        if (!input) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        const ic = qs('#lockToggle i');
+        if (ic) ic.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+        input.focus();
+      }
+    });
+
+    /* شارات الهيدر */
     const host = qs('header .ms-auto') || qs('header');
     if (host) {
       let chip = qs('#lockChip');
@@ -365,7 +426,8 @@
     hideLockError();
     if (typeof window.openModal === 'function') window.openModal(qs('#lockModal'), input);
     else {
-      qs('#lockModal').classList.remove('hidden');
+      const m = qs('#lockModal');
+      if (m) m.classList.remove('hidden');
       document.body.classList.add('overflow-hidden');
       setTimeout(() => input && input.focus(), 60);
     }
@@ -374,11 +436,16 @@
 
   function closeLockModal() {
     if (typeof window.closeModal === 'function') window.closeModal(qs('#lockModal'));
-    else { qs('#lockModal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+    else {
+      const m = qs('#lockModal');
+      if (m) m.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
     pendingAction = null;
     lockMode = null;
     lockResource = null;
   }
+  MCL.closeLockModal = closeLockModal;
 
   function hideLockError() {
     const err = qs('#lockError');
@@ -390,23 +457,25 @@
   function showLockError(msg) {
     const err = qs('#lockError');
     const input = qs('#lockPassword');
-    if (err) {
-      if (msg) err.textContent = msg;
-      err.classList.remove('hidden');
-    }
+    if (err) { if (msg) err.textContent = msg; err.classList.remove('hidden'); }
     if (input) { input.classList.add('invalid'); input.focus(); input.select(); }
     const panel = qs('#lockModal .modal-panel');
     if (panel) { panel.classList.remove('shake'); void panel.offsetWidth; panel.classList.add('shake'); }
   }
 
-  /* ---------- المعالج المركزي: باسورد المالك يُفحص أولًا ----------
-     مهم: الفحص هنا على القيمة الخام، قبل فحص صيغة رقم الموبايل،
-     عشان باسورد المالك اللي فيه حروف يشتغل من أي شاشة. */
+  /* ---------- المعالج المركزي ---------- */
   function handleLockSubmit(form) {
     const input = (form && form.querySelector('#lockPassword')) || qs('#lockPassword');
-    const adminPass = norm(MCL.ADMIN_PASSWORD);
+    /* ✅ استخدام ADMIN_PASSWORD الحالية من المتغير المحلي */
+    const adminPass = norm(ADMIN_PASSWORD);
     const pending = pendingAction;
     let ok = false, msg = '';
+
+    if (!adminPass) {
+      showLockError('وضع المالك معطّل — إعدادات ناقصة. كلّم المالك.');
+      console.error('[GATE] __OWNER_PASSWORD__ غير محدد في config.js');
+      return;
+    }
 
     if (lockMode === 'login') {
       const val = norm(input ? input.value : '');
@@ -447,7 +516,7 @@
     if (pending && pending.run) pending.run();
   }
 
-  /* ---------- الاشتراكات (احتياطي — cloud.js بيستبدلها بالمزامنة السحابية) ---------- */
+  /* ---------- الاشتراكات ---------- */
   function validateSubsPayload(data) {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
     if (!('subscriptions' in data) || typeof data.subscriptions !== 'object' || data.subscriptions === null) return null;
@@ -554,7 +623,7 @@
     const lockChip = qs('#lockChip');
     if (lockChip) {
       const anyProtected = typeof MCL.hasProtected === 'function' && MCL.hasProtected();
-      if (!anyProtected) { lockChip.classList.add('hidden'); }
+      if (!anyProtected) lockChip.classList.add('hidden');
       else {
         lockChip.classList.remove('hidden');
         const lockedVisible = typeof MCL.countLockedVisible === 'function' ? MCL.countLockedVisible() : 0;
@@ -590,6 +659,7 @@
       adminChip.title = admin ? 'انقر للخروج من وضع المالك' : 'دخول وضع المالك';
     }
   }
+  MCL.renderChips = renderChips;
 
   /* ---------- قسم إدارة المشتركين ---------- */
   let subsEditingPhone = null;
@@ -654,7 +724,7 @@
       if (e.target.closest('#subsSaveBtn')) { saveSubscriber(); return; }
       if (e.target.closest('#subsCancelEditBtn')) { resetSubsForm(); return; }
       if (e.target.closest('#subsExportBtn')) { exportSubscriptions(); return; }
-      if (e.target.closest('#subsImportBtn')) { qs('#subsImportFile').click(); return; }
+      if (e.target.closest('#subsImportBtn')) { const fi = qs('#subsImportFile'); if (fi) fi.click(); return; }
       if (e.target.closest('#subsReloadBtn')) { reloadFromServer(); return; }
       const btn = e.target.closest('[data-subs-action]');
       if (btn) {
@@ -663,7 +733,8 @@
         else deleteSubscriber(phone);
       }
     });
-    qs('#subsImportFile').addEventListener('change', (e) => {
+    const fi = qs('#subsImportFile');
+    if (fi) fi.addEventListener('change', (e) => {
       const f = e.target.files[0];
       if (f) importSubsFile(f);
       e.target.value = '';
@@ -675,8 +746,9 @@
     if (!banner) return;
     const diff = unsyncedCount();
     const cloudOk = window.CloudSync && CloudSync.authed;
-    if (diff > 0 && !cloudOk) {
-      qs('#subsSyncText').innerHTML =
+    const txt = qs('#subsSyncText');
+    if (diff > 0 && !cloudOk && txt) {
+      txt.innerHTML =
         `<b>${diff}</b> تعديل محلي ومش متزامن مع السحابة (وضع المالك مش متصل سحابيًا).
          لو ظهرت رسالة اتصال سحابية في الـConsole هيتبعتوا تلقائيًا، أو استخدم التصدير كنسخة احتياطية.`;
       banner.classList.remove('hidden');
@@ -704,7 +776,8 @@
     }
 
     const phones = Object.keys(MCL.subscriptions).sort();
-    qs('#subsCount').textContent = phones.length;
+    const cnt = qs('#subsCount');
+    if (cnt) cnt.textContent = phones.length;
     updateSyncBanner();
 
     if (!phones.length) {
@@ -728,6 +801,7 @@
       </li>`;
     }).join('');
   }
+  window.renderSubsViewGate = renderSubsView;
 
   function toggleCoursesBox() {
     const custom = qs('#view-subs input[name="subsPlan"][value="custom"]');
@@ -752,14 +826,16 @@
   }
 
   function saveSubscriber() {
-    const phone = normPhone(qs('#subsPhone') ? qs('#subsPhone').value : '');
+    const phoneInput = qs('#subsPhone');
+    const phone = normPhone(phoneInput ? phoneInput.value : '');
     if (!isEgyptPhone(phone)) { notify('رقم الموبايل لازم يكون 11 رقم يبدأ بـ 01.', 'error'); return; }
     const isEdit = subsEditingPhone !== null;
     if (!isEdit && MCL.subscriptions[phone]) {
       notify('الرقم ده مسجّل بالفعل — استخدم زرار التعديل لتغيير خطته.', 'warn');
       return;
     }
-    const planAll = qs('#view-subs input[name="subsPlan"][value="all"]').checked;
+    const allRadio = qs('#view-subs input[name="subsPlan"][value="all"]');
+    const planAll = allRadio && allRadio.checked;
     if (planAll) {
       MCL.subscriptions[phone] = 'all';
     } else {
@@ -865,31 +941,6 @@
     reader.readAsText(file);
   }
 
-  /* ---------- أحداث النافذة ---------- */
-  document.addEventListener('submit', (e) => {
-    if (e.target && e.target.id === 'lockForm') { e.preventDefault(); handleLockSubmit(e.target); }
-  });
-  document.addEventListener('click', (e) => {
-    if (!qs('#lockModal')) return;
-    if (e.target.closest('#waCopyCash')) {
-      copyText(MCL.CONTACT_PHONE, 'تم نسخ رقم فودافون كاش.');
-      return;
-    }
-    const submitBtn = e.target.closest('#lockModal button[type="submit"]');
-    if (submitBtn) { e.preventDefault(); handleLockSubmit(submitBtn.closest('form')); return; }
-    if (e.target.closest('#lockModal [data-close-lock]')) { closeLockModal(); return; }
-    if (e.target.closest('#lockToggle')) {
-      const input = qs('#lockPassword');
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      qs('#lockToggle i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
-      input.focus();
-    }
-  });
-
   /* ---------- تشغيل ---------- */
-  ensureGateDOM();
-  MCL.closeLockModal = closeLockModal;
-  MCL.renderChips = renderChips;
-   window.renderSubsViewGate = renderSubsView;
+   ensureGateDOM();
 })();

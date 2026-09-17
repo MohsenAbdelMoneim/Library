@@ -1,14 +1,15 @@
 /* ==========================================================
-   auth.js — v15.1
+   auth.js — v16
    حسابات الطلاب: تسجيل بدليل رقم الموبايل + دخول + استرجاع
+   ✅ v16: التحويل بعد الدخول على library.html
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Auth — v15.1 ', 'background:#7c5cff;color:#fff;font-weight:bold');
+  console.log('%c Nexora Auth — v16 ', 'background:#7c5cff;color:#fff;font-weight:bold');
 
-  const firebaseConfig = {
+  const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
     projectId: "gymzone-f53f1",
@@ -17,22 +18,35 @@
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
 
+  if (typeof firebase === 'undefined') {
+    console.error('[AUTH] Firebase SDK مش محمّل — تأكد من السكريبتات في HTML.');
+    return;
+  }
+
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  const qs = (s) => document.querySelector(s);
+  const qs  = (s) => document.querySelector(s);
+  const qsa = (s) => [...document.querySelectorAll(s)];
+
+  function on(sel, evt, fn) {
+    const el = qs(sel);
+    if (el) el.addEventListener(evt, fn);
+    else console.warn('[AUTH][WIRE] عنصر غير موجود:', sel);
+    return el;
+  }
+
   const normPhone = (s) => {
-    let v = String(s || '').replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    let v = String(s || '')
+      .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
       .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
-      .replace(/\s+/g, '').replace(/^\+?20/, '');
+      .replace(/\s+/g, '')
+      .replace(/^\+?20/, '');
     if (v.length === 10 && v.startsWith('1')) v = '0' + v;
     return v;
   };
   const isEgyptPhone = (v) => /^01\d{9}$/.test(v);
-
-  /* Firebase Auth مش بيقبل رقم موبايل كإيميل — فنحوّله معرّف داخلي ثابت:
-     01140059073  →  01140059073@students.nexora.local */
   const phoneToEmail = (p) => p + '@students.nexora.local';
 
   const ERRORS_AR = {
@@ -46,47 +60,80 @@
   };
   const errAr = (code) => ERRORS_AR[code] || 'حصل خطأ غير متوقع — جرب تاني.';
 
-  let redirecting = false; /* منع الدبل-ريدايركت */
+  /* ✅ التحويل على library.html */
+  let redirecting = false;
   function goToApp() {
     if (redirecting) return;
     redirecting = true;
-    location.href = 'index.html';
+    try {
+      location.replace('library.html');
+    } catch (e) {
+      location.href = 'library.html';
+    }
+  }
+
+  function safeGoToApp(delay = 0) {
+    if (delay > 0) {
+      setTimeout(() => {
+        if (!document.hidden) goToApp();
+      }, delay);
+    } else {
+      goToApp();
+    }
   }
 
   function show(view) {
-    qs('#loginView').style.display = view === 'login' ? '' : 'none';
-    qs('#registerView').style.display = view === 'register' ? '' : 'none';
+    const lv = qs('#loginView');
+    const rv = qs('#registerView');
+    if (lv) lv.style.display = view === 'login' ? '' : 'none';
+    if (rv) rv.style.display = view === 'register' ? '' : 'none';
   }
 
   function setErr(inputId, errId, on) {
-    qs('#' + inputId).classList.toggle('invalid', on);
-    qs('#' + errId).classList.toggle('show', on);
+    const inp = qs('#' + inputId);
+    const err = qs('#' + errId);
+    if (inp) inp.classList.toggle('invalid', on);
+    if (err) err.classList.toggle('show', on);
   }
 
   function notice(id, msg, type) {
     const el = qs('#' + id);
+    if (!el) return;
     el.className = 'notice ' + (type || 'err');
     el.textContent = msg || '';
   }
 
   function busy(btnId, on, label) {
     const b = qs('#' + btnId);
+    if (!b) return;
     b.disabled = on;
     b.textContent = on ? 'لحظة…' : label;
   }
 
   /* ---------- التسجيل ---------- */
-  qs('#registerForm').addEventListener('submit', async (e) => {
+  on('#registerForm', 'submit', async (e) => {
     e.preventDefault();
     notice('regNotice');
-    const name = qs('#regName').value.trim();
-    const phone = normPhone(qs('#regPhone').value);
-    const pass = qs('#regPass').value;
+
+    const nameEl  = qs('#regName');
+    const phoneEl = qs('#regPhone');
+    const passEl  = qs('#regPass');
+    if (!nameEl || !phoneEl || !passEl) return;
+
+    const name  = nameEl.value.trim();
+    const phone = normPhone(phoneEl.value);
+    const pass  = passEl.value;
 
     let bad = false;
-    if (name.length < 2) { setErr('regName', 'regNameErr', true); bad = true; } else setErr('regName', 'regNameErr', false);
-    if (!isEgyptPhone(phone)) { setErr('regPhone', 'regPhoneErr', true); bad = true; } else setErr('regPhone', 'regPhoneErr', false);
-    if (pass.length < 6) { setErr('regPass', 'regPassErr', true); bad = true; } else setErr('regPass', 'regPassErr', false);
+    if (name.length < 2) { setErr('regName', 'regNameErr', true); bad = true; }
+    else setErr('regName', 'regNameErr', false);
+
+    if (!isEgyptPhone(phone)) { setErr('regPhone', 'regPhoneErr', true); bad = true; }
+    else setErr('regPhone', 'regPhoneErr', false);
+
+    if (pass.length < 6) { setErr('regPass', 'regPassErr', true); bad = true; }
+    else setErr('regPass', 'regPassErr', false);
+
     if (bad) return;
 
     busy('regBtn', true, 'إنشاء الحساب');
@@ -97,7 +144,7 @@
         name, phone, role: 'student', createdAt: new Date().toISOString()
       });
       notice('regNotice', 'تم إنشاء حسابك بنجاح! بنحوّلك لمنصتك…', 'ok');
-      setTimeout(goToApp, 1200);
+      safeGoToApp(1200);
     } catch (e) {
       console.warn('[AUTH]', e.code);
       if (e.code === 'auth/email-already-in-use') {
@@ -110,22 +157,31 @@
   });
 
   /* ---------- الدخول ---------- */
-  qs('#loginForm').addEventListener('submit', async (e) => {
+  on('#loginForm', 'submit', async (e) => {
     e.preventDefault();
     notice('loginNotice');
-    const phone = normPhone(qs('#loginPhone').value);
-    const pass = qs('#loginPass').value;
+
+    const phoneEl = qs('#loginPhone');
+    const passEl  = qs('#loginPass');
+    if (!phoneEl || !passEl) return;
+
+    const phone = normPhone(phoneEl.value);
+    const pass  = passEl.value;
 
     let bad = false;
-    if (!isEgyptPhone(phone)) { setErr('loginPhone', 'loginPhoneErr', true); bad = true; } else setErr('loginPhone', 'loginPhoneErr', false);
-    if (!pass) { setErr('loginPass', 'loginPassErr', true); bad = true; } else setErr('loginPass', 'loginPassErr', false);
+    if (!isEgyptPhone(phone)) { setErr('loginPhone', 'loginPhoneErr', true); bad = true; }
+    else setErr('loginPhone', 'loginPhoneErr', false);
+
+    if (!pass) { setErr('loginPass', 'loginPassErr', true); bad = true; }
+    else setErr('loginPass', 'loginPassErr', false);
+
     if (bad) return;
 
     busy('loginBtn', true, 'دخول');
     try {
       await auth.signInWithEmailAndPassword(phoneToEmail(phone), pass);
       notice('loginNotice', 'تم الدخول بنجاح! بنحوّلك…', 'ok');
-      setTimeout(goToApp, 800);
+      safeGoToApp(800);
     } catch (e) {
       console.warn('[AUTH]', e.code);
       notice('loginNotice', errAr(e.code));
@@ -134,23 +190,37 @@
   });
 
   /* ---------- نسيت كلمة المرور ---------- */
-  /* الإيميل الداخلي مش بيستقبل رسايل — إعادة التعيين بتتم يدويًا من المالك */
-  qs('#forgotBtn').addEventListener('click', () => {
-    const phone = normPhone(qs('#loginPhone').value);
+  on('#forgotBtn', 'click', () => {
+    const phoneEl = qs('#loginPhone');
+    if (!phoneEl) return;
+    const phone = normPhone(phoneEl.value);
     if (!isEgyptPhone(phone)) {
       notice('loginNotice', 'اكتب رقم موبايلك في الخانة الأول، وبعدين دوس "نسيت كلمة المرور".');
       return;
     }
     notice('loginNotice',
-      'لإعادة تعيين كلمة المرور: كلّمنا واتساب أو اتصل على 01096295395 وهنعملها لك فورًا. تأكد إنك كاتب رقمك صح: ' + phone, 'ok');
+      'لإعادة تعيين كلمة المرور: كلّمنا واتساب أو اتصل على 01096295395 وهنعملها لك فورًا. تأكد إنك كاتب رقمك صح: ' + phone,
+      'ok');
   });
 
   /* ---------- التنقل بين النماذج ---------- */
-  qs('#toRegister').addEventListener('click', () => show('register'));
-  qs('#toLogin').addEventListener('click', () => show('login'));
+  on('#toRegister', 'click', () => show('register'));
+  on('#toLogin',    'click', () => show('login'));
 
-  /* لو داخله من قبل — تحويل مباشر للمنصة */
+  /* ---------- مراقبة حالة الدخول ---------- */
   auth.onAuthStateChanged((user) => {
-    if (user) goToApp();
+    if (redirecting) return;
+    if (user) {
+      console.info('[AUTH] المستخدم مسجّل دخول — تحويل للمنصة');
+      safeGoToApp(0);
+    }
   });
+
+  /* ✅ شاشة التحميل */
+  const body = document.body;
+  if (body) {
+    body.style.opacity = '0';
+    body.style.transition = 'opacity .2s ease';
+    setTimeout(() => { body.style.opacity = '1'; }, 100);
+  }
 })();

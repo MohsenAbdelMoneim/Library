@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Seed Catalog — Nexora</title>
+<style>
+  body { font-family: system-ui; background: #0a0a0d; color: #ececf1; padding: 40px; max-width: 700px; margin: 0 auto; }
+  h1 { color: #4f7cff; }
+  button { background: linear-gradient(135deg, #4f7cff, #7c5cff); color: white; border: none; padding: 16px 32px; border-radius: 12px; font-size: 18px; font-weight: 700; cursor: pointer; margin: 10px 5px; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .log { background: #101015; border: 1px solid #212129; border-radius: 12px; padding: 20px; margin-top: 20px; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+  .ok { color: #4ade80; }
+  .err { color: #f4636e; }
+  .warn { color: #f0b53e; }
+</style>
+</head>
+<body>
+  <h1>🌱 Seed Catalog — Nexora</h1>
+  <p>ده ملف لمرة واحدة — بيرفع الكورسات والباقات لـ Firestore.</p>
+  <p style="color: #9c9cab;">بعد ما تخلص، امسح الملف ده.</p>
+
+  <button id="seedBtn">🚀 ارفع الكورسات والباقات</button>
+  <button id="checkBtn" style="background: #212129;">🔍 فحص الحالة الحالية</button>
+
+  <div class="log" id="log">جاهز…</div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="config.js?v=16"></script>
+
+  <script>
+    const log = (msg, cls) => {
+      const el = document.getElementById('log');
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = msg;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const cfg = window.__FIREBASE_CONFIG__;
+    if (!cfg) {
+      log('❌ config.js ناقص أو __FIREBASE_CONFIG__ مش موجود', 'err');
+    } else {
+      firebase.initializeApp(cfg);
+      const db = firebase.firestore();
+      const auth = firebase.auth();
+
+      const OWNER_EMAIL = window.__OWNER_EMAIL__ || 'owner@gymzone.com';
+      const OWNER_PASSWORD = window.__OWNER_PASSWORD__ || '';
+
+      let ready = false;
+
+      /* ✅ دخول المالك عشان نقدر نكتب */
+      (async () => {
+        try {
+          log('🔐 جاري تسجيل دخول المالك…');
+          await auth.signInWithEmailAndPassword(OWNER_EMAIL, OWNER_PASSWORD);
+          log('✅ تم تسجيل الدخول كمالك', 'ok');
+          ready = true;
+        } catch (e) {
+          log('⚠️ فشل تسجيل الدخول: ' + e.code, 'err');
+          log('→ لو الحساب مش موجود في Firebase Auth، اعمل واحد بالإيميل ' + OWNER_EMAIL, 'warn');
+        }
+      })();
+
+      /* ===== البيانات ===== */
+      const COURSES = [
+        { id: 'frontend-diploma',   title: 'Frontend Diploma',        category: 'Frontend',      accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تعلم تطوير واجهات المواقع باحتراف من الصفر للاحتراف.', icon: '🌐', order: 1 },
+        { id: 'backend-course',     title: 'Backend Course',          category: 'Backend',       accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'ابنِ الخدمات الخلفية وقواعد البيانات باحتراف.', icon: '⚙️', order: 2 },
+        { id: 'uiux-course',        title: 'UI/UX Course',            category: 'UI/UX',         accessType: 'paid', cashPrice: 1500, installmentAmount: 400,  installmentCount: 4, installmentTotal: 1600, description: 'تصميم تجارب وواجهات استخدام عصرية.', icon: '🎨', order: 3 },
+        { id: 'mobile-app-course',  title: 'Mobile App Course',       category: 'Mobile App',    accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تطوير تطبيقات الموبايل خطوة بخطوة.', icon: '📱', order: 4 },
+        { id: 'data-diploma',       title: 'Data Analysis Diploma',   category: 'Data Analysis', accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تحليل البيانات واتخاذ القرار بالأرقام.', icon: '📊', order: 5 },
+        { id: 'ai-ds-ml',           title: 'AI / Data Science / ML',  category: 'AI',            accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'الذكاء الاصطناعي وعلم البيانات وتعلم الآلة.', icon: '🤖', order: 6 },
+        { id: 'cyber-course',       title: 'Cyber Security Course',   category: 'Cyber Security',accessType: 'paid', cashPrice: 2999, installmentAmount: 775,  installmentCount: 4, installmentTotal: 3100, description: 'أساسيات وعمق الأمن السيبراني.', icon: '🔐', order: 7 },
+        { id: 'media-buying',       title: 'Media Buying Course',     category: 'Other',         accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'الإعلانات الممولة وإدارة الحملات.', icon: '📣', order: 8 },
+        { id: 'fullstack-diploma',  title: 'Full Stack Diploma',      category: 'Full Stack',    accessType: 'paid', cashPrice: 4500, installmentAmount: 1150, installmentCount: 4, installmentTotal: 4600, description: 'الواجهة والخلفية في دبلومة واحدة شاملة.', icon: '🚀', order: 9 },
+        { id: 'git-github',         title: 'Git & GitHub',            category: 'Other',         accessType: 'paid', cashPrice: 500,  installmentAmount: 150,  installmentCount: 4, installmentTotal: 600,  description: 'أساسيات إدارة الإصدارات والعمل الجماعي.', icon: '📦', order: 10 }
+      ];
+
+      const PACKAGES = [
+        { id: 'starter-pack',      title: 'Starter Pack',      courseIds: ['frontend-diploma','uiux-course'],              cashPrice: 3500, installmentAmount: 875,  installmentCount: 4, installmentTotal: 3500,  featured: false, count: 2, order: 1 },
+        { id: 'developer-pack',    title: 'Developer Pack',    courseIds: ['frontend-diploma','backend-course','uiux-course','git-github'], cashPrice: 6000, installmentAmount: 1500, installmentCount: 4, installmentTotal: 6000,  featured: false, count: 4, order: 2 },
+        { id: 'professional-pack', title: 'Professional Pack', courseIds: ['frontend-diploma','backend-course','mobile-app-course','data-diploma','uiux-course','media-buying'], cashPrice: 7999, installmentAmount: 2000, installmentCount: 4, installmentTotal: 8000,  featured: false, count: 6, order: 3 },
+        { id: 'tech-master-pack',  title: 'Tech Master Pack',  courseIds: ['frontend-diploma','backend-course','fullstack-diploma','mobile-app-course','data-diploma','ai-ds-ml','cyber-course','uiux-course','media-buying'], cashPrice: 9999, installmentAmount: 2500, installmentCount: 4, installmentTotal: 10000, featured: true,  count: 9, order: 4 }
+      ];
+
+      /* ===== الفحص ===== */
+      document.getElementById('checkBtn').onclick = async () => {
+        log('--- فحص ---');
+        try {
+          const c = await db.collection('courses').get();
+          const p = await db.collection('packages').get();
+          log(`courses: ${c.size} doc`, c.size > 0 ? 'ok' : 'warn');
+          log(`packages: ${p.size} doc`, p.size > 0 ? 'ok' : 'warn');
+        } catch (e) {
+          log('خطأ: ' + e.message, 'err');
+        }
+      };
+
+      /* ===== الرفع ===== */
+      document.getElementById('seedBtn').onclick = async () => {
+        if (!ready) {
+          log('❌ لازم تسجل دخول الأول — استنى شوية وجرب تاني', 'err');
+          return;
+        }
+        const btn = document.getElementById('seedBtn');
+        btn.disabled = true;
+        btn.textContent = 'جاري الرفع…';
+        log('--- بدء الرفع ---');
+
+        try {
+          /* 1) الكورسات */
+          log(`جاري رفع ${COURSES.length} كورس…`);
+          const batch1 = db.batch();
+          COURSES.forEach((c) => {
+            const ref = db.collection('courses').doc(c.id);
+            batch1.set(ref, c);
+          });
+          await batch1.commit();
+          log(`✅ تم رفع ${COURSES.length} كورس`, 'ok');
+
+          /* 2) الباقات */
+          log(`جاري رفع ${PACKAGES.length} باقة…`);
+          const batch2 = db.batch();
+          PACKAGES.forEach((p) => {
+            const ref = db.collection('packages').doc(p.id);
+            batch2.set(ref, p);
+          });
+          await batch2.commit();
+          log(`✅ تم رفع ${PACKAGES.length} باقة`, 'ok');
+
+          log('🎉 خلص! اعمل Refresh على المشروع', 'ok');
+          btn.textContent = '✅ تم';
+        } catch (e) {
+          log('❌ فشل: ' + e.message, 'err');
+          console.error(e);
+          btn.disabled = false;
+          btn.textContent = '🚀 حاول تاني';
+        }
+      };
+    }
+  </script>
+</body>
+</html>

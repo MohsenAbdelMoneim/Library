@@ -1,15 +1,17 @@
 /* ==========================================================
-   student.js — v15.1
+   student.js — v15.2
    Dashboard الطالب: أهلاً بيك يا [فلان] + كورساته المفعلة هو بس
    (المالك owner@gymzone.com مش بيشوف الداشبورد ده خالص)
+   إصلاحات: TDZ state، capture listener، حماية DOM
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Student — v15.1 ', 'background:#7c5cff;color:#fff;font-weight:bold');
+  console.log('%c Nexora Student — v15.2 ', 'background:#7c5cff;color:#fff;font-weight:bold');
 
-  const firebaseConfig = {
+  /* ⚠️ انقل المفاتيح لملف config خارجي */
+  const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
     projectId: "gymzone-f53f1",
@@ -18,7 +20,12 @@
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
 
-  const OWNER_EMAIL = 'owner@gymzone.com';
+  const OWNER_EMAIL = (window.__OWNER_EMAIL__) || 'owner@gymzone.com';
+
+  if (typeof firebase === 'undefined') {
+    console.error('[STUDENT] Firebase SDK مش محمّل');
+    return;
+  }
 
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
@@ -26,12 +33,35 @@
 
   const PHONE = '01096295395';
   const WA = 'https://wa.me/201096295395';
-  const qs = (s) => document.querySelector(s);
+
+  /* ---------- أدوات مساعدة ---------- */
+  const qs  = (s) => document.querySelector(s);
   const qsa = (s) => [...document.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  /* كتالوج الكورسات المدفوعة (نفس معرفات catalog.js وadmin.js) */
+  /* ✅ مساعد آمن */
+  function on(sel, evt, fn, opts) {
+    const el = typeof sel === 'string' ? qs(sel) : sel;
+    if (el) el.addEventListener(evt, fn, opts);
+    else console.warn('[STUDENT][WIRE] عنصر غير موجود:', sel);
+    return el;
+  }
+
+  /* ✅ الوصول الآمن لـ state من app.js */
+  function getAppState() {
+    if (window.__nexoraState && Array.isArray(window.__nexoraState.resources)) {
+      return window.__nexoraState;
+    }
+    try {
+      if (typeof state !== 'undefined' && state && Array.isArray(state.resources)) {
+        return state;
+      }
+    } catch (e) { /* TDZ */ }
+    return null;
+  }
+
+  /* ---------- كتالوج الكورسات ---------- */
   const CATALOG = {
     'frontend-diploma':  { title: 'Frontend Diploma',      category: 'Frontend',      description: 'تطوير واجهات المواقع من الصفر للاحتراف.' },
     'backend-course':    { title: 'Backend Course',        category: 'Backend',       description: 'الخدمات الخلفية وقواعد البيانات.' },
@@ -44,6 +74,7 @@
     'fullstack-diploma': { title: 'Full Stack Diploma',    category: 'Full Stack',    description: 'واجهة + خلفية في دبلومة واحدة.' }
   };
 
+  /* ---------- الأنماط ---------- */
   const STYLES = `
 .nex-dash{max-width:1100px;margin:0 auto}
 .dash-hero{padding:24px 0 20px}
@@ -51,7 +82,7 @@
 .dash-sub{font-size:13.5px;color:var(--mut,#9c9cab);margin-top:6px}
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
 .stu-card{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:10px}
-.stu-top{display:flex;align-items:center;justify-content:space-between}
+.stu-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .stu-cat{font-size:10.5px;font-weight:700;color:#7ea2ff;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);padding:3px 10px;border-radius:999px}
 .stu-status{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px}
 .stu-status.active{color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
@@ -63,21 +94,22 @@
 .prog-fill{height:100%;background:linear-gradient(90deg,#4f7cff,#7c5cff);border-radius:999px;transition:width .3s}
 .prog-txt{font-size:10.5px;color:var(--dim,#66666f);margin-top:5px}
 .stu-cta{display:flex;gap:8px;margin-top:auto;padding-top:6px}
-.stu-open{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit}
+.stu-open{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .stu-open:hover{opacity:.9}
 .stu-open.wa{background:#25D366;color:#04310f;text-decoration:none}
 .empty-dash{text-align:center;padding:56px 20px;background:var(--panel,#101015);border:1px dashed var(--edge2,#2e2e39);border-radius:20px}
 .empty-icon{font-size:44px;margin-bottom:12px}
 .empty-t{font-size:17px;font-weight:800;margin-bottom:6px}
 .empty-d{font-size:13px;color:var(--mut,#9c9cab);line-height:1.8;margin-bottom:18px}
-.empty-btn{display:inline-flex;align-items:center;gap:7px;height:46px;padding:0 22px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit}
+.empty-btn{display:inline-flex;align-items:center;gap:7px;height:46px;padding:0 22px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .top-nav-row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
-.top-nav-chip{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;font-family:inherit}
+.top-nav-chip{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .top-nav-chip:hover{color:var(--ink,#ececf1);border-color:#4f7cff66}
 .top-nav-chip.out{color:#f4636e;border-color:rgba(229,72,77,.3)}
 @media (max-width:640px){
   .dash-hello{font-size:20px}
   .dash-grid{grid-template-columns:1fr}
+  .top-nav-chip{flex:1;justify-content:center;height:44px}
 }
 `;
 
@@ -92,7 +124,10 @@
   function ensureDashDOM() {
     if (qs('#view-student')) return;
     const main = qs('main#content') || qs('main');
-    if (!main) return;
+    if (!main) {
+      console.warn('[STUDENT] main#content مش موجود');
+      return;
+    }
     const section = document.createElement('section');
     section.id = 'view-student';
     section.className = 'hidden';
@@ -107,24 +142,21 @@
       <div class="empty-icon">📚</div>
       <p class="empty-t">لسه مفيش كورسات مضافة لحسابك</p>
       <p class="empty-d">تقدر تتصفح الكورسات المتاحة وتختار المجال المناسب ليك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس لحسابك فورًا.</p>
-      <button type="button" class="empty-btn" id="goCatalogBtn"><i class="bi bi-compass"></i>تصفح الكورسات</button>
+      <button type="button" class="empty-btn" id="goCatalogBtn"><i class="bi bi-compass" aria-hidden="true"></i>تصفح الكورسات</button>
     </div>`;
   }
 
-  /* ---------- إيجاد رابط الكورس من مكتبتك ----------
-     admin.js مش بيكتب url في الاشتراك — فنجيبه من state.resources
-     بمطابقة العنوان، ونحترم قفل Drive لو الكورس مقفول. */
+  /* ---------- إيجاد رابط الكورس ---------- */
   function resolveCourseLink(enroll) {
     const c = CATALOG[enroll.courseId] || { title: enroll.courseId };
-    try {
-      if (typeof state !== 'undefined' && state && Array.isArray(state.resources)) {
-        const r = state.resources.find((x) => x.title === c.title);
-        if (r) {
-          const locked = window.MCL ? MCL.isResourceLocked(r) : false;
-          return { resource: r, url: r.url, locked };
-        }
+    const appState = getAppState();
+    if (appState) {
+      const r = appState.resources.find((x) => x.title === c.title);
+      if (r) {
+        const locked = window.MCL ? MCL.isResourceLocked(r) : false;
+        return { resource: r, url: r.url, locked };
       }
-    } catch (e) { /* app.js لسه محمّلش */ }
+    }
     return { resource: null, url: null, locked: false };
   }
 
@@ -147,13 +179,13 @@
       </div>` : ''}
       <div class="stu-cta">
         <button type="button" class="stu-open" data-course-id="${esc(enroll.courseId)}" data-course-title="${esc(c.title)}">
-          <i class="bi bi-play-circle"></i>ابدأ التعلم
+          <i class="bi bi-play-circle" aria-hidden="true"></i>ابدأ التعلم
         </button>
       </div>
     </article>`;
   }
 
-  /* فتح الكورس: رابط من المكتبة + احترام بوابة الاشتراكات، أو واتساب لو مفيش رابط */
+  /* فتح الكورس */
   function openCourse(courseId, courseTitle) {
     const link = resolveCourseLink({ courseId });
     if (link.resource && link.url) {
@@ -165,7 +197,6 @@
       }
       return;
     }
-    /* مفيش كورس مطابق في المكتبة — نوجه الطالب للتواصل */
     window.open(WA + '?text=' + encodeURIComponent(`أهلاً 👋 فعّلوا لي كورس «${courseTitle}» في حسابي`), '_blank', 'noopener,noreferrer');
   }
 
@@ -184,19 +215,18 @@
       <h2 class="dash-hello">أهلاً بيك يا ${esc(firstName)} 👋</h2>
       <p class="dash-sub">دي الكورسات المتاحة ليك — ${list.length} كورس</p>
       <div class="top-nav-row">
-        <a class="top-nav-chip" href="${WA}?text=${encodeURIComponent('أهلاً 👋 عايز أشترك في كورس جديد')}" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i>اشترك في كورس جديد</a>
-        <button type="button" class="top-nav-chip out" id="studentLogout"><i class="bi bi-box-arrow-left"></i>خروج</button>
+        <a class="top-nav-chip" href="${WA}?text=${encodeURIComponent('أهلاً 👋 عايز أشترك في كورس جديد')}" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك في كورس جديد</a>
+        <button type="button" class="top-nav-chip out" id="studentLogout"><i class="bi bi-box-arrow-left" aria-hidden="true"></i>خروج</button>
       </div>
     </div>
     ${cards}`;
 
-    qs('#studentLogout').addEventListener('click', async () => {
+    on('#studentLogout', 'click', async () => {
       await auth.signOut();
       location.reload();
     });
 
-    const go = qs('#goCatalogBtn');
-    if (go) go.addEventListener('click', () => {
+    on('#goCatalogBtn', 'click', () => {
       const btn = qs('[data-nav="view:catalog"]');
       if (btn) btn.click();
     });
@@ -205,7 +235,7 @@
       b.addEventListener('click', () => openCourse(b.dataset.courseId, b.dataset.courseTitle)));
   }
 
-  /* ---------- تحميل بيانات الطالب واشتراكاته ---------- */
+  /* ---------- تحميل بيانات الطالب ---------- */
   async function loadStudentData(user) {
     let profile = null;
     try {
@@ -220,13 +250,23 @@
         .where('status', '==', 'active')
         .get();
       enrollments = snap.docs.map((d) => d.data());
+            /* 🗝️ فتح كورسات Drive المرتبطة باشتراكات الطالب */
+      const map = (window.__COURSE_LIBRARY_MAP__ || {});
+      const titles = enrollments
+        .map((en) => map[en.courseId])
+        .filter(Boolean);
+      window.__accountAccess = {
+        logged: true,
+        allowedTitles: new Set(titles),
+        has(title) { return this.allowedTitles.has(title); }
+      };
     } catch (e) {
       console.warn('[STUDENT] الاشتراكات:', e.code);
     }
     renderDash(user, profile, enrollments);
   }
 
-  /* ---------- بند "حسابي" + إعادة حقنه بعد كل رسم للسايدبار ---------- */
+  /* ---------- بند "حسابي" ---------- */
   function ensureNav() {
     const nav = qs('#sideNav');
     if (!nav || qs('[data-nav="view:student"]')) return;
@@ -235,7 +275,7 @@
     btn.type = 'button';
     btn.dataset.nav = 'view:student';
     btn.className = 'nav-item';
-    btn.innerHTML = '<i class="bi bi-person-circle text-[13.5px] w-4 text-center shrink-0"></i>' +
+    btn.innerHTML = '<i class="bi bi-person-circle text-[13.5px] w-4 text-center shrink-0" aria-hidden="true"></i>' +
                     '<span class="grow text-start truncate">حسابي</span>';
     if (filesBtn) filesBtn.after(btn);
     else nav.appendChild(btn);
@@ -243,58 +283,67 @@
 
   function installSidebarHook() {
     if (window.__stuSidebarHooked) return;
-    const orig = window.renderSidebar;
-    if (typeof orig !== 'function') return;
+    if (typeof window.renderSidebar !== 'function') return;
     window.__stuSidebarHooked = true;
+    const orig = window.renderSidebar;
     window.renderSidebar = function () {
-      orig();
+      try { orig(); } catch (e) { console.error('[STUDENT] renderSidebar:', e); }
       ensureNav();
+      bindStudentNav();
     };
   }
 
   function showStudentView() {
     qsa('main#content > section:not(#view-student)').forEach((s) => s.classList.add('hidden'));
-    qs('#view-student')?.classList.remove('hidden');
-    qs('#pageTitle').textContent = 'حسابي';
-    qs('#pageSub').textContent = 'كورساتك وتقدّمك';
+    const v = qs('#view-student');
+    if (v) v.classList.remove('hidden');
+    const pt = qs('#pageTitle'); if (pt) pt.textContent = 'حسابي';
+    const ps = qs('#pageSub');   if (ps) ps.textContent = 'كورساتك وتقدّمك';
     window.scrollTo(0, 0);
-    qs('#sidebar')?.classList.remove('open');
-    qs('#overlay')?.classList.add('hidden');
+    const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
+    const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
   }
 
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-nav="view:student"]');
-    if (!b) return;
-    e.stopPropagation();
-    e.preventDefault();
-    showStudentView();
-  }, true);
+  /* ✅ listener على #sideNav بدل document */
+  function bindStudentNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__studentNavBound) return;
+    nav.__studentNavBound = true;
+    nav.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav="view:student"]');
+      if (!b) return;
+      e.preventDefault();
+      showStudentView();
+    });
+  }
 
   /* ---------- تشغيل ---------- */
   function boot() {
     injectStyles();
     ensureDashDOM();
     ensureNav();
-    installSidebarHook(); /* app.js خلص تحميل قبل DOMContentLoaded — الدالة موجودة */
+    bindStudentNav();
+    installSidebarHook();
 
     let autoOpened = false;
     auth.onAuthStateChanged((user) => {
-      /* 🛡️ المالك مالوش الداشبورد ده — برفعه، وسيب المكتبة زي ما هي */
+      /* 🛡️ المالك مالوش الداشبورد ده */
       if (user && user.email === OWNER_EMAIL) return;
 
       if (user) {
         ensureNav();
+        bindStudentNav();
         loadStudentData(user);
-        /* فتح الداشبورد تلقائيًا مرة واحدة بس، ولو المستخدم لسه في المكتبة */
+        /* فتح الداشبورد تلقائيًا مرة واحدة بس */
         if (!autoOpened) {
           autoOpened = true;
           setTimeout(() => {
-            const stillOnLibrary = qs('#pageTitle') && qs('#pageTitle').textContent === 'المكتبة';
+            const pt = qs('#pageTitle');
+            const stillOnLibrary = pt && pt.textContent === 'المكتبة';
             if (stillOnLibrary) showStudentView();
           }, 300);
         }
       } else {
-        /* زائر غير مسجل — بانر ترحيبي داخل قسم حسابي */
         const inner = qs('#studentDashInner');
         if (inner) {
           inner.innerHTML = `
@@ -302,7 +351,7 @@
             <h2 class="dash-hello">أهلاً بيك في Nexora Academy 👋</h2>
             <p class="dash-sub">أنشئ حسابك أو سجّل دخولك لتشوف كورساتك وتقدّمك</p>
             <div class="top-nav-row">
-              <a class="top-nav-chip" style="color:#fff;background:linear-gradient(135deg,#4f7cff,#7c5cff);border:none" href="auth.html"><i class="bi bi-person-plus"></i>تسجيل / دخول</a>
+              <a class="top-nav-chip" style="color:#fff;background:linear-gradient(135deg,#4f7cff,#7c5cff);border:none" href="auth.html"><i class="bi bi-person-plus" aria-hidden="true"></i>تسجيل / دخول</a>
             </div>
           </div>`;
         }
@@ -310,9 +359,27 @@
     });
   }
 
+  /* ✅ التشغيل بعد DOM جاهز */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
   } else {
     boot();
+  }
+
+  /* ✅ ضمان إضافي */
+  window.addEventListener('load', () => {
+    ensureNav();
+    bindStudentNav();
+    installSidebarHook();
+  }, { once: true });
+
+  /* ✅ راقب السايدبار */
+  const nav = qs('#sideNav');
+  if (nav && !nav.__studentObserver) {
+    nav.__studentObserver = new MutationObserver(() => {
+      ensureNav();
+      bindStudentNav();
+    });
+    nav.__studentObserver.observe(nav, { childList: true });
   }
 })();

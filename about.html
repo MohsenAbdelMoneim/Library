@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="description" content="من نحن — Nexora Academy منصة تعليمية احترافية لتعليم مهارات المستقبل">
+  <title>من نحن — Nexora Academy</title>
+  <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <style>
+    :root {
+      --bg: #0a0a0d; --panel: #101015; --raise: #16161d;
+      --edge: #212129; --edge2: #2e2e39;
+      --ink: #ececf1; --mut: #9c9cab; --dim: #66666f;
+      --accent: #f0b53e; --accent2: #f7c85f;
+      --blue: #4f7cff; --purple: #7c5cff;
+      --green: #4ade80; --red: #e5484d;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'IBM Plex Sans Arabic', sans-serif;
+      background: var(--bg); color: var(--ink);
+      min-height: 100vh; overflow-x: clip; line-height: 1.6;
+      background-image:
+        radial-gradient(1000px 600px at 85% -5%, rgba(79,124,255,.15), transparent 55%),
+        radial-gradient(800px 500px at 5% 30%, rgba(124,92,255,.10), transparent 55%),
+        radial-gradient(900px 500px at 50% 105%, rgba(240,181,62,.08), transparent 55%);
+      background-attachment: fixed;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    img, svg { max-width: 100%; height: auto; display: block; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,13,.85);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--edge);
+    }
+    .navbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 24px;
+      height: 64px; display: flex; align-items: center; gap: 16px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-size: 18px;
+      box-shadow: 0 6px 18px rgba(79,124,255,.35);
+    }
+    .logo-text h1 {
+      font-size: 14.5px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
+    .nav-links { display: none; gap: 4px; margin-inline-start: 20px; }
+    .nav-links a {
+      padding: 8px 14px; border-radius: 10px;
+      font-size: 13px; color: var(--mut); transition: .15s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); background: var(--raise); }
+    .nav-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+    .btn-login {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; font-size: 12.5px; font-weight: 700; transition: .15s;
+    }
+    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-menu {
+      display: grid; place-items: center;
+      width: 38px; height: 38px; border-radius: 10px;
+      border: 1px solid var(--edge); color: var(--mut);
+    }
+    .mobile-menu {
+      display: none; border-top: 1px solid var(--edge); background: var(--panel);
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 24px; font-size: 13.5px; color: var(--mut);
+      border-bottom: 1px solid var(--edge);
+    }
+    .mobile-menu a:hover { color: var(--ink); background: var(--raise); }
+    @media (min-width: 900px) {
+      .nav-links { display: flex; }
+      .btn-menu { display: none; }
+    }
+
+    /* Page Hero */
+    .page-hero {
+      padding: 60px 0 40px; text-align: center;
+    }
+    .page-hero .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: 999px;
+      background: rgba(240,181,62,.08);
+      border: 1px solid rgba(240,181,62,.3);
+      color: var(--accent); font-size: 12px; font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .page-hero h1 {
+      font-size: clamp(28px, 5vw, 46px);
+      font-weight: 900; line-height: 1.3; margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff 30%, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .page-hero p {
+      font-size: clamp(14px, 2vw, 17px); color: var(--mut);
+      max-width: 640px; margin: 0 auto; line-height: 1.9;
+    }
+
+    /* Sections */
+    section { padding: 50px 0; }
+    .section-title {
+      font-size: clamp(22px, 3.5vw, 30px);
+      font-weight: 900; margin-bottom: 14px;
+      text-align: center;
+    }
+    .section-title span {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .section-sub {
+      text-align: center; color: var(--mut);
+      font-size: 14px; max-width: 620px;
+      margin: 0 auto 36px; line-height: 1.9;
+    }
+
+    /* Story Card */
+    .story-card {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 22px;
+      padding: 36px;
+      line-height: 1.9;
+    }
+    .story-card p {
+      font-size: 14.5px;
+      color: var(--mut);
+      margin-bottom: 16px;
+    }
+    .story-card p:last-child { margin-bottom: 0; }
+    .story-card strong { color: var(--accent); font-weight: 800; }
+
+    /* Mission/Vision Cards */
+    .mv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .mv-card {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 20px;
+      padding: 32px;
+      text-align: center;
+      transition: .2s;
+    }
+    .mv-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(79,124,255,.5);
+    }
+    .mv-icon {
+      width: 64px; height: 64px;
+      border-radius: 18px;
+      display: grid; place-items: center;
+      font-size: 30px;
+      margin: 0 auto 18px;
+      background: linear-gradient(135deg, rgba(79,124,255,.15), rgba(124,92,255,.15));
+      border: 1px solid rgba(79,124,255,.3);
+    }
+    .mv-card h3 {
+      font-size: 18px; font-weight: 800; margin-bottom: 12px;
+    }
+    .mv-card p {
+      font-size: 13.5px; color: var(--mut); line-height: 1.9;
+    }
+
+    /* Values */
+    .values-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .value-card {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      padding: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: .2s;
+    }
+    .value-card:hover {
+      border-color: rgba(240,181,62,.5);
+      transform: translateY(-2px);
+    }
+    .value-icon {
+      flex-shrink: 0;
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      display: grid; place-items: center;
+      font-size: 22px;
+      background: rgba(240,181,62,.1);
+      border: 1px solid rgba(240,181,62,.3);
+    }
+    .value-card h4 {
+      font-size: 14.5px; font-weight: 800; margin-bottom: 6px;
+    }
+    .value-card p {
+      font-size: 12.5px; color: var(--mut); line-height: 1.8;
+    }
+
+    /* Numbers */
+    .numbers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+    }
+    .num-box {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      padding: 26px;
+      text-align: center;
+    }
+    .num-box .num {
+      font-size: 34px; font-weight: 900;
+      background: linear-gradient(135deg, var(--blue), var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      font-variant-numeric: tabular-nums;
+    }
+    .num-box .lbl {
+      font-size: 12.5px; color: var(--mut); margin-top: 6px; font-weight: 600;
+    }
+
+    /* CTA */
+    .cta-box {
+      background: linear-gradient(135deg, rgba(79,124,255,.2), rgba(124,92,255,.2));
+      border: 1px solid rgba(79,124,255,.4);
+      border-radius: 24px;
+      padding: 48px 32px;
+      text-align: center;
+    }
+    .cta-box h2 {
+      font-size: clamp(22px, 4vw, 32px); font-weight: 900; margin-bottom: 12px;
+    }
+    .cta-box p {
+      color: var(--mut); margin-bottom: 26px; font-size: 15px;
+    }
+    .cta-actions {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 50px; padding: 0 28px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; font-size: 14.5px; font-weight: 800;
+      transition: .15s; box-shadow: 0 10px 30px rgba(79,124,255,.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(79,124,255,.45); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 50px; padding: 0 28px; border-radius: 14px;
+      border: 1px solid var(--edge2); color: var(--ink);
+      font-size: 14.5px; font-weight: 700; transition: .15s;
+    }
+    .btn-secondary:hover { background: var(--raise); border-color: var(--accent); color: var(--accent); }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--edge);
+      padding: 40px 0 24px; margin-top: 60px;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 32px; margin-bottom: 32px;
+    }
+    .footer h4 {
+      font-size: 13px; font-weight: 800; margin-bottom: 14px; color: var(--ink);
+    }
+    .footer ul {
+      list-style: none; display: flex; flex-direction: column; gap: 8px;
+    }
+    .footer ul a {
+      font-size: 12.5px; color: var(--mut); transition: .15s;
+    }
+    .footer ul a:hover { color: var(--accent); }
+    .footer-bottom {
+      border-top: 1px solid var(--edge);
+      padding-top: 24px; text-align: center;
+      color: var(--dim); font-size: 11.5px; line-height: 1.8;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 0 18px; }
+      section { padding: 36px 0; }
+      .page-hero { padding: 40px 0 30px; }
+      .story-card { padding: 24px 20px; }
+      .mv-card { padding: 24px 20px; }
+      .cta-box { padding: 32px 20px; }
+      .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+    }
+
+    .reveal {
+      opacity: 0; transform: translateY(20px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="landing.html" class="logo-wrap">
+        <span class="logo-mark">🎓</span>
+        <div class="logo-text">
+          <h1>Nexora Academy</h1>
+          <p>LEARN · BUILD · GROW</p>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="landing.html">الرئيسية</a>
+        <a href="index.html">الكورسات</a>
+        <a href="about.html" class="active">من نحن</a>
+        <a href="contact.html">اتصل بنا</a>
+      </div>
+      <div class="nav-actions">
+        <a href="auth.html" class="btn-login"><i class="bi bi-person-circle"></i><span>تسجيل الدخول</span></a>
+        <button class="btn-menu" id="menuBtn" aria-label="القائمة"><i class="bi bi-list"></i></button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="landing.html"><i class="bi bi-house"></i>الرئيسية</a>
+      <a href="index.html"><i class="bi bi-mortarboard"></i>الكورسات</a>
+      <a href="about.html"><i class="bi bi-info-circle"></i>من نحن</a>
+      <a href="contact.html"><i class="bi bi-telephone"></i>اتصل بنا</a>
+      <a href="auth.html"><i class="bi bi-person-circle"></i>تسجيل الدخول</a>
+    </div>
+  </nav>
+
+  <header class="page-hero container">
+    <div class="badge"><i class="bi bi-info-circle"></i> من نحن</div>
+    <h1>منصة تعليمية<br>بُنيت بشغف</h1>
+    <p>Nexora Academy مش مجرد منصة كورسات — هي رحلة بنبنيها معاك خطوة بخطوة عشان توصل لأهدافك.</p>
+  </header>
+
+  <section class="container reveal">
+    <div class="story-card">
+      <p>
+        <strong>Nexora Academy</strong> بدأت بفكرة بسيطة: إن التعليم الاحترافي لازم يكون متاح لكل حد،
+        بأسعار معقولة ومحتوى بجودة عالية.
+      </p>
+      <p>
+        لاحظنا إن في فجوة كبيرة بين اللي بيتعلم في الجامعات واللي بيتطلبه سوق العمل الفعلي.
+        وقررنا نسد الفجوة دي بكورسات عملية مبنية على احتياجات السوق الحقيقية.
+      </p>
+      <p>
+        النهاردة، <strong>Nexora Academy</strong> بتحتوي على كورسات في البرمجة، التصميم، تحليل البيانات،
+        والذكاء الاصطناعي — وكل يوم بنضيف محتوى جديد.
+      </p>
+      <p>
+        هدفنا إننا نساعدك تبدأ رحلتك في التعلم، وتوصل لهدفك في أقل وقت وبأفضل جودة.
+      </p>
+    </div>
+  </section>
+
+  <section class="container reveal">
+    <h2 class="section-title">رؤيتنا و<span>رسالتنا</span></h2>
+    <p class="section-sub">المبادئ اللي بنتحرك بيها كل يوم</p>
+
+    <div class="mv-grid">
+      <div class="mv-card">
+        <div class="mv-icon">🎯</div>
+        <h3>رؤيتنا</h3>
+        <p>
+          نكون المنصة التعليمية الأولى في مصر والوطن العربي لتعليم مهارات المستقبل، 
+          وإعداد جيل من المبرمجين والمصممين المحترفين.
+        </p>
+      </div>
+      <div class="mv-card">
+        <div class="mv-icon">🚀</div>
+        <h3>رسالتنا</h3>
+        <p>
+          نقدّم محتوى تعليمي عالي الجودة بأسعار معقولة، ونوفّر بيئة تعليمية محفزة 
+          تساعد الطالب على التعلم والتطبيق العملي.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container reveal">
+    <h2 class="section-title">قيمنا <span>الأساسية</span></h2>
+    <p class="section-sub">الحاجات اللي بنؤمن بيها وبنشتغل عشانها</p>
+
+    <div class="values-grid">
+      <div class="value-card">
+        <div class="value-icon">📚</div>
+        <div>
+          <h4>جودة المحتوى</h4>
+          <p>محتوى متجدد ومبني على أحدث المعايير العالمية</p>
+        </div>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">💡</div>
+        <div>
+          <h4>التطبيق العملي</h4>
+          <p>مشاهدة + تطبيق + مشاريع حقيقية = فهم حقيقي</p>
+        </div>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">💰</div>
+        <div>
+          <h4>أسعار عادلة</h4>
+          <p>أسعار مناسبة وتقسيط مريح لكل المستويات</p>
+        </div>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🤝</div>
+        <div>
+          <h4>دعم حقيقي</h4>
+          <p>فريق دعم متاح للرد على استفساراتك خلال 24 ساعة</p>
+        </div>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">🎓</div>
+        <div>
+          <h4>شهادات معتمدة</h4>
+          <p>شهادات إتمام تضيفها لـ CV و LinkedIn</p>
+        </div>
+      </div>
+      <div class="value-card">
+        <div class="value-icon">♾️</div>
+        <div>
+          <h4>وصول مدى الحياة</h4>
+          <p>ادفع مرة واحدة واستمتع بالكورس للأبد</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container reveal">
+    <h2 class="section-title">أرقام <span>بتتكلم</span></h2>
+    <p class="section-sub">ثقة طلابنا هي أكبر إنجاز</p>
+
+    <div class="numbers-grid">
+      <div class="num-box">
+        <div class="num">10+</div>
+        <div class="lbl">كورس احترافي</div>
+      </div>
+      <div class="num-box">
+        <div class="num">6</div>
+        <div class="lbl">مسار تعلم</div>
+      </div>
+      <div class="num-box">
+        <div class="num">100+</div>
+        <div class="lbl">طالب نشط</div>
+      </div>
+      <div class="num-box">
+        <div class="num">4.8★</div>
+        <div class="lbl">تقييم الطلاب</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container reveal">
+    <div class="cta-box">
+      <h2>ابدأ رحلتك معانا</h2>
+      <p>سجّل دلوقتي واكتشف بنفسك ليه آلاف الطلاب بيثقوا فينا</p>
+      <div class="cta-actions">
+        <a href="auth.html" class="btn-primary"><i class="bi bi-person-plus"></i>سجّل الآن</a>
+        <a href="contact.html" class="btn-secondary"><i class="bi bi-chat-dots"></i>اتصل بنا</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="logo-wrap" style="margin-bottom:12px;">
+            <span class="logo-mark">🎓</span>
+            <div class="logo-text">
+              <h1>Nexora Academy</h1>
+              <p>LEARN · BUILD · GROW</p>
+            </div>
+          </div>
+          <p style="font-size:12.5px;color:var(--mut);line-height:1.8;">
+            منصة تعليمية احترافية متخصصة في تعليم مهارات المستقبل.
+          </p>
+        </div>
+        <div>
+          <h4>روابط سريعة</h4>
+          <ul>
+            <li><a href="landing.html">الرئيسية</a></li>
+            <li><a href="index.html">الكورسات</a></li>
+            <li><a href="about.html">من نحن</a></li>
+            <li><a href="contact.html">اتصل بنا</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>حسابي</h4>
+          <ul>
+            <li><a href="auth.html">تسجيل الدخول</a></li>
+            <li><a href="profile.html">الملف الشخصي</a></li>
+            <li><a href="index.html">كورساتي</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>تواصل معنا</h4>
+          <ul>
+            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone"></i> 01096295395</a></li>
+            <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> واتساب</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© <span id="year"></span> Nexora Academy — جميع الحقوق محفوظة</p>
+        <p style="margin-top:4px;">صُنع بـ ❤️ في مصر</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (menuBtn && mobileMenu) {
+      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('open'));
+      mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

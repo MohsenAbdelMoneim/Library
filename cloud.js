@@ -1,15 +1,17 @@
 /* ==========================================================
-   cloud.js — v15.1
-   المزامنة السحابية: الكورسات والاشتراكات على Firestore
+   cloud.js — v16
+   المزامنة السحابية: الكورسات + الاشتراكات على Firestore
    القراءة للجميع — النشر للمالك فقط (owner@gymzone.com)
+   ✅ النشر لحظي عند أي تغيير (كورسات أو اشتراكات) بدون polling
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Cloud — v15.1 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c MCL Cloud — v16 ', 'background:#2684fc;color:#fff;font-weight:bold');
 
-  const firebaseConfig = {
+  /* المفاتيح تيجي من config.js (بفولباك للقيم المباشرة لو config مش محمّل) */
+  const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
     projectId: "gymzone-f53f1",
@@ -17,44 +19,54 @@
     messagingSenderId: "138864850130",
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
-  const OWNER_EMAIL = 'owner@gymzone.com';
+  const OWNER_EMAIL = window.__OWNER_EMAIL__ || 'owner@gymzone.com';
+  const OWNER_PASSWORD = window.__OWNER_PASSWORD__ || null;
   const RES_KEY = 'my-course-library:resources:v1';
+  const SUBS_LOCAL_KEY = 'my-course-library:subs-local';
 
   if (!window.firebase) {
     console.error('[CLOUD] مكتبة Firebase مش محمّلة — راجع سطور السكربت في index.html');
     return;
   }
 
-  /* تهيئة آمنة — catalog/student/roadmap/auth ممكن يبدأوا قبله أو بعده */
+  /* تهيئة آمنة — باقي الملفات ممكن تكون مهيئة قبله */
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
   const resDoc = db.doc('library/main');
   const subsDoc = db.doc('config/subscriptions');
 
-  const CloudSync = window.CloudSync = { authed: false };
+  const CloudSync = window.CloudSync = { authed: false, ready: false };
 
   const snap = (o) => JSON.stringify(o);
   let lastPushedRes = null;
   let lastPushedSubs = null;
   let authAttempted = false;
+  let authRetryTimer = null;
 
   function toast(msg, type, duration) {
     if (typeof window.showToast === 'function') window.showToast(msg, type, { duration: duration || 5000 });
     else console.log('[CLOUD]', msg);
   }
 
-  /* ---------- تنظيف الاشتراكات الواردة ---------- */
+  /* ---------- تنظيف الاشتراكات الواردة (متسامح — يتجاهل الخاطئ مش يرفض الكل) ---------- */
   function sanitizeSubs(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const out = {};
-    const normPhone = (window.MCL && MCL.normPhone) ? MCL.normPhone : (s) => String(s).replace(/\s+/g, '').trim();
+    const normPhone = (window.MCL && MCL.normPhone)
+      ? MCL.normPhone
+      : (s) => String(s || '').replace(/\s+/g, '').trim();
+
+    let invalidCount = 0;
     for (const [k, v] of Object.entries(raw)) {
       const p = normPhone(k);
-      if (!/^01\d{9}$/.test(p)) return null;
+      if (!/^01\d{9}$/.test(p)) { invalidCount++; continue; }
       if (v === 'all') { out[p] = 'all'; continue; }
       if (Array.isArray(v) && v.every((x) => typeof x === 'string' && x.trim())) { out[p] = v; continue; }
-      return null;
+      invalidCount++;
+    }
+    if (invalidCount > 0) {
+      console.warn('[CLOUD] اشتراكات غير صالحة تم تجاهلها:', invalidCount);
     }
     return out;
   }
@@ -68,14 +80,17 @@
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
   }
 
-  /* محمّل الاشتراكات: يقرا من السحابة بدل الملف */
+  /* ---------- محمّل الاشتراكات: السحابة أولًا ثم الملف الاحتياطي ---------- */
   if (window.MCL) {
     MCL.loadSubscriptions = async function () {
       try {
         const doc = await subsDoc.get();
         if (doc.exists) {
           const subs = sanitizeSubs(doc.data().subscriptions);
-          if (subs) { applySubs(subs, 'من السحابة'); return; }
+          if (subs && Object.keys(subs).length > 0) {
+            applySubs(subs, 'من السحابة');
+            return;
+          }
         }
         console.info('[CLOUD] السحابة فاضية من الاشتراكات — محاولة الملف الاحتياطي');
       } catch (e) {
@@ -100,7 +115,7 @@
     }
     const arr = doc.data().resources || [];
     const str = JSON.stringify(arr);
-    if (str === lastPushedRes) return; /* صدى لتعديلنا بنفسنا — تجاهل */
+    if (str === lastPushedRes) return; /* صدى — تجاهل */
     try { localStorage.setItem(RES_KEY, str); } catch (e) { /* تجاهل */ }
     if (typeof window.__applyCloudResources === 'function') {
       window.__applyCloudResources(arr);
@@ -117,36 +132,73 @@
   }, (err) => console.warn('[CLOUD] استماع الاشتراكات:', err.code));
 
   /* ---------- 🛡️ نقطة الحماية الحرجة ----------
-     onAuthStateChanged بيرن لكل مستخدم (طلاب كمان!) —
-     فبنتحقق أن المستخدم هو المالك بالإيميل قبل اعتباره قادرًا على النشر.
-     الطالب العادي: authed = false → مفيش push خالص من جهازه. */
+     onAuthStateChanged بيشتغل لكل مستخدم (طلاب كمان) —
+     بنتحقق أن المستخدم هو المالك بالإيميل قبل اعتباره قادرًا على النشر. */
   auth.onAuthStateChanged((user) => {
     const isOwner = !!user && user.email === OWNER_EMAIL;
     CloudSync.authed = isOwner;
+    CloudSync.ready = true;
+
     if (isOwner) {
       console.info('[CLOUD] ✅ متصل بالسحابة كمالك — كل تعديلاتك بتنشر تلقائيًا');
       pushAll(true);
     } else if (user) {
-      /* مستخدم مسجّل لكنه مش المالك (طالب) — قراية بس */
       console.info('[CLOUD] مستخدم طالب متصل — وضع القراءة فقط (مفيش نشر)');
+    } else {
+      console.info('[CLOUD] مفيش مستخدم — وضع القراءة فقط');
     }
   });
 
-  setInterval(() => {
-    if (authAttempted || CloudSync.authed) return;
-    if (!(window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive())) return;
+  /* ---------- دخول المالك للسحابة (مرة واحدة + retry واحد بعد 30 ثانية) ---------- */
+  function attemptOwnerSignIn() {
+    if (CloudSync.authed || authAttempted) return;
+    if (!OWNER_PASSWORD) {
+      console.info('[CLOUD] مفيش OWNER_PASSWORD في config — النشر التلقائي معطّل.');
+      return;
+    }
     authAttempted = true;
-    auth.signInWithEmailAndPassword(OWNER_EMAIL, MCL.ADMIN_PASSWORD)
+    auth.signInWithEmailAndPassword(OWNER_EMAIL, OWNER_PASSWORD)
+      .then(() => {
+        console.info('[CLOUD] ✅ دخول المالك نجح');
+      })
       .catch((e) => {
         console.warn('[CLOUD] فشل دخول السحابة:', e.code);
         if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
-          toast('التعديلات هتشتغل محليًا بس مش هتنشر. افتح Firebase Console → Authentication → Users وتأكد إن فيه مستخدم owner@gymzone.com والباسورد بتاعه 01096295395mo بالظبط.', 'warn', 12000);
+          toast('التعديلات هتشتغل محليًا بس مش هتنشر. افتح Firebase Console → Authentication → Users وتأكد إن فيه مستخدم ' +
+                OWNER_EMAIL, 'warn', 12000);
         }
-        setTimeout(() => { authAttempted = false; }, 30000);
+        if (authRetryTimer) clearTimeout(authRetryTimer);
+        authRetryTimer = setTimeout(() => {
+          authAttempted = false;
+          if (window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive()) {
+            attemptOwnerSignIn();
+          }
+        }, 30000);
       });
-  }, 2000);
+  }
 
-  /* ---------- النشر التلقائي (للمالك فقط — مضمون بالتحقق فوق + Rules) ---------- */
+  /* ---------- مراقبة حالة المالك (MutationObserver بدل polling) ---------- */
+  let lastAdminState = false;
+  function checkAdminState() {
+    const isAdmin = !!(window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive());
+    if (isAdmin && !lastAdminState) {
+      attemptOwnerSignIn();
+    }
+    lastAdminState = isAdmin;
+  }
+
+  function observeAdminChip() {
+    const chip = document.querySelector('#adminChip');
+    if (!chip) {
+      setInterval(checkAdminState, 5000);
+      return;
+    }
+    const observer = new MutationObserver(checkAdminState);
+    observer.observe(chip, { attributes: true, attributeFilter: ['class'] });
+    checkAdminState();
+  }
+
+  /* ---------- النشر (للمالك فقط) ---------- */
   function pushAll(force) {
     if (!CloudSync.authed) return;
     try {
@@ -170,9 +222,33 @@
     } catch (e) { console.warn('[CLOUD] push:', e); }
   }
 
-  setInterval(() => {
-    if (!(window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive())) return;
-    if (!CloudSync.authed) return;
-    pushAll(false);
-  }, 2500);
+  /* ---------- 🔔 النشر عند تغيّر البيانات (بدون polling) ----------
+     نراقب مفتاحين في localStorage عبر Storage.prototype:
+     • RES_KEY        → الكورسات (app.js بيكتبها)
+     • SUBS_LOCAL_KEY → الاشتراكات (gate.js بيكتبها)
+     أي إضافة/تعديل/حذف مشترك → يتنشر خلال أقل من ثانية. */
+  const ORIGINAL_SET_ITEM = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (key, value) {
+    ORIGINAL_SET_ITEM.call(this, key, value);
+    if (CloudSync.authed && (key === RES_KEY || key === SUBS_LOCAL_KEY)) {
+      clearTimeout(window.__cloudPushTimer);
+      window.__cloudPushTimer = setTimeout(() => pushAll(false), 800);
+    }
+  };
+
+  /* MCL.on مش معرّف في gate.js — نعرّفه هنا احتياطيًا */
+  if (window.MCL && typeof MCL.on !== 'function') {
+    MCL.on = (fn) => { MCL._onPush = fn; };
+  }
+
+  /* ---------- الإقلاع ---------- */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      observeAdminChip();
+      setTimeout(checkAdminState, 1000);
+    }, { once: true });
+  } else {
+    observeAdminChip();
+    setTimeout(checkAdminState, 1000);
+  }
 })();

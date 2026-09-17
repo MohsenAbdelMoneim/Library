@@ -1,14 +1,16 @@
 /* ==========================================================
-   roadmap.js — v15.1
+   roadmap.js — v15.2
    خرائط التعلم: مسارات بخطوات + تقدم محفوظ سحابيًا لكل طالب
+   إصلاحات: TDZ state، capture listener، حماية DOM
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Roadmap — v15.1 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c Nexora Roadmap — v15.2 ', 'background:#2684fc;color:#fff;font-weight:bold');
 
-  const firebaseConfig = {
+  /* ⚠️ انقل المفاتيح لملف config خارجي */
+  const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
     projectId: "gymzone-f53f1",
@@ -17,10 +19,43 @@
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
 
-  /* تهيئة آمنة — cloud.js بيمر قبلنا وبيبدأ التطبيق بالفعل */
+  if (typeof firebase === 'undefined') {
+    console.error('[RM] Firebase SDK مش محمّل');
+    return;
+  }
+
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
+
+  /* ---------- أدوات مساعدة ---------- */
+  const qs  = (s) => document.querySelector(s);
+  const qsa = (s) => [...document.querySelectorAll(s)];
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+    (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  /* ✅ مساعد آمن */
+  function on(sel, evt, fn, opts) {
+    const el = typeof sel === 'string' ? qs(sel) : sel;
+    if (el) el.addEventListener(evt, fn, opts);
+    else console.warn('[RM][WIRE] عنصر غير موجود:', sel);
+    return el;
+  }
+
+  /* ✅ الوصول الآمن لـ state من app.js */
+  function getAppState() {
+    /* الطريقة الأفضل: app.js يعرّض state في window */
+    if (window.__nexoraState && Array.isArray(window.__nexoraState.resources)) {
+      return window.__nexoraState;
+    }
+    /* fallback: global lexical */
+    try {
+      if (typeof state !== 'undefined' && state && Array.isArray(state.resources)) {
+        return state;
+      }
+    } catch (e) { /* TDZ */ }
+    return null;
+  }
 
   /* ---------- الخرائط (بياناتك الفعلية بالترتيب) ---------- */
   const ROADMAPS = [
@@ -104,16 +139,11 @@
   let currentUser = null;
   let progress = {};
 
-  const qs  = (s) => document.querySelector(s);
-  const qsa = (s) => [...document.querySelectorAll(s)];
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
-    (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-
   /* ---------- أنماط ---------- */
   const STYLES = `
 .rm-wrap{max-width:900px;margin:0 auto}
-.rm-tabs{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:20px}
-.rm-tab{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:14px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+.rm-tabs{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:20px;-webkit-overflow-scrolling:touch}
+.rm-tab{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:14px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .rm-tab:hover{color:var(--ink,#ececf1);border-color:#4f7cff66}
 .rm-tab.active{background:linear-gradient(135deg,#4f7cff,#7c5cff);border-color:transparent;color:#fff}
 .rm-hero{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:20px;padding:24px;margin-bottom:22px}
@@ -135,7 +165,7 @@
 .rm-step-num{font-size:10.5px;font-weight:800;color:var(--dim,#66666f);min-width:52px}
 .rm-step-title{flex:1;min-width:140px;font-size:14px;font-weight:700;line-height:1.5}
 .rm-step-actions{display:flex;gap:8px;flex-wrap:wrap}
-.rm-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;text-decoration:none;transition:.15s}
+.rm-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;text-decoration:none;transition:.15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .rm-btn.open{background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.35);color:#7ea2ff}
 .rm-btn.open:hover{background:rgba(79,124,255,.22)}
 .rm-btn.done-btn{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.35);color:#4ade80}
@@ -145,30 +175,28 @@
 @media (max-width:640px){
   .rm-hero{padding:18px}
   .rm-hero-title{font-size:19px}
+  .rm-hero-icon{font-size:34px}
   .rm-step-card{padding:14px}
   .rm-step-title{min-width:100%}
   .rm-step-actions{width:100%}
-  .rm-btn{flex:1;justify-content:center}
+  .rm-btn{flex:1;justify-content:center;min-height:44px;font-size:12.5px}
+  .rm-tabs{gap:8px}
+  .rm-tab{padding:10px 14px;font-size:12.5px}
 }
 `;
 
-  /* ---------- الربط بكورسات المكتبة ----------
-     ملاحظة مهمة: state معرّف بـconst في app.js (global lexical) —
-     بنوصل له بالاسم المباشر، مش window.state (اللي مش موجود أبدًا). */
+  /* ---------- الربط بكورسات المكتبة ---------- */
   function findLibResource(libTitle) {
-    try {
-      if (typeof state !== 'undefined' && state && Array.isArray(state.resources)) {
-        return state.resources.find((r) => r.title === libTitle) || null;
-      }
-    } catch (e) { /* app.js لسه محمّلش — نرجّع null بهدوء */ }
-    return null;
+    const appState = getAppState();
+    if (!appState) return null;
+    return appState.resources.find((r) => r.title === libTitle) || null;
   }
 
   function stepLockInfo(step) {
     const r = findLibResource(step.libTitle);
     if (!r) return { resource: null, locked: false, reason: '' };
-    if (r.source !== 'Google Drive') return { resource: r, locked: false };
-    if (window.MCL && !MCL.isResourceLocked(r)) return { resource: r, locked: false };
+    if (r.source !== 'Google Drive') return { resource: r, locked: false, reason: '' };
+    if (window.MCL && !MCL.isResourceLocked(r)) return { resource: r, locked: false, reason: '' };
     return { resource: r, locked: true, reason: 'اشترك في الكورس ده الأول' };
   }
 
@@ -176,7 +204,10 @@
   function ensureRoadmapDOM() {
     if (qs('#view-roadmap')) return;
     const main = qs('main#content') || qs('main');
-    if (!main) return;
+    if (!main) {
+      console.warn('[RM] main#content مش موجود');
+      return;
+    }
     if (!document.getElementById('nexRoadmapStyles')) {
       const st = document.createElement('style');
       st.id = 'nexRoadmapStyles';
@@ -206,9 +237,12 @@
   async function saveStep(roadmapId, idx, on) {
     progress[roadmapId] = progress[roadmapId] || {};
     progress[roadmapId][idx] = on;
-    if (!currentUser) return; /* مش مسجل → محلي مؤقت بس */
+    if (!currentUser) return;   /* مش مسجل → محلي مؤقت بس */
     try {
-      await db.collection('roadmapProgress').doc(currentUser.uid).set({ steps: progress }, { merge: true });
+      await db.collection('roadmapProgress').doc(currentUser.uid).set(
+        { steps: progress },
+        { merge: true }
+      );
     } catch (e) {
       console.warn('[RM] حفظ التقدم:', e.code);
     }
@@ -256,20 +290,21 @@
     let actions = '';
     if (info.resource && !locked) {
       actions += `<a class="rm-btn open" href="${esc(info.resource.url)}" target="_blank" rel="noopener noreferrer">
-        <i class="bi bi-play-circle"></i>افتح الكورس</a>`;
+        <i class="bi bi-play-circle" aria-hidden="true"></i>افتح الكورس</a>`;
     } else if (locked && info.locked) {
       actions += `<a class="rm-btn wa" href="https://wa.me/201096295395?text=${encodeURIComponent('أهلاً 👋 عايز أشترك في كورس «' + step.libTitle + '» عشان أكمل المسار')}" target="_blank" rel="noopener noreferrer">
-        <i class="bi bi-whatsapp"></i>اشترك</a>`;
+        <i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك</a>`;
     }
     if (done) {
       actions += `<button type="button" class="rm-btn done-btn" data-rm-undone="${esc(rm.id)}" data-rm-idx="${i}">
-        <i class="bi bi-arrow-counterclockwise"></i>رجّعها</button>`;
+        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>رجّعها</button>`;
     } else if (!locked) {
       actions += `<button type="button" class="rm-btn done-btn" data-rm-done="${esc(rm.id)}" data-rm-idx="${i}">
-        <i class="bi bi-check2-circle"></i>خلصت الخطوة دي ✓</button>`;
+        <i class="bi bi-check2-circle" aria-hidden="true"></i>خلصت الخطوة دي ✓</button>`;
     }
 
-    const hint = lockedBySeq && !info.locked ? '<p class="rm-hint">🔗 خلّص الخطوة اللي قبلها الأول</p>'
+    const hint = lockedBySeq && !info.locked
+      ? '<p class="rm-hint">🔗 خلّص الخطوة اللي قبلها الأول</p>'
       : (info.locked ? '<p class="rm-hint">🔒 ' + esc(info.reason) + '</p>' : '');
 
     return `
@@ -288,16 +323,19 @@
     const rm = ROADMAPS.find((r) => r.id === rmId) || ROADMAPS[0];
     const inner = qs('#rmInner');
     if (!inner) return;
-    inner.innerHTML = heroHTML(rm) + `<div class="rm-steps">${rm.steps.map((s, i) => stepHTML(rm, s, i)).join('')}</div>`;
+    inner.innerHTML = heroHTML(rm) +
+      `<div class="rm-steps">${rm.steps.map((s, i) => stepHTML(rm, s, i)).join('')}</div>`;
 
-    qsa('#rmInner [data-rm-done]').forEach((b) => b.addEventListener('click', async () => {
-      await saveStep(b.dataset.rmDone, Number(b.dataset.rmIdx), true);
-      renderRoadmap(rm.id);
-    }));
-    qsa('#rmInner [data-rm-undone]').forEach((b) => b.addEventListener('click', async () => {
-      await saveStep(b.dataset.rmUndone, Number(b.dataset.rmIdx), false);
-      renderRoadmap(rm.id);
-    }));
+    qsa('#rmInner [data-rm-done]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        await saveStep(b.dataset.rmDone, Number(b.dataset.rmIdx), true);
+        renderRoadmap(rm.id);
+      }));
+    qsa('#rmInner [data-rm-undone]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        await saveStep(b.dataset.rmUndone, Number(b.dataset.rmIdx), false);
+        renderRoadmap(rm.id);
+      }));
   }
 
   function renderAll() {
@@ -311,15 +349,17 @@
     </div>
     ${tabsHTML()}
     <div id="rmDetail"></div>`;
+
     renderRoadmap(ROADMAPS[0].id);
-    qsa('[data-rm-tab]').forEach((t) => t.addEventListener('click', () => {
-      qsa('[data-rm-tab]').forEach((x) => x.classList.remove('active'));
-      t.classList.add('active');
-      renderRoadmap(t.dataset.rmTab);
-    }));
+    qsa('[data-rm-tab]').forEach((t) =>
+      t.addEventListener('click', () => {
+        qsa('[data-rm-tab]').forEach((x) => x.classList.remove('active'));
+        t.classList.add('active');
+        renderRoadmap(t.dataset.rmTab);
+      }));
   }
 
-  /* ---------- بند القايمة + إعادة الحقن بعد كل رسم ---------- */
+  /* ---------- بند القايمة ---------- */
   function ensureNavEntry() {
     const nav = qs('#sideNav');
     if (!nav || qs('[data-nav="view:roadmap"]')) return;
@@ -328,55 +368,85 @@
     btn.type = 'button';
     btn.dataset.nav = 'view:roadmap';
     btn.className = 'nav-item';
-    btn.innerHTML = '<i class="bi bi-signpost-split text-[13.5px] w-4 text-center shrink-0"></i>' +
+    btn.innerHTML = '<i class="bi bi-signpost-split text-[13.5px] w-4 text-center shrink-0" aria-hidden="true"></i>' +
                     '<span class="grow text-start truncate">خرائط التعلم</span>';
     if (cat) cat.after(btn);
     else nav.appendChild(btn);
   }
 
-  /* الهوك بيتنصّب مؤجَّلًا (من boot) — بعد ما app.js يعرّف renderSidebar */
+  /* ✅ الهوك بيتنصّب مؤجَّلًا — بعد ما app.js يعرّف renderSidebar */
   function installSidebarHook() {
     if (window.__rmSidebarHooked) return;
-    const orig = window.renderSidebar;
-    if (typeof orig !== 'function') return;
+    if (typeof window.renderSidebar !== 'function') return;
     window.__rmSidebarHooked = true;
+    const orig = window.renderSidebar;
     window.renderSidebar = function () {
-      orig();
+      try { orig(); } catch (e) { console.error('[RM] renderSidebar:', e); }
       ensureNavEntry();
+      bindRoadmapNav();
     };
   }
 
-  document.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-nav="view:roadmap"]');
-    if (!b) return;
-    e.stopPropagation();
-    e.preventDefault();
-    qsa('main#content > section:not(#view-roadmap)').forEach((s) => s.classList.add('hidden'));
-    qs('#view-roadmap')?.classList.remove('hidden');
-    qs('#pageTitle').textContent = 'خرائط التعلم';
-    qs('#pageSub').textContent = 'اختار مسارك واتبع الخطوات';
-    window.scrollTo(0, 0);
-    qs('#sidebar')?.classList.remove('open');
-    qs('#overlay')?.classList.add('hidden');
-    await loadProgress();
-    renderAll();
-  }, true);
+  /* ✅ listener على #sideNav بدل document */
+  function bindRoadmapNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__rmNavBound) return;
+    nav.__rmNavBound = true;
+    nav.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-nav="view:roadmap"]');
+      if (!b) return;
+      e.preventDefault();
+      qsa('main#content > section:not(#view-roadmap)').forEach((s) => s.classList.add('hidden'));
+      const v = qs('#view-roadmap');
+      if (v) v.classList.remove('hidden');
+      const pt = qs('#pageTitle'); if (pt) pt.textContent = 'خرائط التعلم';
+      const ps = qs('#pageSub');   if (ps) ps.textContent = 'اختار مسارك واتبع الخطوات';
+      window.scrollTo(0, 0);
+      const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
+      const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
+      await loadProgress();
+      renderAll();
+    });
+  }
 
-  /* ---------- تشغيل (مؤجَّل — بعد جاهزية app.js) ---------- */
+  /* ---------- تشغيل ---------- */
   function boot() {
     ensureRoadmapDOM();
     ensureNavEntry();
-    installSidebarHook(); /* ← هنا بتلقائي: renderSidebar مبقى موجود */
+    bindRoadmapNav();
+    installSidebarHook();
     auth.onAuthStateChanged(async (user) => {
       currentUser = user;
       ensureNavEntry();
+      bindRoadmapNav();
       if (user) await loadProgress();
     });
   }
 
+  /* ✅ التشغيل بعد DOM + بعد window.load كضمان */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
   } else {
     boot();
   }
+
+  /* ✅ ضمان إضافي: لو app.js خلّص بعده */
+  window.addEventListener('load', () => {
+    ensureNavEntry();
+    bindRoadmapNav();
+    installSidebarHook();
+  }, { once: true });
+
+  /* ✅ راقب السايدبار */
+  function observeSideNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__rmObserver) return;
+    nav.__rmObserver = new MutationObserver(() => {
+      ensureNavEntry();
+      bindRoadmapNav();
+    });
+    nav.__rmObserver.observe(nav, { childList: true });
+  }
+
+  observeSideNav();
 })();

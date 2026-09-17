@@ -1,6 +1,7 @@
 /* ==========================================================
    My Course Library — style.css
    طبقة التنسيق المخصصة فوق Tailwind CSS (Dark فقط)
+   v16 — إصلاحات الموبايل + sticky header + safe-area
    ========================================================== */
 
 :root {
@@ -18,11 +19,16 @@
   color-scheme: dark; /* يجعل عناصر النظام (select / scrollbar) داكنة */
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;               /* أفضل من hidden — مايكسرش sticky */
+}
 
 body {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   text-rendering: optimizeLegibility;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 ::selection { background: rgba(240, 181, 62, .28); }
@@ -265,6 +271,7 @@ code {
   }
   html { scroll-behavior: auto; }
 }
+
 /* ---------- قفل كورسات Google Drive ---------- */
 .lock-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -287,7 +294,9 @@ code {
 .lock-overlay {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 11.5px; font-weight: 600; color: var(--acc);
-  background: rgba(10, 10, 13, .75); backdrop-filter: blur(4px);
+  background: rgba(10, 10, 13, .75);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   border: 1px solid rgba(240, 181, 62, .35);
   padding: 7px 13px; border-radius: 999px;
 }
@@ -298,76 +307,60 @@ code {
   30%, 50%, 70% { transform: translateX(-4px); }
   40%, 60% { transform: translateX(4px); }
 }
+
 /* ==========================================================
-   Nexora Mobile-First Enhancements — v15
-   إصلاح تجربة الهاتف: navbar مثبت، أزرار كبيرة، مفيش horizontal scroll
+   Nexora Mobile-First Enhancements — v16
+   إصلاح: sticky header، منع horizontal scroll، تجربة لمس أفضل
    ========================================================== */
 
-/* منع أي تمرير أفقي نهائيًا */
-html, body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* الهيدر مثبت دايمًا قدام الكل */
+/* الهيدر مثبت — لازم مايكونش داخل عنصر فيه overflow غير visible */
 header {
   position: sticky;
   top: 0;
   z-index: 40;
+  isolation: isolate;             /* يحتوي الـ stacking context */
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
-/* أزرار كبيرة ومريحة على الموبايل */
+/* تحسين التفاعل باللمس */
+.btn-accent,
+.btn-ghost,
+.btn-danger,
+.btn-danger-o,
+.icon-btn,
+.seg-btn,
+.lock-chip,
+button.stat,
+.open-btn {
+  touch-action: manipulation;     /* يلغي double-tap zoom delay */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== الموبايل (≤ 640px) ===== */
 @media (max-width: 640px) {
+  /* أزرار كبيرة ومريحة */
   .btn-accent, .btn-ghost, .btn-danger, .btn-danger-o {
     min-height: 44px;
     font-size: 13.5px;
     padding: 0 16px;
   }
-  .icon-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
-  }
-  .seg-btn {
-    width: 38px;
-    height: 38px;
-    font-size: 15px;
-  }
-  .lock-chip {
-    height: 40px;
-    font-size: 12px;
-  }
-  #menuBtn {
-    width: 44px;
-    height: 44px;
-  }
+  .icon-btn { width: 40px; height: 40px; font-size: 16px; }
+  .seg-btn  { width: 38px; height: 38px; font-size: 15px; }
+  .lock-chip { height: 40px; font-size: 12px; }
+  #menuBtn  { width: 44px; height: 44px; }
 
-  /* الإحصائيات: شبكة مريحة 2×2 */
-  #statsBar {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .stat {
-    padding: 12px 10px;
-  }
-  .stat-num {
-    font-size: 18px;
-  }
-  .stat-label {
-    font-size: 10px;
-  }
+  /* الإحصائيات: شبكة 2×2 مريحة */
+  #statsBar { grid-template-columns: repeat(2, 1fr); }
+  .stat       { padding: 12px 10px; }
+  .stat-num   { font-size: 18px; }
+  .stat-label { font-size: 10px; }
 
-  /* الكروت بتاخد العرض كامل والنص مبيقصش غلط */
-  .cat-chip {
-    font-size: 10px;
-    padding: 3px 8px;
-  }
-  .line-clamp-2 {
-    -webkit-line-clamp: 3;
-  }
+  /* الشيبس والنص */
+  .cat-chip     { font-size: 10px; padding: 3px 8px; }
+  .line-clamp-2 { -webkit-line-clamp: 3; }
 
-  /* شريط الأدوات (بحث + فلاتر) عمودي مريح */
+  /* شريط الأدوات عمودي */
   #view-library > div:nth-child(2) {
     flex-direction: column;
     align-items: stretch !important;
@@ -384,33 +377,44 @@ header {
     align-self: flex-end;
   }
 
-  /* المودالات: كاملة تقريبًا على الشاشة مع scroll داخلي */
+  /* المودالات: عرض كامل تقريبًا + scroll داخلي */
   .modal-panel {
+    width: 100%;
     max-width: calc(100vw - 16px) !important;
-    max-height: calc(100dvh - 32px);
+    max-height: calc(100vh - 32px);        /* fallback */
+    max-height: calc(100dvh - 32px);       /* حديث */
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;     /* iOS momentum scroll */
   }
 
-  /* التوستات فوق مش جوه السكرول */
+  /* التوستات: تحت الهيدر مباشرة */
   #toasts {
+    position: fixed;
     bottom: auto;
-    top: 72px;
+    top: calc(env(safe-area-inset-top, 0px) + 64px);
     left: 8px;
     right: 8px;
     width: auto;
     max-width: none;
+    z-index: 50;                           /* أقل من الـ sidebar */
   }
 
-  /* الدوراويل (القايمة الجانبية) فوق كل حاجة */
+  /* السايدبار فوق كل حاجة */
   #sidebar {
     z-index: 60;
     box-shadow: -8px 0 32px rgba(0, 0, 0, .6);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
-/* في الوضع شبه الموبايل (641-1023): سطرين إحصائيات مريحين */
+/* ===== تابلت (641–1279px) ===== */
 @media (min-width: 641px) and (max-width: 1279px) {
-  #statsBar {
-    grid-template-columns: repeat(4, 1fr);
+  #statsBar { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ===== دعم iPhone notch ===== */
+@supports (padding: env(safe-area-inset-top)) {
+  header {
+    padding-top: env(safe-area-inset-top);
   }
 }

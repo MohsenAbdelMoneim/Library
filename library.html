@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="description" content="Nexora Academy — منصة تعليمية احترافية: كورسات، مسارات تعلم، واشتراكات بالتقسيط">
+  <title>Nexora Academy — منصة التعلم</title>
+  <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
+
+  <!-- الخطوط -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap Icons (أيقونات فقط) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas:  '#0a0a0d',
+            panel:   '#101015',
+            raise:   '#16161d',
+            edge:    '#212129',
+            edge2:   '#2e2e39',
+            ink:     '#ececf1',
+            mut:     '#9c9cab',
+            dim:     '#66666f',
+            accent:  '#f0b53e',
+            accent2: '#f7c85f',
+            red:     '#e5484d'
+          },
+          fontFamily: {
+            sans: ['"IBM Plex Sans Arabic"', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="style.css?v=16">
+</head>
+
+<body class="bg-canvas text-ink font-sans antialiased min-h-screen">
+
+  <a href="#content" class="skip-link">تخطَّ إلى المحتوى</a>
+
+  <div id="overlay" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] hidden lg:hidden"></div>
+
+  <!-- ===== Sidebar ===== -->
+  <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-[272px] max-w-[85vw] bg-panel border-s border-edge flex flex-col translate-x-full lg:translate-x-0 transition-transform duration-300"
+         aria-label="الشريط الجانبي">
+    <div class="flex items-center justify-between gap-2 px-4 h-16 border-b border-edge shrink-0">
+      <div class="flex items-center gap-2.5">
+        <span class="logo-mark"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
+        <div class="leading-tight">
+          <h1 class="text-[13.5px] font-bold text-ink">Nexora Academy</h1>
+          <p class="text-[10px] text-dim">Learn · Build · Grow</p>
+        </div>
+      </div>
+      <button id="closeSidebarBtn" class="icon-btn lg:hidden" aria-label="إغلاق القائمة">
+        <i class="bi bi-x-lg text-[13px]"></i>
+      </button>
+    </div>
+
+    <nav id="sideNav" class="flex-1 overflow-y-auto py-3 px-3" aria-label="التنقل الرئيسي"></nav>
+
+    <div class="shrink-0 border-t border-edge p-4">
+      <p class="flex items-start gap-2 text-[10.5px] leading-relaxed text-dim">
+        <i class="bi bi-cloud-check mt-0.5 shrink-0" aria-hidden="true"></i>
+        <span>المنصة متزامنة سحابيًا — تقدّمك وكورساتك معاك على أي جهاز.</span>
+      </p>
+    </div>
+  </aside>
+
+  <!-- ===== المحتوى ===== -->
+  <div class="min-h-screen flex flex-col lg:ps-[272px]">
+
+    <header class="sticky top-0 z-30 border-b border-edge bg-canvas/85 backdrop-blur">
+      <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
+        <button id="menuBtn" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition lg:hidden"
+                aria-label="فتح القائمة" aria-expanded="false">
+          <i class="bi bi-list text-[18px]"></i>
+        </button>
+        <div class="min-w-0">
+          <h2 id="pageTitle" class="text-[15px] font-semibold truncate">المكتبة</h2>
+          <p id="pageSub" class="text-[11px] text-dim truncate"></p>
+        </div>
+        <div class="ms-auto flex items-center gap-2 shrink-0">
+          <button id="lockChip" type="button" class="lock-chip locked">
+            <i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>
+            <span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>
+          </button>
+          <button id="quickExportBtn" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition"
+                  aria-label="تصدير نسخة احتياطية JSON" title="تصدير نسخة احتياطية JSON">
+            <i class="bi bi-download text-[14px]"></i>
+          </button>
+          <button id="addResourceBtn" class="btn-accent">
+            <i class="bi bi-plus-lg text-[13px]" aria-hidden="true"></i>
+            <span class="hidden sm:inline">إضافة مورد</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="content" class="grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+      <!-- ===== المكتبة ===== -->
+      <section id="view-library" aria-label="المكتبة">
+
+        <section id="statsBar" aria-label="إحصائيات المكتبة"
+                 class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-px rounded-2xl border border-edge bg-edge overflow-hidden">
+          <button type="button" class="stat" data-stat="total">
+            <span class="stat-num" id="s-total">0</span>
+            <span class="stat-label"><i class="bi bi-collection" aria-hidden="true"></i>إجمالي الموارد</span>
+          </button>
+          <button type="button" class="stat" data-stat="status:Not Started">
+            <span class="stat-num" id="s-ns">0</span>
+            <span class="stat-label"><span class="dot" style="background:#8b8b98"></span>غير مبدوء</span>
+          </button>
+          <button type="button" class="stat" data-stat="status:In Progress">
+            <span class="stat-num" id="s-ip">0</span>
+            <span class="stat-label"><span class="dot pulse-dot" style="background:#f0b53e"></span>قيد التنفيذ</span>
+          </button>
+          <button type="button" class="stat" data-stat="status:Completed">
+            <span class="stat-num" id="s-cp">0</span>
+            <span class="stat-label"><span class="dot" style="background:#4ade80"></span>مكتمل</span>
+          </button>
+          <button type="button" class="stat" data-stat="source:Google Drive">
+            <span class="stat-num" id="s-drive">0</span>
+            <span class="stat-label"><i class="bi bi-cloud-fill" style="color:#2684fc" aria-hidden="true"></i>Google Drive</span>
+          </button>
+          <button type="button" class="stat" data-stat="source:YouTube">
+            <span class="stat-num" id="s-yt">0</span>
+            <span class="stat-label"><i class="bi bi-youtube" style="color:#ff5b52" aria-hidden="true"></i>YouTube</span>
+          </button>
+          <button type="button" class="stat" data-stat="favorites">
+            <span class="stat-num" id="s-fav">0</span>
+            <span class="stat-label"><i class="bi bi-star-fill" style="color:#f0b53e" aria-hidden="true"></i>المفضلة</span>
+          </button>
+          <div class="stat cursor-default" aria-label="عدد التصنيفات">
+            <span class="stat-num" id="s-cats">0</span>
+            <span class="stat-label"><i class="bi bi-tags" aria-hidden="true"></i>التصنيفات</span>
+          </div>
+        </section>
+
+        <div class="mt-6 flex flex-wrap items-center gap-2.5">
+          <div class="relative grow min-w-[220px] max-w-md">
+            <i class="bi bi-search absolute start-3 top-1/2 -translate-y-1/2 text-dim text-[13px]" aria-hidden="true"></i>
+            <input id="searchInput" type="search" placeholder="ابحث في العنوان والتصنيف والوصف والملاحظات…"
+                   class="field !h-10 ps-9 pe-12" aria-label="بحث في الموارد">
+            <kbd class="absolute end-3 top-1/2 -translate-y-1/2 pointer-events-none">/</kbd>
+          </div>
+
+          <select id="filterSource" class="field !h-10 !w-auto" aria-label="تصفية حسب المصدر">
+            <option value="all">كل المصادر</option>
+            <option value="Google Drive">Google Drive</option>
+            <option value="YouTube">YouTube</option>
+          </select>
+
+          <select id="filterStatus" class="field !h-10 !w-auto" aria-label="تصفية حسب الحالة">
+            <option value="all">كل الحالات</option>
+            <option value="Not Started">غير مبدوء</option>
+            <option value="In Progress">قيد التنفيذ</option>
+            <option value="Completed">مكتمل</option>
+          </select>
+
+          <select id="sortSelect" class="field !h-10 !w-auto" aria-label="ترتيب النتائج">
+            <option value="newest">الأحدث إضافة</option>
+            <option value="oldest">الأقدم إضافة</option>
+            <option value="az">الاسم A-Z</option>
+            <option value="za">الاسم Z-A</option>
+            <option value="opened">الأحدث فتحًا</option>
+          </select>
+
+          <div class="flex items-center rounded-[10px] border border-edge bg-panel p-0.5 ms-auto"
+               role="group" aria-label="طريقة العرض">
+            <button id="viewGrid" class="seg-btn" aria-label="عرض شبكي" aria-pressed="true">
+              <i class="bi bi-grid-3x3-gap"></i>
+            </button>
+            <button id="viewList" class="seg-btn" aria-label="عرض قائمة" aria-pressed="false">
+              <i class="bi bi-list-ul"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 mb-3 flex items-center justify-between gap-3">
+          <p id="resultsMeta" class="text-[11.5px] text-dim" aria-live="polite"></p>
+          <button id="clearFiltersBtn" class="hidden items-center gap-1.5 text-[11.5px] text-accent hover:text-accent2 transition">
+            <i class="bi bi-x-circle text-[12px]" aria-hidden="true"></i>مسح الفلاتر
+          </button>
+        </div>
+
+        <div id="cardsContainer"></div>
+      </section>
+
+      <!-- ===== الملفات المهمة ===== -->
+      <section id="view-files" class="hidden" aria-labelledby="filesHeading">
+        <div class="rounded-2xl border border-edge bg-panel overflow-hidden">
+          <div class="px-5 py-4 border-b border-edge flex items-center gap-2.5">
+            <i class="bi bi-file-earmark-word-fill text-[16px]" style="color:#6ea2f0" aria-hidden="true"></i>
+            <h2 id="filesHeading" class="text-[13.5px] font-semibold">مستندات Word المهمة</h2>
+            <span class="text-[11px] text-dim">ملفان</span>
+          </div>
+          <ul>
+            <li class="flex flex-wrap items-center gap-3 px-5 py-4">
+              <span class="source-tile"><i class="bi bi-file-earmark-word-fill text-[17px]" style="color:#6ea2f0" aria-hidden="true"></i></span>
+              <div class="grow min-w-0">
+                <p class="text-[13px] font-medium font-mono text-ink" dir="ltr">file-1.docx</p>
+              </div>
+              <span class="docx-badge">DOCX</span>
+              <div class="flex items-center gap-2">
+                <a href="assets/files/file-1.docx" target="_blank" rel="noopener noreferrer" class="btn-ghost">
+                  <i class="bi bi-box-arrow-up-right text-[11px]" aria-hidden="true"></i>فتح
+                </a>
+                <a href="assets/files/file-1.docx" download class="btn-ghost">
+                  <i class="bi bi-download text-[12px]" aria-hidden="true"></i>تنزيل
+                </a>
+              </div>
+            </li>
+            <li class="flex flex-wrap items-center gap-3 px-5 py-4 border-t border-edge">
+              <span class="source-tile"><i class="bi bi-file-earmark-word-fill text-[17px]" style="color:#6ea2f0" aria-hidden="true"></i></span>
+              <div class="grow min-w-0">
+                <p class="text-[13px] font-medium font-mono text-ink" dir="ltr">file-2.docx</p>
+              </div>
+              <span class="docx-badge">DOCX</span>
+              <div class="flex items-center gap-2">
+                <a href="assets/files/file-2.docx" target="_blank" rel="noopener noreferrer" class="btn-ghost">
+                  <i class="bi bi-box-arrow-up-right text-[11px]" aria-hidden="true"></i>فتح
+                </a>
+                <a href="assets/files/file-2.docx" download class="btn-ghost">
+                  <i class="bi bi-download text-[12px]" aria-hidden="true"></i>تنزيل
+                </a>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===== إدارة البيانات ===== -->
+      <section id="view-data" class="hidden space-y-4" aria-label="إدارة البيانات">
+
+        <div class="rounded-2xl border border-edge bg-panel p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <span class="icon-tile"><i class="bi bi-box-arrow-down" aria-hidden="true"></i></span>
+          <div class="grow">
+            <h2 class="text-[13.5px] font-semibold">تصدير نسخة احتياطية</h2>
+            <p class="mt-1 text-[12px] leading-relaxed text-mut">
+              نزِّل كل الموارد (<span id="exportCount" class="text-ink font-medium">0</span>) كملف JSON —
+              مع المزامنة السحابية دي نسخة أمان إضافية.
+            </p>
+          </div>
+          <button id="exportBtn" class="btn-accent shrink-0">
+            <i class="bi bi-download text-[13px]" aria-hidden="true"></i>تصدير JSON
+          </button>
+        </div>
+
+        <div class="rounded-2xl border border-edge bg-panel p-5">
+          <div class="flex items-center gap-3">
+            <span class="icon-tile"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="text-[13.5px] font-semibold">استيراد من ملف</h2>
+              <p class="mt-1 text-[12px] text-mut">يتم التحقق من البنية والحقول قبل الاستبدال، وبعد الاستيراد هيتنشر على السحابة تلقائيًا.</p>
+            </div>
+          </div>
+          <div id="dropZone" class="mt-4 rounded-xl border border-dashed border-edge2 bg-canvas px-6 py-8 text-center cursor-pointer transition hover:border-accent/60"
+               role="button" tabindex="0" aria-label="اختر ملف JSON أو أفلته هنا">
+            <i class="bi bi-cloud-arrow-up text-[22px] text-dim" aria-hidden="true"></i>
+            <p class="mt-2 text-[13px] text-mut">اسحب ملف النسخة الاحتياطية هنا أو انقر للاختيار</p>
+            <p class="text-[11px] text-dim mt-1" dir="ltr">{ version, exportedAt, resources }</p>
+          </div>
+          <input type="file" id="importFile" accept=".json,application/json" class="hidden" aria-label="ملف JSON">
+        </div>
+
+        <div class="rounded-2xl border border-red/25 bg-panel p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <span class="icon-tile !border-red/30 !text-red"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
+          <div class="grow">
+            <h2 class="text-[13.5px] font-semibold text-red">استرجاع الموارد الأصلية</h2>
+            <p class="mt-1 text-[12px] leading-relaxed text-mut">
+              سيتم حذف الموارد الحالية (<span id="restoreCount" class="text-ink font-medium">0</span>) نهائيًا
+              واستبدالها بالقايمة الأصلية، والتغيير هينشر على السحابة.
+            </p>
+          </div>
+          <button id="restoreBtn" class="btn-danger-o shrink-0">
+            <i class="bi bi-arrow-counterclockwise text-[13px]" aria-hidden="true"></i>استرجاع
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-edge px-4 sm:px-6 lg:px-8 py-4">
+      <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-dim">
+        <p>Nexora Academy — مزامنة سحابية فورية لكل الأجهزة.</p>
+        <p dir="ltr" class="font-mono">HTML · Tailwind CSS · Firebase · Bootstrap Icons</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal: إضافة/تعديل مورد -->
+  <div id="resourceModal" class="modal fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-labelledby="resourceModalTitle">
+    <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-[3px]" data-close-resource></div>
+    <div class="absolute inset-0 overflow-y-auto">
+      <div class="min-h-full flex items-center justify-center p-4">
+        <div class="modal-panel relative w-full max-w-xl rounded-2xl border border-edge2 bg-panel shadow-2xl">
+          <div class="flex items-center justify-between px-5 h-14 border-b border-edge">
+            <h2 id="resourceModalTitle" class="text-[14px] font-semibold">إضافة مورد جديد</h2>
+            <button class="icon-btn" data-close-resource aria-label="إغلاق النافذة">
+              <i class="bi bi-x-lg text-[13px]"></i>
+            </button>
+          </div>
+
+          <form id="resourceForm" novalidate class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label for="f-title" class="field-label">العنوان <span class="text-red" aria-hidden="true">*</span></label>
+              <input id="f-title" type="text" class="field" placeholder="مثال: React JS — كورس كامل">
+              <p class="field-err hidden" id="e-title"></p>
+            </div>
+
+            <div class="sm:col-span-2">
+              <label for="f-url" class="field-label">الرابط <span class="text-red" aria-hidden="true">*</span></label>
+              <input id="f-url" type="url" class="field" dir="ltr" placeholder="https://drive.google.com/… أو https://youtube.com/…">
+              <p id="urlMaskHint" class="hidden mt-1.5 text-[11px] text-dim">
+                الرابط مخفي لأن هذا الكورس مقفل — اتركه كما هو للحفاظ على الرابط الحالي.
+              </p>
+              <p class="field-err hidden" id="e-url"></p>
+            </div>
+
+            <div>
+              <label for="f-category" class="field-label">التصنيف <span class="text-red" aria-hidden="true">*</span></label>
+              <select id="f-category" class="field">
+                <option value="" disabled selected>اختر التصنيف…</option>
+              </select>
+              <p class="field-err hidden" id="e-category"></p>
+            </div>
+
+            <div>
+              <label for="f-source" class="field-label">المصدر <span class="text-red" aria-hidden="true">*</span></label>
+              <select id="f-source" class="field">
+                <option value="" disabled selected>اختر المصدر…</option>
+                <option value="Google Drive">Google Drive</option>
+                <option value="YouTube">YouTube</option>
+              </select>
+              <p class="field-err hidden" id="e-source"></p>
+            </div>
+
+            <div>
+              <label for="f-status" class="field-label">الحالة <span class="text-red" aria-hidden="true">*</span></label>
+              <select id="f-status" class="field">
+                <option value="Not Started">غير مبدوء</option>
+                <option value="In Progress">قيد التنفيذ</option>
+                <option value="Completed">مكتمل</option>
+              </select>
+              <p class="field-err hidden" id="e-status"></p>
+            </div>
+
+            <div>
+              <label for="f-cover" class="field-label">رابط الغلاف <span class="text-dim font-normal">(اختياري)</span></label>
+              <input id="f-cover" type="url" class="field" dir="ltr" placeholder="https://…/image.jpg">
+            </div>
+
+            <div class="sm:col-span-2">
+              <label for="f-description" class="field-label">الوصف <span class="text-dim font-normal">(اختياري)</span></label>
+              <textarea id="f-description" class="field" placeholder="وصف مختصر للمورد…"></textarea>
+            </div>
+
+            <div class="sm:col-span-2">
+              <label for="f-notes" class="field-label">ملاحظات <span class="text-dim font-normal">(اختياري)</span></label>
+              <textarea id="f-notes" class="field" placeholder="ملاحظاتك الشخصية…"></textarea>
+            </div>
+
+            <div id="dupBox" class="sm:col-span-2 hidden rounded-xl border border-accent/30 bg-accent/10 px-4 py-3">
+              <div class="flex items-start gap-2.5">
+                <i class="bi bi-exclamation-triangle-fill text-accent mt-0.5" aria-hidden="true"></i>
+                <div class="grow text-[12.5px] leading-relaxed text-ink">
+                  <p id="dupMsg"></p>
+                  <button type="button" id="dupConfirmBtn"
+                          class="mt-2 text-[12px] font-semibold text-accent hover:text-accent2 underline underline-offset-4">
+                    إضافة على أي حال
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="sm:col-span-2 flex items-center justify-end gap-2 pt-2 border-t border-edge">
+              <button type="button" class="btn-ghost" data-close-resource>إلغاء</button>
+              <button type="submit" id="saveResourceBtn" class="btn-accent">إضافة المورد</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: تأكيد -->
+  <div id="confirmModal" class="modal fixed inset-0 z-[65] hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-[3px]" data-close-confirm></div>
+    <div class="absolute inset-0 overflow-y-auto">
+      <div class="min-h-full flex items-center justify-center p-4">
+        <div class="modal-panel relative w-full max-w-md rounded-2xl border border-edge2 bg-panel shadow-2xl p-5">
+          <div class="flex items-start gap-3">
+            <span id="confirmIcon" class="icon-tile !border-red/30 !text-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <div class="min-w-0">
+              <h2 id="confirmTitle" class="text-[14.5px] font-semibold"></h2>
+              <p id="confirmMsg" class="mt-1.5 text-[12.5px] leading-relaxed text-mut"></p>
+            </div>
+          </div>
+          <div class="mt-5 flex items-center justify-end gap-2">
+            <button id="confirmCancel" class="btn-ghost">إلغاء</button>
+            <button id="confirmOk" class="btn-danger">تأكيد</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1) config.js — الأول دايمًا (المفاتيح وبيانات المالك) -->
+  <script src="config.js?v=17"></script>
+
+  <!-- 2) Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- 3) ملفات التطبيق -->
+  <script src="catalog-loader.js?v=1"></script>
+  <script src="gate.js?v=16"></script>
+  <script src="cloud.js?v=16"></script>
+  <script src="catalog.js?v=16"></script>
+  <script src="shop.js?v=17"></script>
+  <script src="orders.js?v=16"></script>
+  <script src="student.js?v=16"></script>
+  <script src="roadmap.js?v=16"></script>
+  <script src="admin.js?v=16"></script>
+  <script src="app.js?v=17"></script>
+</body>
+</html>

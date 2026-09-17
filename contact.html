@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="description" content="اتصل بنا — Nexora Academy للاستفسارات والدعم الفني">
+  <title>اتصل بنا — Nexora Academy</title>
+  <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <style>
+    :root {
+      --bg: #0a0a0d; --panel: #101015; --raise: #16161d;
+      --edge: #212129; --edge2: #2e2e39;
+      --ink: #ececf1; --mut: #9c9cab; --dim: #66666f;
+      --accent: #f0b53e; --accent2: #f7c85f;
+      --blue: #4f7cff; --purple: #7c5cff;
+      --green: #4ade80; --red: #e5484d;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'IBM Plex Sans Arabic', sans-serif;
+      background: var(--bg); color: var(--ink);
+      min-height: 100vh; overflow-x: clip; line-height: 1.6;
+      background-image:
+        radial-gradient(1000px 600px at 85% -5%, rgba(79,124,255,.15), transparent 55%),
+        radial-gradient(800px 500px at 5% 30%, rgba(124,92,255,.10), transparent 55%),
+        radial-gradient(900px 500px at 50% 105%, rgba(240,181,62,.08), transparent 55%);
+      background-attachment: fixed;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    img, svg { max-width: 100%; height: auto; display: block; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Navbar */
+    .navbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,13,.85);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--edge);
+    }
+    .navbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 24px;
+      height: 64px; display: flex; align-items: center; gap: 16px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-size: 18px;
+      box-shadow: 0 6px 18px rgba(79,124,255,.35);
+    }
+    .logo-text h1 {
+      font-size: 14.5px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
+    .nav-links { display: none; gap: 4px; margin-inline-start: 20px; }
+    .nav-links a {
+      padding: 8px 14px; border-radius: 10px;
+      font-size: 13px; color: var(--mut); transition: .15s;
+    }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); background: var(--raise); }
+    .nav-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
+    .btn-login {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; font-size: 12.5px; font-weight: 700; transition: .15s;
+    }
+    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-menu {
+      display: grid; place-items: center;
+      width: 38px; height: 38px; border-radius: 10px;
+      border: 1px solid var(--edge); color: var(--mut);
+    }
+    .mobile-menu {
+      display: none; border-top: 1px solid var(--edge); background: var(--panel);
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 24px; font-size: 13.5px; color: var(--mut);
+      border-bottom: 1px solid var(--edge);
+    }
+    .mobile-menu a:hover { color: var(--ink); background: var(--raise); }
+    @media (min-width: 900px) {
+      .nav-links { display: flex; }
+      .btn-menu { display: none; }
+    }
+
+    /* Page Hero */
+    .page-hero { padding: 60px 0 40px; text-align: center; }
+    .page-hero .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: 999px;
+      background: rgba(240,181,62,.08);
+      border: 1px solid rgba(240,181,62,.3);
+      color: var(--accent); font-size: 12px; font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .page-hero h1 {
+      font-size: clamp(28px, 5vw, 46px);
+      font-weight: 900; line-height: 1.3; margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff 30%, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .page-hero p {
+      font-size: clamp(14px, 2vw, 17px); color: var(--mut);
+      max-width: 600px; margin: 0 auto; line-height: 1.9;
+    }
+
+    section { padding: 40px 0 60px; }
+
+    /* Contact Grid */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    @media (min-width: 900px) {
+      .contact-grid { grid-template-columns: 1fr 1.2fr; }
+    }
+
+    /* Contact Cards */
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .info-card {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      padding: 22px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      transition: .2s;
+    }
+    .info-card:hover {
+      border-color: rgba(79,124,255,.5);
+      transform: translateY(-2px);
+    }
+    .info-icon {
+      flex-shrink: 0;
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: grid; place-items: center;
+      font-size: 22px;
+      background: linear-gradient(135deg, rgba(79,124,255,.15), rgba(124,92,255,.15));
+      border: 1px solid rgba(79,124,255,.3);
+      color: var(--blue);
+    }
+    .info-body { flex-grow: 1; min-width: 0; }
+    .info-body h4 {
+      font-size: 13px; font-weight: 700; color: var(--mut);
+      margin-bottom: 4px;
+    }
+    .info-body a, .info-body p {
+      font-size: 15px; font-weight: 700; color: var(--ink);
+      transition: .15s;
+    }
+    .info-body a:hover { color: var(--accent); }
+    .info-body .sub {
+      font-size: 11.5px; color: var(--dim); margin-top: 2px; font-weight: 400;
+    }
+
+    /* WhatsApp special */
+    .info-card.wa {
+      background: linear-gradient(135deg, rgba(37,211,102,.12), rgba(37,211,102,.05));
+      border-color: rgba(37,211,102,.35);
+    }
+    .info-card.wa .info-icon {
+      background: #25D366;
+      border-color: #25D366;
+      color: #04310f;
+    }
+    .info-card.wa:hover { border-color: #25D366; }
+
+    /* Form */
+    .form-card {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 22px;
+      padding: 32px;
+    }
+    .form-card h2 {
+      font-size: 20px; font-weight: 900; margin-bottom: 6px;
+    }
+    .form-card .form-sub {
+      font-size: 13px; color: var(--mut); margin-bottom: 24px; line-height: 1.8;
+    }
+    .fld {
+      margin-bottom: 16px;
+    }
+    .fld label {
+      display: block;
+      font-size: 12px; font-weight: 600;
+      color: var(--mut); margin-bottom: 6px;
+    }
+    .fld input, .fld textarea, .fld select {
+      width: 100%;
+      height: 46px;
+      background: var(--bg);
+      border: 1px solid var(--edge);
+      border-radius: 12px;
+      color: var(--ink);
+      font-size: 13.5px;
+      padding: 0 14px;
+      font-family: inherit;
+      transition: .15s;
+    }
+    .fld textarea {
+      height: auto;
+      min-height: 120px;
+      padding: 12px 14px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+    .fld input:focus, .fld textarea:focus, .fld select:focus {
+      outline: none;
+      border-color: rgba(79,124,255,.6);
+      box-shadow: 0 0 0 3px rgba(79,124,255,.12);
+    }
+    .fld input.invalid, .fld textarea.invalid {
+      border-color: rgba(229,72,77,.6);
+    }
+    .fld .err {
+      font-size: 11px;
+      color: #f4636e;
+      margin-top: 5px;
+      display: none;
+    }
+    .fld .err.show { display: block; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 600px) {
+      .form-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    .btn-submit {
+      width: 100%;
+      height: 50px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff;
+      font-size: 15px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: .15s;
+      margin-top: 8px;
+      box-shadow: 0 10px 30px rgba(79,124,255,.3);
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(79,124,255,.45); }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .notice {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .notice.show { display: block; }
+    .notice.ok {
+      background: rgba(74,222,128,.1);
+      border: 1px solid rgba(74,222,128,.3);
+      color: var(--green);
+    }
+    .notice.err {
+      background: rgba(229,72,77,.1);
+      border: 1px solid rgba(229,72,77,.3);
+      color: #f4636e;
+    }
+
+    /* FAQ */
+    .faq-section { margin-top: 60px; }
+    .faq-title {
+      text-align: center;
+      font-size: clamp(20px, 3vw, 26px);
+      font-weight: 900;
+      margin-bottom: 30px;
+    }
+    .faq-title span {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .faq-item {
+      background: rgba(16,16,21,.85);
+      border: 1px solid var(--edge);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: .2s;
+    }
+    .faq-item:hover { border-color: rgba(79,124,255,.4); }
+    .faq-q {
+      padding: 18px 22px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--ink);
+      background: none;
+      width: 100%;
+      text-align: start;
+    }
+    .faq-q i {
+      transition: transform .2s;
+      color: var(--accent);
+      font-size: 14px;
+    }
+    .faq-item.open .faq-q i { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .3s ease, padding .3s ease;
+      padding: 0 22px;
+      font-size: 13px;
+      color: var(--mut);
+      line-height: 1.9;
+    }
+    .faq-item.open .faq-a {
+      max-height: 400px;
+      padding: 0 22px 18px;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--edge);
+      padding: 40px 0 24px; margin-top: 60px;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 32px; margin-bottom: 32px;
+    }
+    .footer h4 {
+      font-size: 13px; font-weight: 800; margin-bottom: 14px; color: var(--ink);
+    }
+    .footer ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .footer ul a {
+      font-size: 12.5px; color: var(--mut); transition: .15s;
+    }
+    .footer ul a:hover { color: var(--accent); }
+    .footer-bottom {
+      border-top: 1px solid var(--edge);
+      padding-top: 24px; text-align: center;
+      color: var(--dim); font-size: 11.5px; line-height: 1.8;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 0 18px; }
+      .page-hero { padding: 40px 0 30px; }
+      .form-card { padding: 24px 20px; }
+      .info-card { padding: 18px; }
+    }
+
+    .reveal {
+      opacity: 0; transform: translateY(20px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="landing.html" class="logo-wrap">
+        <span class="logo-mark">🎓</span>
+        <div class="logo-text">
+          <h1>Nexora Academy</h1>
+          <p>LEARN · BUILD · GROW</p>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="landing.html">الرئيسية</a>
+        <a href="index.html">الكورسات</a>
+        <a href="about.html">من نحن</a>
+        <a href="contact.html" class="active">اتصل بنا</a>
+      </div>
+      <div class="nav-actions">
+        <a href="auth.html" class="btn-login"><i class="bi bi-person-circle"></i><span>تسجيل الدخول</span></a>
+        <button class="btn-menu" id="menuBtn" aria-label="القائمة"><i class="bi bi-list"></i></button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="landing.html"><i class="bi bi-house"></i>الرئيسية</a>
+      <a href="index.html"><i class="bi bi-mortarboard"></i>الكورسات</a>
+      <a href="about.html"><i class="bi bi-info-circle"></i>من نحن</a>
+      <a href="contact.html"><i class="bi bi-telephone"></i>اتصل بنا</a>
+      <a href="auth.html"><i class="bi bi-person-circle"></i>تسجيل الدخول</a>
+    </div>
+  </nav>
+
+  <header class="page-hero container">
+    <div class="badge"><i class="bi bi-chat-dots"></i> تواصل معنا</div>
+    <h1>عندك سؤال؟<br>احنا هنا نساعدك</h1>
+    <p>فريق الدعم متاح للرد على استفساراتك — اختار الطريقة الأسهل ليك.</p>
+  </header>
+
+  <section class="container reveal">
+    <div class="contact-grid">
+      <!-- Contact Info -->
+      <div class="contact-info">
+        <a class="info-card wa" href="https://wa.me/201096295395?text=أهلاً 👋 عايز أعرف تفاصيل" target="_blank" rel="noopener noreferrer">
+          <div class="info-icon"><i class="bi bi-whatsapp"></i></div>
+          <div class="info-body">
+            <h4>واتساب (الأسرع)</h4>
+            <p>كلمنا فورًا</p>
+            <p class="sub">رد فوري خلال دقايق</p>
+          </div>
+        </a>
+
+        <a class="info-card" href="tel:01096295395">
+          <div class="info-icon"><i class="bi bi-telephone"></i></div>
+          <div class="info-body">
+            <h4>تليفون</h4>
+            <p dir="ltr">01096295395</p>
+            <p class="sub">يوميًا من 10 صباحًا لـ 10 مساءً</p>
+          </div>
+        </a>
+
+        <div class="info-card">
+          <div class="info-icon"><i class="bi bi-envelope"></i></div>
+          <div class="info-body">
+            <h4>إيميل</h4>
+            <p dir="ltr" style="font-size:13px;">mt9276404@gmail.com
+</p>
+            <p class="sub">هنرد خلال 24 ساعة</p>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon"><i class="bi bi-geo-alt"></i></div>
+          <div class="info-body">
+            <h4>الموقع</h4>
+            <p>القاهرة، مصر</p>
+            <p class="sub">منصة أونلاين 100%</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Form -->
+      <div class="form-card">
+        <h2>ابعتلنا رسالة</h2>
+        <p class="form-sub">املأ الفورم وهنرد عليك في أقرب وقت</p>
+
+        <form id="contactForm" novalidate>
+          <div class="form-row">
+            <div class="fld">
+              <label for="cName">الاسم <span style="color:var(--red)">*</span></label>
+              <input id="cName" type="text" placeholder="اسمك الكامل" autocomplete="name">
+              <p class="err" id="cNameErr">اكتب اسمك (حرفين على الأقل)</p>
+            </div>
+            <div class="fld">
+              <label for="cPhone">رقم الموبايل <span style="color:var(--red)">*</span></label>
+              <input id="cPhone" type="tel" inputmode="numeric" dir="ltr" placeholder="01xxxxxxxxx" autocomplete="tel">
+              <p class="err" id="cPhoneErr">رقم مصري صحيح (11 رقم يبدأ بـ 01)</p>
+            </div>
+          </div>
+
+          <div class="fld">
+            <label for="cEmail">الإيميل (اختياري)</label>
+            <input id="cEmail" type="email" dir="ltr" placeholder="you@example.com" autocomplete="email">
+          </div>
+
+          <div class="fld">
+            <label for="cSubject">الموضوع <span style="color:var(--red)">*</span></label>
+            <select id="cSubject">
+              <option value="">اختار موضوع…</option>
+              <option value="استفسار عن كورس">استفسار عن كورس</option>
+              <option value="مشكلة في الدفع">مشكلة في الدفع</option>
+              <option value="مشكلة تقنية">مشكلة تقنية</option>
+              <option value="اقتراح">اقتراح</option>
+              <option value="أخرى">أخرى</option>
+            </select>
+            <p class="err" id="cSubjectErr">اختار موضوع من القائمة</p>
+          </div>
+
+          <div class="fld">
+            <label for="cMessage">الرسالة <span style="color:var(--red)">*</span></label>
+            <textarea id="cMessage" placeholder="اكتب رسالتك هنا… (10 أحرف على الأقل)"></textarea>
+            <p class="err" id="cMessageErr">اكتب رسالة (10 أحرف على الأقل)</p>
+          </div>
+
+          <div class="notice" id="cNotice" role="status"></div>
+
+          <button type="submit" class="btn-submit" id="cSubmit">
+            <i class="bi bi-send"></i>
+            إرسال الرسالة
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="container faq-section reveal">
+    <h2 class="faq-title">الأسئلة <span>الشائعة</span></h2>
+    <div class="faq-list">
+      <div class="faq-item">
+        <button class="faq-q">إزاي أقدر أشترك في كورس؟<i class="bi bi-chevron-down"></i></button>
+        <div class="faq-a">سجّل حساب جديد من صفحة تسجيل الدخول، وبعدين اختار الكورس واضغط "اشترك". تقدر تدفع كاش أو تقسيط — والتقسيط متاح على 4 دفعات.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">إيه طرق الدفع المتاحة؟<i class="bi bi-chevron-down"></i></button>
+        <div class="faq-a">بنقبل فودافون كاش و InstaPay. بعد ما تعمل الحجز، هنتواصل معاك على واتساب ونبعتلك تفاصيل الدفع، وبعد تأكيد التحويل بنفعّل الكورس فورًا.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">مدة الوصول للكورس قد إيه؟<i class="bi bi-chevron-down"></i></button>
+        <div class="faq-a">وصول مدى الحياة! ادفع مرة واحدة واستمتع بالكورس للأبد، مع كل التحديثات المستقبلية مجانًا.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">في شهادة بعد ما أخلص الكورس؟<i class="bi bi-chevron-down"></i></button>
+        <div class="faq-a">أيوة، بعد إتمام كل كورس بتحصل على شهادة إتمام معتمدة من Nexora Academy تقدر تضيفها لـ CV و LinkedIn.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">لو واجهتني مشكلة في الدفع، أعمل إيه؟<i class="bi bi-chevron-down"></i></button>
+        <div class="faq-a">كلمنا فورًا على واتساب 01096295395، وهنساعدك نحل المشكلة بأسرع وقت. فريق الدعم متاح يوميًا من 10 صباحًا لـ 10 مساءً.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="logo-wrap" style="margin-bottom:12px;">
+            <span class="logo-mark">🎓</span>
+            <div class="logo-text">
+              <h1>Nexora Academy</h1>
+              <p>LEARN · BUILD · GROW</p>
+            </div>
+          </div>
+          <p style="font-size:12.5px;color:var(--mut);line-height:1.8;">
+            منصة تعليمية احترافية متخصصة في تعليم مهارات المستقبل.
+          </p>
+        </div>
+        <div>
+          <h4>روابط سريعة</h4>
+          <ul>
+            <li><a href="landing.html">الرئيسية</a></li>
+            <li><a href="index.html">الكورسات</a></li>
+            <li><a href="about.html">من نحن</a></li>
+            <li><a href="contact.html">اتصل بنا</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>حسابي</h4>
+          <ul>
+            <li><a href="auth.html">تسجيل الدخول</a></li>
+            <li><a href="profile.html">الملف الشخصي</a></li>
+            <li><a href="index.html">كورساتي</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>تواصل معنا</h4>
+          <ul>
+            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone"></i> 01096295395</a></li>
+            <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> واتساب</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© <span id="year"></span> Nexora Academy — جميع الحقوق محفوظة</p>
+        <p style="margin-top:4px;">صُنع بـ ❤️ في مصر</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    /* Mobile Menu */
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (menuBtn && mobileMenu) {
+      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('open'));
+      mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
+    }
+
+    /* Reveal on scroll */
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.classList.add('visible');
+          observer.unobserve(entry);
+        }
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    /* FAQ */
+    document.querySelectorAll('.faq-q').forEach(q => {
+      q.addEventListener('click', () => {
+        q.parentElement.classList.toggle('open');
+      });
+    });
+
+    /* Contact Form */
+    const form = document.getElementById('contactForm');
+    const notice = document.getElementById('cNotice');
+
+    function setErr(id, errId, on) {
+      const el = document.getElementById(id);
+      const err = document.getElementById(errId);
+      if (el) el.classList.toggle('invalid', on);
+      if (err) err.classList.toggle('show', on);
+    }
+
+    function showNotice(msg, type) {
+      notice.className = 'notice show ' + (type || 'err');
+      notice.textContent = msg;
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      notice.className = 'notice';
+
+      const name = document.getElementById('cName').value.trim();
+      const phone = document.getElementById('cPhone').value.trim().replace(/\s+/g, '');
+      const email = document.getElementById('cEmail').value.trim();
+      const subject = document.getElementById('cSubject').value;
+      const message = document.getElementById('cMessage').value.trim();
+
+      let bad = false;
+      if (name.length < 2) { setErr('cName', 'cNameErr', true); bad = true; }
+      else setErr('cName', 'cNameErr', false);
+
+      if (!/^(\+?20)?01\d{9}$/.test(phone)) { setErr('cPhone', 'cPhoneErr', true); bad = true; }
+      else setErr('cPhone', 'cPhoneErr', false);
+
+      if (!subject) { setErr('cSubject', 'cSubjectErr', true); bad = true; }
+      else setErr('cSubject', 'cSubjectErr', false);
+
+      if (message.length < 10) { setErr('cMessage', 'cMessageErr', true); bad = true; }
+      else setErr('cMessage', 'cMessageErr', false);
+
+      if (bad) {
+        showNotice('من فضلك اكمل الحقول المطلوبة.', 'err');
+        return;
+      }
+
+      /* تجهيز رسالة واتساب */
+      const waMsg =
+        'أهلاً 👋\n\n' +
+        '📌 *رسالة جديدة من موقع Nexora Academy*\n\n' +
+        '👤 الاسم: ' + name + '\n' +
+        '📱 الموبايل: ' + phone + '\n' +
+        (email ? '📧 الإيميل: ' + email + '\n' : '') +
+        '📝 الموضوع: ' + subject + '\n\n' +
+        '💬 الرسالة:\n' + message;
+
+      const waURL = 'https://wa.me/201096295395?text=' + encodeURIComponent(waMsg);
+
+      showNotice('تمام! جاري تحويلك لواتساب لإرسال الرسالة…', 'ok');
+
+      setTimeout(() => {
+        window.open(waURL, '_blank', 'noopener,noreferrer');
+        form.reset();
+        setTimeout(() => { notice.className = 'notice'; }, 4000);
+      }, 800);
+    });
+  </script>
+</body>
+</html>
