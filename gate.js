@@ -7,16 +7,15 @@
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v14 ', 'background:#4ade80;color:#052e12;font-weight:bold');
-
+  console.log('%c MCL Gate — v15.1 ', 'background:#4ade80;color:#052e12;font-weight:bold');
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
   const SUBS_LOCAL_KEY = 'my-course-library:subs-local';
   const SUBS_EXPORTED_KEY = 'my-course-library:subs-exported';
 
   const MCL = window.MCL = {
-    version: '14',
-    ADMIN_PASSWORD: '01096295395mo',
+    version: '15.1',
+        ADMIN_PASSWORD: '01096295395mo',
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
     SUBS_URL: 'subscriptions.json',
@@ -892,5 +891,5 @@
   ensureGateDOM();
   MCL.closeLockModal = closeLockModal;
   MCL.renderChips = renderChips;
-  window.renderSubsViewGate = renderSubsView;
+   window.renderSubsViewGate = renderSubsView;
 })();

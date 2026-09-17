@@ -1,12 +1,55 @@
 /* ==========================================================
-   My Course Library — app.js (v14)
+   My Course Library — app.js (v15)
    نواة المكتبة — الحماية في gate.js — المزامنة السحابية في cloud.js
+   كتالوج الكورسات المدفوعة + الباقات + الأسعار
    ========================================================== */
 
 'use strict';
 
 const STORAGE_KEY = 'my-course-library:resources:v1';
 const SETTINGS_KEY = 'my-course-library:settings:v1';
+
+/* ---------- Nexora: نظام الكورسات المجانية والمدفوعة ---------- */
+const CATALOG_KEY = 'nexora:catalog:v1';
+const PACKAGES_KEY = 'nexora:packages:v1';
+
+/* الكورسات المدفوعة بالأسعار الرسمية — متغيرش أي رقم */
+const PAID_CATALOG = [
+  { id: 'frontend-diploma',   title: 'Frontend Diploma',        category: 'Frontend',      accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تعلم تطوير واجهات المواقع باحتراف من الصفر للاحتراف.' },
+  { id: 'backend-course',     title: 'Backend Course',          category: 'Backend',       accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'ابنِ الخدمات الخلفية وقواعد البيانات باحتراف.' },
+  { id: 'uiux-course',        title: 'UI/UX Course',            category: 'UI/UX',         accessType: 'paid', cashPrice: 1500, installmentAmount: 400,  installmentCount: 4, installmentTotal: 1600, description: 'تصميم تجارب وواجهات استخدام عصرية.' },
+  { id: 'mobile-app-course',  title: 'Mobile App Course',       category: 'Mobile App',    accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تطوير تطبيقات الموبايل خطوة بخطوة.' },
+  { id: 'data-diploma',       title: 'Data Analysis Diploma',   category: 'Data Analysis', accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تحليل البيانات واتخاذ القرار بالأرقام.' },
+  { id: 'ai-ds-ml',           title: 'AI / Data Science / ML',  category: 'AI',            accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'الذكاء الاصطناعي وعلم البيانات وتعلم الآلة.' },
+  { id: 'cyber-course',       title: 'Cyber Security Course',   category: 'Cyber Security',accessType: 'paid', cashPrice: 2999, installmentAmount: 775,  installmentCount: 4, installmentTotal: 3100, description: 'أساسيات وعمق الأمن السيبراني.' },
+  { id: 'media-buying',       title: 'Media Buying Course',     category: 'Other',         accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'الإعلانات الممولة وإدارة الحملات.' },
+  { id: 'fullstack-diploma',  title: 'Full Stack Diploma',      category: 'Full Stack',    accessType: 'paid', cashPrice: 4500, installmentAmount: 1150, installmentCount: 4, installmentTotal: 4600, description: 'الواجهة والخلفية في دبلومة واحدة شاملة.' }
+];
+
+/* الباقات الرسمية — متغيرش أي رقم */
+const PACKAGES = [
+  { id: 'starter-pack',      title: 'Starter Pack',      courseIds: ['frontend-diploma','uiux-course'],              cashPrice: 3500, installmentAmount: 875,  installmentCount: 4, installmentTotal: 3500,  featured: false },
+  { id: 'developer-pack',    title: 'Developer Pack',    courseIds: ['frontend-diploma','backend-course','uiux-course','git-github'], cashPrice: 6000, installmentAmount: 1500, installmentCount: 4, installmentTotal: 6000,  featured: false },
+  { id: 'professional-pack', title: 'Professional Pack', courseIds: ['frontend-diploma','backend-course','mobile-app-course','data-diploma','uiux-course','media-buying'], cashPrice: 7999, installmentAmount: 2000, installmentCount: 4, installmentTotal: 8000,  featured: false },
+  { id: 'tech-master-pack',  title: 'Tech Master Pack',  courseIds: ['frontend-diploma','backend-course','fullstack-diploma','mobile-app-course','data-diploma','ai-ds-ml','cyber-course','uiux-course','media-buying'], cashPrice: 9999, installmentAmount: 2500, installmentCount: 4, installmentTotal: 10000, featured: true }
+];
+
+const fmtEGP = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
+function getPaidCourse(id) { return PAID_CATALOG.find((c) => c.id === id) || null; }
+function renderPriceBlock(c, compact) {
+  if (c.accessType !== 'paid') return '';
+  const cash = `
+    <div class="price-cash">
+      <span class="price-label">دفع كاش</span>
+      <span class="price-value">${fmtEGP(c.cashPrice)}</span>
+    </div>`;
+  const inst = `
+    <div class="price-inst">
+      <span class="price-label">التقسيط متاح</span>
+      <span class="price-value-sm">${fmtEGP(c.installmentAmount)} × ${c.installmentCount} دفعات = ${fmtEGP(c.installmentTotal)}</span>
+    </div>`;
+  return `<div class="price-block ${compact ? 'compact' : ''}">${cash}${inst}</div>`;
+}
 
 const CATEGORIES = [
   'Frontend', 'Backend', 'UI/UX', 'HTML', 'CSS', 'JavaScript',
@@ -32,8 +75,6 @@ const CATEGORY_HUES = {
   'Other': null
 };
 
-/* ملاحظة: من إضافة Firebase، الكورسات بتنشر من الواجهة (وضع المالك)
-   وبتتزامن سحابيًا — القايمة دي نقطة بداية للأجهزة الجديدة بس. */
 const INITIAL_CREATED_AT = '2025-01-15T09:00:00.000Z';
 
 const INITIAL_RESOURCES = (() => {
@@ -126,7 +167,6 @@ function timeAgo(iso) {
   if (diff < 86400)    return rtf.format(-Math.round(diff / 3600), 'hour');
   if (diff < 604800)   return rtf.format(-Math.round(diff / 604800), 'week');
   if (diff < 2629800)  return rtf.format(-Math.round(diff / 2629800), 'month');
-  if (diff < 31557600) return rtf.format(-Math.round(diff / 2629800), 'month');
   return fmtDate(iso);
 }
 
@@ -1145,7 +1185,7 @@ function wireEvents() {
 
 /* ---------- الإقلاع ---------- */
 function init() {
-  console.log('%c My Course Library — v14 ', 'background:#f0b53e;color:#161204;font-weight:bold');
+  console.log('%c My Course Library — v15 ', 'background:#f0b53e;color:#161204;font-weight:bold');
 
   /* فحص التكامل مع gate.js */
   const required = ['isAdminActive', 'isProtected', 'isResourceLocked',
@@ -1168,16 +1208,15 @@ function init() {
     if (view === 'subs' && typeof window.renderSubsViewGate === 'function') window.renderSubsViewGate();
   };
 
-  /* تطبيق الكورسات القادمة من السحابة (cloud.js بيناديها عند أي تحديث لحظي) */
+  /* تطبيق الكورسات القادمة من السحابة */
   window.__applyCloudResources = (arr) => { state.resources = arr; renderAll(); };
 
-  /* شارة الإصدار في الفوتر */
   const fp = qs('footer p');
   if (fp && !qs('#mclVersionBadge')) {
     const b = document.createElement('span');
     b.id = 'mclVersionBadge';
     b.className = 'text-accent font-mono';
-    b.textContent = ' — v14';
+    b.textContent = ' — v15';
     fp.appendChild(b);
   }
 

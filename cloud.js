@@ -1,13 +1,13 @@
 /* ==========================================================
-   cloud.js — v14
+   cloud.js — v15.1
    المزامنة السحابية: الكورسات والاشتراكات على Firestore
-   الكل يقرا — والكتابة للمالك فقط (بعد دخول سحابي تلقائي)
+   القراءة للجميع — النشر للمالك فقط (owner@gymzone.com)
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Cloud — v14 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c MCL Cloud — v15.1 ', 'background:#2684fc;color:#fff;font-weight:bold');
 
   const firebaseConfig = {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
@@ -25,7 +25,8 @@
     return;
   }
 
-  firebase.initializeApp(firebaseConfig);
+  /* تهيئة آمنة — catalog/student/roadmap/auth ممكن يبدأوا قبله أو بعده */
+  const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
   const resDoc = db.doc('library/main');
@@ -67,7 +68,7 @@
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
   }
 
-  /* استبدال محمّل الاشتراكات: يقرا من السحابة بدل الملف */
+  /* محمّل الاشتراكات: يقرا من السحابة بدل الملف */
   if (window.MCL) {
     MCL.loadSubscriptions = async function () {
       try {
@@ -91,7 +92,7 @@
     };
   }
 
-  /* ---------- الاستماع اللحظي: أي تغيير على السحابة يوصل لكل الأجهزة فورًا ---------- */
+  /* ---------- الاستماع اللحظي (القراءة آمنة للجميع) ---------- */
   resDoc.onSnapshot((doc) => {
     if (!doc.exists) {
       console.info('[CLOUD] مفيش كورسات منشورة على السحابة لسه — أول دخول للمالك هينشرها تلقائيًا');
@@ -99,7 +100,7 @@
     }
     const arr = doc.data().resources || [];
     const str = JSON.stringify(arr);
-    if (str === lastPushedRes) return; // صدى لتعديلنا بنفسنا — تجاهل
+    if (str === lastPushedRes) return; /* صدى لتعديلنا بنفسنا — تجاهل */
     try { localStorage.setItem(RES_KEY, str); } catch (e) { /* تجاهل */ }
     if (typeof window.__applyCloudResources === 'function') {
       window.__applyCloudResources(arr);
@@ -115,12 +116,19 @@
     applySubs(subs, 'تحديث لحظي');
   }, (err) => console.warn('[CLOUD] استماع الاشتراكات:', err.code));
 
-  /* ---------- دخول المالك للسحابة (تلقائي عند تفعيل وضع المالك) ---------- */
+  /* ---------- 🛡️ نقطة الحماية الحرجة ----------
+     onAuthStateChanged بيرن لكل مستخدم (طلاب كمان!) —
+     فبنتحقق أن المستخدم هو المالك بالإيميل قبل اعتباره قادرًا على النشر.
+     الطالب العادي: authed = false → مفيش push خالص من جهازه. */
   auth.onAuthStateChanged((user) => {
-    CloudSync.authed = !!user;
-    if (user) {
+    const isOwner = !!user && user.email === OWNER_EMAIL;
+    CloudSync.authed = isOwner;
+    if (isOwner) {
       console.info('[CLOUD] ✅ متصل بالسحابة كمالك — كل تعديلاتك بتنشر تلقائيًا');
       pushAll(true);
+    } else if (user) {
+      /* مستخدم مسجّل لكنه مش المالك (طالب) — قراية بس */
+      console.info('[CLOUD] مستخدم طالب متصل — وضع القراءة فقط (مفيش نشر)');
     }
   });
 
@@ -138,7 +146,7 @@
       });
   }, 2000);
 
-  /* ---------- النشر التلقائي: أي تعديل محلي يروح للسحابة ---------- */
+  /* ---------- النشر التلقائي (للمالك فقط — مضمون بالتحقق فوق + Rules) ---------- */
   function pushAll(force) {
     if (!CloudSync.authed) return;
     try {

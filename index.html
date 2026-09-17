@@ -4,19 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0a0a0d">
-  <meta name="description" content="My Course Library — لوحة شخصية لتنظيم وحفظ روابط الكورسات والموارد التعليمية">
-  <title>My Course Library — مكتبة الكورسات</title>
+  <meta name="description" content="Nexora Academy — منصة تعليمية احترافية: كورسات مسجلة، مسارات تعلم، واشتراكات بالتقسيط">
+  <title>Nexora Academy — منصة التعلم</title>
   <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
 
-  <!-- الخطوط -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <!-- Bootstrap Icons (أيقونات فقط) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -44,25 +41,23 @@
     }
   </script>
 
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 
 <body class="bg-canvas text-ink font-sans antialiased min-h-screen">
 
   <a href="#content" class="skip-link">تخطَّ إلى المحتوى</a>
 
-  <!-- ===== Overlay (موبايل) ===== -->
   <div id="overlay" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] hidden lg:hidden"></div>
 
-  <!-- ===== Sidebar ===== -->
   <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 w-[272px] bg-panel border-s border-edge flex flex-col translate-x-full lg:translate-x-0 transition-transform duration-300"
          aria-label="الشريط الجانبي">
     <div class="flex items-center justify-between gap-2 px-4 h-16 border-b border-edge shrink-0">
       <div class="flex items-center gap-2.5">
-        <span class="logo-mark"><i class="bi bi-book-half" aria-hidden="true"></i></span>
+        <span class="logo-mark"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
         <div class="leading-tight">
-          <h1 class="text-[13.5px] font-bold text-ink">My Course Library</h1>
-          <p class="text-[10px] text-dim">مكتبة الكورسات الشخصية</p>
+          <h1 class="text-[13.5px] font-bold text-ink">Nexora Academy</h1>
+          <p class="text-[10px] text-dim">Learn · Build · Grow</p>
         </div>
       </div>
       <button id="closeSidebarBtn" class="icon-btn lg:hidden" aria-label="إغلاق القائمة">
@@ -74,16 +69,14 @@
 
     <div class="shrink-0 border-t border-edge p-4">
       <p class="flex items-start gap-2 text-[10.5px] leading-relaxed text-dim">
-        <i class="bi bi-shield-lock mt-0.5 shrink-0" aria-hidden="true"></i>
-        <span>بياناتك محفوظة محليًا في متصفحك فقط. صدِّر نسخة JSON دوريًا كنسخة احتياطية يدوية.</span>
+        <i class="bi bi-cloud-check mt-0.5 shrink-0" aria-hidden="true"></i>
+        <span>المنصة متزامنة سحابيًا — تقدّمك وكورساتك معاك على أي جهاز.</span>
       </p>
     </div>
   </aside>
 
-  <!-- ===== المحتوى الرئيسي ===== -->
   <div class="min-h-screen flex flex-col lg:ps-[272px]">
 
-    <!-- Header -->
     <header class="sticky top-0 z-30 border-b border-edge bg-canvas/85 backdrop-blur">
       <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
         <button id="menuBtn" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition lg:hidden"
@@ -112,10 +105,8 @@
 
     <main id="content" class="grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-      <!-- ==================== عرض المكتبة ==================== -->
       <section id="view-library" aria-label="المكتبة">
 
-        <!-- الإحصائيات (انقر أي رقم ليصبح فلترًا) -->
         <section id="statsBar" aria-label="إحصائيات المكتبة"
                  class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-px rounded-2xl border border-edge bg-edge overflow-hidden">
           <button type="button" class="stat" data-stat="total">
@@ -152,7 +143,6 @@
           </div>
         </section>
 
-        <!-- شريط الأدوات: بحث + فلاتر + ترتيب + عرض -->
         <div class="mt-6 flex flex-wrap items-center gap-2.5">
           <div class="relative grow min-w-[220px] max-w-md">
             <i class="bi bi-search absolute start-3 top-1/2 -translate-y-1/2 text-dim text-[13px]" aria-hidden="true"></i>
@@ -200,11 +190,9 @@
           </button>
         </div>
 
-        <!-- حاوية الكروت / الصفوف -->
         <div id="cardsContainer"></div>
       </section>
 
-      <!-- ==================== الملفات المهمة ==================== -->
       <section id="view-files" class="hidden" aria-labelledby="filesHeading">
         <div class="rounded-2xl border border-edge bg-panel overflow-hidden">
           <div class="px-5 py-4 border-b border-edge flex items-center gap-2.5">
@@ -245,26 +233,17 @@
             </li>
           </ul>
         </div>
-
-        <div class="mt-4 rounded-2xl border border-edge bg-panel/60 px-5 py-4 flex items-start gap-2.5 text-[12px] leading-relaxed text-mut">
-          <i class="bi bi-info-circle text-dim mt-0.5 shrink-0" aria-hidden="true"></i>
-          <p>ضع ملفاتك داخل مجلد <code>assets/files/</code> في المشروع بالأسماء <code dir="ltr">file-1.docx</code>
-          و <code dir="ltr">file-2.docx</code>، وستعمل أزرار الفتح والتنزيل تلقائيًا عبر Live Server.
-          عند اعتماد الأسماء النهائية للملفات حدّثها في <code>index.html</code>.</p>
-        </div>
       </section>
 
-      <!-- ==================== إدارة البيانات ==================== -->
       <section id="view-data" class="hidden space-y-4" aria-label="إدارة البيانات">
 
-        <!-- تصدير -->
         <div class="rounded-2xl border border-edge bg-panel p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <span class="icon-tile"><i class="bi bi-box-arrow-down" aria-hidden="true"></i></span>
           <div class="grow">
             <h2 class="text-[13.5px] font-semibold">تصدير نسخة احتياطية</h2>
             <p class="mt-1 text-[12px] leading-relaxed text-mut">
-              نزِّل كل مواردك (<span id="exportCount" class="text-ink font-medium">0</span> موردًا) كملف JSON.
-              تخزين المتصفح ليس نسخة دائمة — صدِّر نسخة بشكل دوري واحتفظ بها.
+              نزِّل كل الموارد (<span id="exportCount" class="text-ink font-medium">0</span>) كملف JSON —
+              مع المزامنة السحابية دي نسخة أمان إضافية.
             </p>
           </div>
           <button id="exportBtn" class="btn-accent shrink-0">
@@ -272,13 +251,12 @@
           </button>
         </div>
 
-        <!-- استيراد -->
         <div class="rounded-2xl border border-edge bg-panel p-5">
           <div class="flex items-center gap-3">
             <span class="icon-tile"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span>
             <div>
               <h2 class="text-[13.5px] font-semibold">استيراد من ملف</h2>
-              <p class="mt-1 text-[12px] text-mut">يتم التحقق من البنية والحقول بالكامل قبل الاستبدال، ولا تُمس بياناتك الحالية إلا بعد تأكيدك.</p>
+              <p class="mt-1 text-[12px] text-mut">يتم التحقق من البنية والحقول قبل الاستبدال، وبعد الاستيراد هيتنشر على السحابة تلقائيًا.</p>
             </div>
           </div>
           <div id="dropZone" class="mt-4 rounded-xl border border-dashed border-edge2 bg-canvas px-6 py-8 text-center cursor-pointer transition hover:border-accent/60"
@@ -290,14 +268,13 @@
           <input type="file" id="importFile" accept=".json,application/json" class="hidden" aria-label="ملف JSON">
         </div>
 
-        <!-- منطقة خطرة -->
         <div class="rounded-2xl border border-red/25 bg-panel p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <span class="icon-tile !border-red/30 !text-red"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></span>
           <div class="grow">
             <h2 class="text-[13.5px] font-semibold text-red">استرجاع الموارد الأصلية</h2>
             <p class="mt-1 text-[12px] leading-relaxed text-mut">
               سيتم حذف الموارد الحالية (<span id="restoreCount" class="text-ink font-medium">0</span>) نهائيًا
-              واستبدالها بالـ30 مورد الأصلية.
+              واستبدالها بالقايمة الأصلية، والتغيير هينشر على السحابة.
             </p>
           </div>
           <button id="restoreBtn" class="btn-danger-o shrink-0">
@@ -309,13 +286,12 @@
 
     <footer class="border-t border-edge px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-dim">
-        <p>My Course Library — كل البيانات محفوظة محليًا داخل متصفحك، ولا يُرسل أي شيء إلى أي خادم.</p>
-        <p dir="ltr" class="font-mono">HTML · Tailwind CSS · Bootstrap Icons</p>
+        <p>Nexora Academy — مزامنة سحابية فورية لكل الأجهزة.</p>
+        <p dir="ltr" class="font-mono">HTML · Tailwind CSS · Firebase · Bootstrap Icons</p>
       </div>
     </footer>
   </div>
 
-  <!-- ===== نافذة إضافة / تعديل مورد ===== -->
   <div id="resourceModal" class="modal fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-labelledby="resourceModalTitle">
     <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-[3px]" data-close-resource></div>
     <div class="absolute inset-0 overflow-y-auto">
@@ -339,7 +315,7 @@
               <label for="f-url" class="field-label">الرابط <span class="text-red" aria-hidden="true">*</span></label>
               <input id="f-url" type="url" class="field" dir="ltr" placeholder="https://drive.google.com/… أو https://youtube.com/…">
               <p id="urlMaskHint" class="hidden mt-1.5 text-[11px] text-dim">
-                الرابط مخفي لأن هذا الكورس مقفل — افتحه بكلمة مروره أولًا، أو اتركه كما هو للحفاظ على الرابط الحالي.
+                الرابط مخفي لأن هذا الكورس مقفل — اتركه كما هو للحفاظ على الرابط الحالي.
               </p>
               <p class="field-err hidden" id="e-url"></p>
             </div>
@@ -387,7 +363,6 @@
               <textarea id="f-notes" class="field" placeholder="ملاحظاتك الشخصية…"></textarea>
             </div>
 
-            <!-- تحذير التكرار -->
             <div id="dupBox" class="sm:col-span-2 hidden rounded-xl border border-accent/30 bg-accent/10 px-4 py-3">
               <div class="flex items-start gap-2.5">
                 <i class="bi bi-exclamation-triangle-fill text-accent mt-0.5" aria-hidden="true"></i>
@@ -411,7 +386,6 @@
     </div>
   </div>
 
-  <!-- ===== نافذة التأكيد العامة ===== -->
   <div id="confirmModal" class="modal fixed inset-0 z-[65] hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-[3px]" data-close-confirm></div>
     <div class="absolute inset-0 overflow-y-auto">
@@ -433,15 +407,17 @@
     </div>
   </div>
 
-  <!-- ===== التوستات ===== -->
   <div id="toasts" class="fixed bottom-4 left-4 z-[70] flex flex-col gap-2 w-[330px] max-w-[calc(100vw-2rem)]" aria-live="polite"></div>
 
-  <!-- Firebase (الترتيب مهم) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="gate.js?v=14"></script>
-  <script src="cloud.js?v=14"></script>
-  <script src="app.js?v=14"></script>
+  <script src="gate.js?v=15"></script>
+  <script src="cloud.js?v=15"></script>
+  <script src="catalog.js?v=15"></script>
+  <script src="student.js?v=15"></script>
+  <script src="roadmap.js?v=15"></script>
+  <script src="admin.js?v=15"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

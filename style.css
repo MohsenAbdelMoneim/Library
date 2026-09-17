@@ -298,3 +298,119 @@ code {
   30%, 50%, 70% { transform: translateX(-4px); }
   40%, 60% { transform: translateX(4px); }
 }
+/* ==========================================================
+   Nexora Mobile-First Enhancements — v15
+   إصلاح تجربة الهاتف: navbar مثبت، أزرار كبيرة، مفيش horizontal scroll
+   ========================================================== */
+
+/* منع أي تمرير أفقي نهائيًا */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* الهيدر مثبت دايمًا قدام الكل */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* أزرار كبيرة ومريحة على الموبايل */
+@media (max-width: 640px) {
+  .btn-accent, .btn-ghost, .btn-danger, .btn-danger-o {
+    min-height: 44px;
+    font-size: 13.5px;
+    padding: 0 16px;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  .seg-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+  }
+  .lock-chip {
+    height: 40px;
+    font-size: 12px;
+  }
+  #menuBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* الإحصائيات: شبكة مريحة 2×2 */
+  #statsBar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat {
+    padding: 12px 10px;
+  }
+  .stat-num {
+    font-size: 18px;
+  }
+  .stat-label {
+    font-size: 10px;
+  }
+
+  /* الكروت بتاخد العرض كامل والنص مبيقصش غلط */
+  .cat-chip {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+  .line-clamp-2 {
+    -webkit-line-clamp: 3;
+  }
+
+  /* شريط الأدوات (بحث + فلاتر) عمودي مريح */
+  #view-library > div:nth-child(2) {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  #view-library > div:nth-child(2) > div:first-child {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  #view-library > div:nth-child(2) select.field {
+    width: 100% !important;
+  }
+  #view-library > div:nth-child(2) > div[role="group"] {
+    margin-inline-start: 0 !important;
+    align-self: flex-end;
+  }
+
+  /* المودالات: كاملة تقريبًا على الشاشة مع scroll داخلي */
+  .modal-panel {
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+
+  /* التوستات فوق مش جوه السكرول */
+  #toasts {
+    bottom: auto;
+    top: 72px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+
+  /* الدوراويل (القايمة الجانبية) فوق كل حاجة */
+  #sidebar {
+    z-index: 60;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, .6);
+  }
+}
+
+/* في الوضع شبه الموبايل (641-1023): سطرين إحصائيات مريحين */
+@media (min-width: 641px) and (max-width: 1279px) {
+  #statsBar {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
