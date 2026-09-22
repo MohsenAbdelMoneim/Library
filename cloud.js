@@ -1,15 +1,18 @@
 /* ==========================================================
-   cloud.js — v17
+   cloud.js — v18
    المزامنة السحابية: الموارد + الاشتراكات
+   ✅ v18: إصلاح Race Condition — الرقم مبيختفيش بعد الإضافة
+   ✅ v18: حماية من Overwrite للتعديلات المحلية الحديثة
+   ✅ v18: دمج بدل استبدال + علامة justPushed
+   ✅ v18: 300ms بدل 800ms للـpush
    ✅ v17: مفيش تعارض مع gate.js (Auth)
    ✅ v17: مفيش sign-in تلقائي لو فيه طالب مسجل
-   ✅ v17: MCL.loadSubscriptions من gate.js مسؤول عن الاشتراكات
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Cloud — v17 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c MCL Cloud — v18 ', 'background:#2684fc;color:#fff;font-weight:bold');
 
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
@@ -35,7 +38,13 @@
   const resDoc = db.doc('library/main');
   const subsDoc = db.doc('config/subscriptions');
 
-  const CloudSync = window.CloudSync = { authed: false, ready: false };
+  const CloudSync = window.CloudSync = {
+    authed: false,
+    ready: false,
+    lastLocalSubsWrite: 0,   /* وقت آخر كتابة محلية للاشتراكات */
+    lastPushTime: 0,         /* وقت آخر push للسحابة */
+    justPushedSubs: false    /* علامة: إحنا اللي دفعنا snapshot */
+  };
 
   const snap = (o) => JSON.stringify(o);
   let lastPushedRes = null;
@@ -70,20 +79,49 @@
     return out;
   }
 
+  /* ✅ v18: حماية من Overwrite + دمج بدل استبدال */
   function applySubs(subs, source) {
     if (!window.MCL) return;
+
+    const isOwner = !!CloudSync.authed;
+    const now = Date.now();
+    const lastLocalWrite = CloudSync.lastLocalSubsWrite || 0;
+    const recentlyWritten = (now - lastLocalWrite) < 3000; /* 3 ثواني */
+
+    /* ✅ حماية 1: تجاهل التحديث اللحظي لو فيه تعديل محلي حديث */
+    if (isOwner && recentlyWritten) {
+      console.info('[CLOUD] ⏸️ تجاهل تحديث لحظي — فيه تعديل محلي جديد (خلال 3 ثواني)');
+      return;
+    }
+
+    /* ✅ حماية 2: دمج بدل استبدال — أي رقم محلي محفوظ */
+    const local = { ...MCL.subscriptions };
+    const merged = { ...subs, ...local };
+
+    /* ✅ تسجيل الفروقات في Console */
+    if (isOwner) {
+      const localKeys = Object.keys(local);
+      const cloudKeys = Object.keys(subs);
+      const localOnly = localKeys.filter((k) => !(k in subs));
+      const cloudOnly = cloudKeys.filter((k) => !(k in local));
+      if (localOnly.length > 0) {
+        console.info('[CLOUD] 🛡️', localOnly.length, 'رقم محلي مش على السحابة — محتفظ بيه');
+      }
+      if (cloudOnly.length > 0) {
+        console.info('[CLOUD] 📥', cloudOnly.length, 'رقم جديد من السحابة');
+      }
+    }
+
+    /* نطبّق النسخة المدمجة */
     Object.keys(MCL.subscriptions).forEach((k) => delete MCL.subscriptions[k]);
-    Object.assign(MCL.subscriptions, subs);
-    console.info('[CLOUD] الاشتراكات (' + source + '):', Object.keys(subs).length, 'مشترك');
+    Object.assign(MCL.subscriptions, merged);
+
+    console.info('[CLOUD] الاشتراكات (' + source + '):', Object.keys(merged).length, 'مشترك');
     if (typeof MCL.emit === 'function') MCL.emit();
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
   }
 
-  /* ---------- ⚠️ مفيش تعريف MCL.loadSubscriptions هنا ----------
-     gate.js مسؤول عن تعريف MCL.loadSubscriptions.
-     cloud.js بس بيوفّر قراءة من السحابة كـ fallback. */
-
-  /* ---------- الاستماع اللحظي (القراءة آمنة للجميع) ---------- */
+  /* ---------- الاستماع اللحظي: الموارد ---------- */
   resDoc.onSnapshot((doc) => {
     if (!doc.exists) {
       console.info('[CLOUD] مفيش موارد منشورة على السحابة لسه');
@@ -99,11 +137,26 @@
     }
   }, (err) => console.warn('[CLOUD] استماع الموارد:', err.code));
 
+  /* ✅ v18: onSnapshot الاشتراكات مع حماية أقوى */
   subsDoc.onSnapshot((doc) => {
     if (!doc.exists) return;
+
+    /* ✅ حماية 1: علامة justPushed — إحنا اللي دفعنا النسخة دي */
+    if (CloudSync.justPushedSubs) {
+      console.info('[CLOUD] ⏭️ تجاهل snapshot — إحنا اللي دفعناها');
+      return;
+    }
+
     const subs = sanitizeSubs(doc.data().subscriptions);
     if (!subs) return;
-    if (snap(subs) === lastPushedSubs) return;
+
+    /* ✅ حماية 2: لو مفيش تغيير فعلي */
+    if (snap(subs) === lastPushedSubs) {
+      console.info('[CLOUD] ⏭️ snapshot مطابق — تجاهل');
+      return;
+    }
+
+    console.info('[CLOUD] 📥 snapshot جديد:', Object.keys(subs).length, 'مشترك');
     applySubs(subs, 'تحديث لحظي');
   }, (err) => console.warn('[CLOUD] استماع الاشتراكات:', err.code));
 
@@ -123,11 +176,11 @@
     }
   });
 
-  /* ---------- دخول المالك للسحابة (آمن) ---------- */
+  /* ---------- دخول المالك للسحابة ---------- */
   function attemptOwnerSignIn() {
     if (CloudSync.authed || authAttempted) return;
 
-    /* ⚠️ مهم: مفيش sign-in لو فيه مستخدم تاني مسجل */
+    /* ⚠️ مفيش sign-in لو فيه مستخدم تاني مسجل */
     const currentUser = auth.currentUser;
     if (currentUser && currentUser.email !== OWNER_EMAIL) {
       console.info('[CLOUD] فيه مستخدم مسجل (' + currentUser.email + ') — مانع دخول المالك');
@@ -165,9 +218,7 @@
   function checkAdminState() {
     /* ⚠️ متعملش sign-in لو فيه مستخدم مسجل */
     const currentUser = auth.currentUser;
-    if (currentUser && currentUser.email !== OWNER_EMAIL) {
-      return;
-    }
+    if (currentUser && currentUser.email !== OWNER_EMAIL) return;
 
     const isAdmin = !!(window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive());
     if (isAdmin && !lastAdminState) {
@@ -187,40 +238,67 @@
     checkAdminState();
   }
 
-  /* ---------- النشر (للمالك فقط) ---------- */
+  /* ✅ v18: pushAll مع علامة justPushed */
   function pushAll(force) {
     if (!CloudSync.authed) return;
     try {
+      /* نشر الموارد */
       const resStr = localStorage.getItem(RES_KEY);
       if (resStr && (force || resStr !== lastPushedRes)) {
         const arr = JSON.parse(resStr);
         lastPushedRes = resStr;
         resDoc.set({ resources: arr, updatedAt: new Date().toISOString() })
           .then(() => console.info('[CLOUD] ☁️ نُشرت الموارد:', arr.length))
-          .catch((err) => { lastPushedRes = null; toast('فشل نشر الموارد: ' + err.code, 'error'); });
+          .catch((err) => {
+            lastPushedRes = null;
+            toast('فشل نشر الموارد: ' + err.code, 'error');
+          });
       }
+
+      /* نشر الاشتراكات */
       if (window.MCL && MCL.subscriptions) {
         const subsStr = snap(MCL.subscriptions);
         if (force || subsStr !== lastPushedSubs) {
           lastPushedSubs = subsStr;
-          subsDoc.set({ subscriptions: JSON.parse(subsStr), updatedAt: new Date().toISOString() })
-            .then(() => console.info('[CLOUD] ☁️ نُشرت الاشتراكات'))
-            .catch((err) => { lastPushedSubs = null; toast('فشل نشر الاشتراكات: ' + err.code, 'error'); });
+          CloudSync.lastPushTime = Date.now();
+
+          /* ✅ علامة justPushed لمدة 5 ثواني */
+          CloudSync.justPushedSubs = true;
+          setTimeout(() => { CloudSync.justPushedSubs = false; }, 5000);
+
+          subsDoc.set({
+            subscriptions: JSON.parse(subsStr),
+            updatedAt: new Date().toISOString()
+          })
+            .then(() => console.info('[CLOUD] ☁️ نُشرت الاشتراكات:',
+              Object.keys(JSON.parse(subsStr)).length, 'مشترك'))
+            .catch((err) => {
+              lastPushedSubs = null;
+              CloudSync.justPushedSubs = false;
+              toast('فشل نشر الاشتراكات: ' + err.code, 'error');
+            });
         }
       }
     } catch (e) { console.warn('[CLOUD] push:', e); }
   }
 
-  /* ---------- النشر عند تغيّر البيانات ---------- */
+  /* ✅ v18: setItem مع تتبع الوقت + 300ms */
   const ORIGINAL_SET_ITEM = Storage.prototype.setItem;
   Storage.prototype.setItem = function (key, value) {
     ORIGINAL_SET_ITEM.call(this, key, value);
+
+    /* تتبع وقت آخر كتابة محلية للاشتراكات */
+    if (key === SUBS_LOCAL_KEY) {
+      CloudSync.lastLocalSubsWrite = Date.now();
+    }
+
     if (CloudSync.authed && (key === RES_KEY || key === SUBS_LOCAL_KEY)) {
       clearTimeout(window.__cloudPushTimer);
-      window.__cloudPushTimer = setTimeout(() => pushAll(false), 800);
+      window.__cloudPushTimer = setTimeout(() => pushAll(false), 300); /* ✅ 300ms بدل 800ms */
     }
   };
 
+  /* ---------- توافق مع MCL.on ---------- */
   if (window.MCL && typeof MCL.on !== 'function') {
     MCL.on = (fn) => { MCL._onPush = fn; };
   }

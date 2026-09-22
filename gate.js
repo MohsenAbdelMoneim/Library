@@ -1,15 +1,17 @@
 /* ==========================================================
-   gate.js — v16.1
+   gate.js — v16.2
    بوابة الحماية + Firebase Auth + إدارة المشتركين
-   ✅ v16: بيتعرف على Firebase Auth + enrollments
-   ✅ v16: المودال ميفتحش تلقائيًا لو الطالب مسجل + عنده كورسات
-   ✅ v16.1: إصلاح مشكلة الإشعارات الثابتة (auto-dismiss مضمون)
+   ✅ v16.2: إصلاح اختفاء المشتركين بعد الإضافة
+   ✅ v16.2: حماية من Overwrite لـ localStorage (cloud sync)
+   ✅ v16.2: Logging كامل في saveLocalSubs
+   ✅ v16.2: تأكيد نجاح الحفظ في saveSubscriber
+   ✅ v16.1: إصلاح مشكلة الإشعارات الثابتة
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v16.1 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+  console.log('%c MCL Gate — v16.2 ', 'background:#4ade80;color:#052e12;font-weight:bold');
 
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
@@ -24,7 +26,7 @@
   }
 
   const MCL = window.MCL = {
-    version: '16.1',
+    version: '16.2',
     get ADMIN_PASSWORD() { return ADMIN_PASSWORD; },
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
@@ -81,19 +83,17 @@
   }
 
   /* ==========================================================
-     ✅ إصلاح الإشعارات: auto-dismiss مضمون + مسح الإشعارات القديمة
+     ✅ إصلاح الإشعارات: auto-dismiss مضمون
      ========================================================== */
   function notify(msg, type = 'info', duration = 4200, action = null) {
     const safeDuration = Math.max(1500, Number(duration) || 4200);
 
-    // 1) لو فيه دالة showToast أصلية: نادها + نضمن المسح
     if (typeof window.showToast === 'function') {
       try {
         window.showToast(msg, type, { duration: safeDuration, action });
       } catch (e) {
         console.warn('[GATE] showToast فشلت، نستخدم fallback:', e);
       }
-      // ضمان المسح حتى لو showToast سايبة الإشعار ثابت
       setTimeout(() => {
         qsa('.toast, #toasts .toast').forEach((el) => {
           if (el.dataset && el.dataset.gateMsg === msg) el.remove();
@@ -103,7 +103,6 @@
       return;
     }
 
-    // 2) Fallback: إشعار مؤقت بنفسنا
     let box = qs('#toasts');
     if (!box) {
       box = document.createElement('div');
@@ -142,7 +141,6 @@
     textNode.style.cssText = 'flex:1;min-width:0';
     el.appendChild(textNode);
 
-    // زرار action (لو موجود)
     if (action && action.label && typeof action.onClick === 'function') {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -172,10 +170,7 @@
       setTimeout(() => { if (el.parentNode) el.remove(); }, 200);
     }
 
-    // ✅ مسح مضمون بعد المدة
     timer = setTimeout(dismiss, safeDuration);
-
-    // ✅ مسح فوري بالضغط على الإشعار
     el.addEventListener('click', dismiss);
   }
 
@@ -229,7 +224,7 @@
   }
   MCL.getSubscriberPhone = getSubscriberPhone;
 
-  /* ---------- 🆕 Firebase Auth + enrollments ---------- */
+  /* ---------- Firebase Auth + enrollments ---------- */
   let fbUser = null;
   let fbEnrollments = [];
   let fbLoading = false;
@@ -722,9 +717,27 @@
     return null;
   }
 
+  /* ✅ v16.2: Logging كامل + إرجاع نتيجة */
   function saveLocalSubs() {
-    try { localStorage.setItem(SUBS_LOCAL_KEY, JSON.stringify(MCL.subscriptions)); } catch { /* تجاهل */ }
+    try {
+      const json = JSON.stringify(MCL.subscriptions);
+      localStorage.setItem(SUBS_LOCAL_KEY, json);
+      console.info('[GATE] 💾 اتحفظ في localStorage:',
+        Object.keys(MCL.subscriptions).length, 'مشترك');
+      return true;
+    } catch (e) {
+      console.error('[GATE] ❌ فشل حفظ localStorage:', e.name, e.message);
+      if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+        notify('مساحة التخزين ممتلئة — فاضي بيانات المتصفح وحاول تاني.', 'error', 9000);
+      } else if (e.name === 'SecurityError') {
+        notify('المتصفح مانع التخزين (Incognito أو حظر كوكيز) — افتح الموقع في وضع عادي.', 'error', 9000);
+      } else {
+        notify('فشل حفظ البيانات في المتصفح — حاول تاني.', 'error', 7000);
+      }
+      return false;
+    }
   }
+  MCL.saveLocalSubs = saveLocalSubs;
 
   function sortSnapshot(subs) {
     const o = {};
@@ -749,6 +762,7 @@
     return diff;
   }
 
+  /* ✅ v16.2: حماية من Overwrite (لو فيه تعديلات محلية مش متزامنة) */
   async function loadSubscriptions() {
     let fileSubs = null;
     try {
@@ -761,7 +775,18 @@
     }
 
     const local = loadLocalSubs();
-    if (local) {
+    const isOwner = isAdminActive();
+    const hasUnsynced = isOwner && unsyncedCount() > 0;
+
+    if (hasUnsynced) {
+      /* ✅ فيه تعديلات محلية مش متزامنة → ندمج بدل ما نستبدل */
+      console.warn('[GATE] ⚠️ فيه', unsyncedCount(),
+        'تعديل محلي مش متزامن — ندمج بدل الاستبدال');
+      const merged = { ...(fileSubs || {}), ...(local || {}) };
+      MCL.subscriptions = merged;
+      saveLocalSubs();
+      console.info('[GATE] الاشتراكات بعد الدمج:', Object.keys(merged).length);
+    } else if (local) {
       MCL.subscriptions = local;
       console.info('[GATE] الاشتراكات: النسخة المحلية للمالك —', Object.keys(local).length, 'مشترك');
     } else if (fileSubs) {
@@ -1014,6 +1039,7 @@
     if (cancelBtn) cancelBtn.classList.add('hidden');
   }
 
+  /* ✅ v16.2: تأكيد نجاح الحفظ */
   function saveSubscriber() {
     const phoneInput = qs('#subsPhone');
     const phone = normPhone(phoneInput ? phoneInput.value : '');
@@ -1033,11 +1059,32 @@
       MCL.subscriptions[phone] = selected;
     }
     if (isEdit && subsEditingPhone !== phone) delete MCL.subscriptions[subsEditingPhone];
-    saveLocalSubs();
+
+    /* ✅ الحفظ مع تحقق */
+    const saved = saveLocalSubs();
+    if (!saved) {
+      /* saveLocalSubs بتعرض إشعار خطأ بنفسها */
+      console.error('[GATE] فشل حفظ الاشتراك — الحفظ مش موجود في localStorage');
+      return;
+    }
+
+    /* ✅ تأكيد إضافي: نقرأ من localStorage ونتأكد إن الرقم موجود */
+    const verify = loadLocalSubs();
+    if (!verify || !verify[phone]) {
+      notify('⚠️ الرقم مظهرش بعد الحفظ — جرّب تحدّث الصفحة أو افتحها في وضع عادي.', 'error', 9000);
+      console.error('[GATE] التحقق فشل: الرقم مش موجود في localStorage بعد الحفظ', phone);
+      return;
+    }
+
     renderSubsView();
     emit();
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
     resetSubsForm();
+
+    /* ✅ إشعار نجاح + تأكيد في Console */
+    console.info('[GATE] ✅ تم حفظ المشترك', phone, '— إجمالي:',
+      Object.keys(MCL.subscriptions).length);
+
     notify(isEdit
       ? `تم تحديث اشتراك ${phone} — بينشر على السحابة تلقائيًا.`
       : `تمت إضافة ${phone} — بينشر على السحابة تلقائيًا. ابعت لعميلك إنه يكتب رقمه.`,

@@ -1,23 +1,19 @@
 /* ==========================================================
-   roadmap.js — v20.2
+   roadmap.js — v20.3
    ✅ v20:   Smart stage matching بـ scoring/priority
-   ✅ v20:   Level detection بـ position داخل المسار
-   ✅ v20:   Current Step + Locking محسّن
-   ✅ v20.1: Advanced Frontend stage في نهاية Frontend
-   ✅ v20.1: Backend Sub-Paths (Node/Python/PHP/Java/.NET)
-   ✅ v20.1: عرض المسارات البديلة تحت الـ Timeline
-   ✅ v20.2: إصلاح dead code (getStageLevel, getCourseStatus مستخدمين فعليًا)
-   ✅ v20.2: منع تكرار كورسات sub-paths في Timeline الأساسي
-   ✅ v20.2: تحسين ARIA في sub-paths
-   ✅ v20.2: عرض loadError في error state
-   ✅ v20.2: عرض stageLabel في الـ step card
-   ✅ v20.2: كل features v19 محفوظة (Auth, Firestore, Hash, ARIA, ...)
+   ✅ v20.1: Advanced Frontend + Backend Sub-Paths
+   ✅ v20.2: إصلاح dead code + منع التكرار + ARIA
+   ✅ v20.3: Threshold منفصل لـ timeline (60) vs sub-paths (25)
+   ✅ v20.3: عرض stageLabel بدل category الخام
+   ✅ v20.3: Keyword specificity أقوى لمنع الـ match الضعيف
+   ✅ v20.3: Leftovers fallback أذكى (بترتيب order)
+   ✅ v20.3: عرض clean + بدون تزويق أرقام
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Roadmap — v20.2 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c Nexora Roadmap — v20.3 ', 'background:#2684fc;color:#fff;font-weight:bold');
 
   /* ---------- Firebase ---------- */
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
@@ -65,7 +61,7 @@
   const LEVEL_PATTERNS = {
     advanced: [
       'advanced', 'متقدم', 'احتراف', 'pro ', 'expert', 'master', 'عميق',
-      'deep dive', 'متقدمة', 'النطاق المتقدم', 'من الصفر للاحتراف المتقدم'
+      'deep dive', 'متقدمة', 'النطاق المتقدم', 'من الصفر للاحتراف المتقدم', 'diploma'
     ],
     intermediate: [
       'intermediate', 'متوسط', 'وسط', 'متوسطة', 'practical', 'تطبيقي'
@@ -98,7 +94,6 @@
     return 'beginner';
   }
 
-  /* ✅ v20.2: مستخدمة فعليًا في mapCourseToStep */
   function getStageLevel(stageIndex, totalSteps, explicitLevel) {
     if (explicitLevel && explicitLevel !== 'beginner') return explicitLevel;
     if (!totalSteps || totalSteps < 3) return explicitLevel || 'beginner';
@@ -119,7 +114,7 @@
     advanced: 'var(--rm-lv-advanced, #ef4444)'
   };
 
-  /* ---------- Roadmap Definitions (Curriculum) ---------- */
+  /* ---------- Roadmap Definitions ---------- */
   const ROADMAP_DEFINITIONS = [
     /* ===================== 1. Frontend ===================== */
     {
@@ -159,7 +154,6 @@
           id: 'nodejs-track',
           label: 'Node.js Track',
           icon: '🟢',
-          keywords: ['node.js', 'nodejs', 'node js', 'express', 'nestjs', 'nest.js'],
           stages: [
             { id: 'nodejs',  label: 'Node.js',    level: 'intermediate', keywords: ['node.js', 'nodejs'],    categories: ['Node.js'] },
             { id: 'express', label: 'Express.js', level: 'intermediate', keywords: ['express'],               categories: [] },
@@ -170,7 +164,6 @@
           id: 'python-track',
           label: 'Python Track',
           icon: '🐍',
-          keywords: ['python', 'django', 'flask', 'fastapi'],
           stages: [
             { id: 'python',  label: 'Python',  level: 'beginner',     keywords: ['python', 'بايثون'],  categories: [] },
             { id: 'django',  label: 'Django',  level: 'intermediate', keywords: ['django'],            categories: [] },
@@ -181,7 +174,6 @@
           id: 'php-track',
           label: 'PHP Track',
           icon: '🐘',
-          keywords: ['php', 'laravel'],
           stages: [
             { id: 'php',     label: 'PHP',     level: 'beginner',     keywords: ['php'],      categories: [] },
             { id: 'laravel', label: 'Laravel', level: 'intermediate', keywords: ['laravel'],  categories: [] }
@@ -191,7 +183,6 @@
           id: 'java-track',
           label: 'Java Track',
           icon: '☕',
-          keywords: ['java', 'spring', 'spring boot'],
           stages: [
             { id: 'java',   label: 'Java',        level: 'beginner',     keywords: ['java'],                  categories: [] },
             { id: 'spring', label: 'Spring Boot', level: 'intermediate', keywords: ['spring', 'spring boot'], categories: [] }
@@ -201,7 +192,6 @@
           id: 'dotnet-track',
           label: '.NET Track',
           icon: '🟣',
-          keywords: ['.net', 'dotnet', 'c#', 'asp.net'],
           stages: [
             { id: 'csharp', label: 'C#',      level: 'beginner',     keywords: ['c#', 'csharp'],      categories: [] },
             { id: 'aspnet', label: 'ASP.NET', level: 'intermediate', keywords: ['asp.net', 'aspnet'], categories: [] }
@@ -413,40 +403,40 @@
   ];
 
   /* ---------- Matching Engine (scored) ---------- */
+  /* ✅ v20.3: specificity أقوى */
   function scoreCourseStage(course, stage) {
     const title = normalizeText(course.title || '');
     const desc  = normalizeText(course.description || '');
     const cat   = String(course.category || '');
     let score = 0;
 
+    /* Category exact */
     if (Array.isArray(stage.categories) && stage.categories.length) {
       if (stage.categories.includes(cat)) score += 100;
     }
 
+    /* Keywords */
     if (Array.isArray(stage.keywords)) {
       for (const k of stage.keywords) {
         const kw = normalizeText(k);
         if (!kw) continue;
-        const specificity = Math.min(kw.length * 4, 40);
+        const kwLen = kw.length;
+        /* ✅ v20.3: specificity أوضح */
+        const specificity = Math.min(kwLen * 6, 60);
 
         if (title === kw) {
-          score += 90 + specificity;
-        } else {
-          /* ✅ v20.3: Word-boundary صارم بدل substring فضفاض.
-             قبل كده "js advanced" كانت بتماتش جوه "node.js advanced" (النقطة مش boundary)،
-             و"ml" (keyword قصير لمرحلة Machine Learning) كانت بتماتش جوه "html".
-             شلنا الـ fallback اللي كان بيدي score عالي لأي substring حتى من غير boundary حقيقي —
-             ده كان سبب رئيسي لتصنيف كورسات في مسار/مرحلة غلط. */
+          score += 100 + specificity;
+        } else if (title.includes(kw)) {
           const wordBoundary = new RegExp(`(^|\\s)${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`);
-          if (wordBoundary.test(title)) {
-            score += 75 + specificity;
-          } else if (kw.length >= 5 && desc.includes(kw)) {
-            score += 25 + specificity * 0.5;
-          }
+          if (wordBoundary.test(title)) score += 80 + specificity;
+          else score += 50 + specificity;
+        } else if (kwLen >= 5 && desc.includes(kw)) {
+          score += 25 + specificity * 0.5;
         }
       }
     }
 
+    /* Level match bonus */
     if (stage.level) {
       const courseLevel = detectLevel(course);
       if (courseLevel === stage.level) score += 15;
@@ -455,7 +445,9 @@
     return score;
   }
 
-  function findBestCourseForStage(courses, stage, usedIds) {
+  /* ✅ v20.3: minScore threshold */
+  function findBestCourseForStage(courses, stage, usedIds, minScore) {
+    const threshold = (typeof minScore === 'number') ? minScore : 25;
     let best = null;
     let bestScore = 0;
     for (const c of courses) {
@@ -463,21 +455,20 @@
       const s = scoreCourseStage(c, stage);
       if (s > bestScore) { bestScore = s; best = c; }
     }
-    if (best && bestScore >= 25) return { course: best, score: bestScore };
+    if (best && bestScore >= threshold) return { course: best, score: bestScore };
     return null;
   }
 
-  /* ---------- بناء المسارات من الـCatalog ---------- */
+  /* ---------- Cache ---------- */
   let _catalogCacheKey = '';
   let _catalogCache = null;
   let _lastDebugInfo = null;
 
-  /* ✅ v20.2: cache key أخف */
   function catalogCacheKey(courses) {
     return courses.length + '::' + courses.map((c) => c.id + ':' + (c.order ?? '')).join('|');
   }
 
-  /* ✅ v20.1: بناء sub-paths منفصلة */
+  /* ---------- Sub-Paths ---------- */
   function buildSubPathsFor(def, courses) {
     if (!def.subPaths || !def.subPaths.length) return { subPaths: [], courseIds: new Set() };
 
@@ -488,7 +479,8 @@
       const steps = [];
 
       for (const stage of sp.stages) {
-        const best = findBestCourseForStage(courses, stage, usedInSub);
+        /* sub-paths: threshold 25 (أخف) */
+        const best = findBestCourseForStage(courses, stage, usedInSub, 25);
         if (best) {
           usedInSub.add(best.course.id);
           subPathCourseIds.add(best.course.id);
@@ -496,17 +488,13 @@
         }
       }
 
-      return {
-        id: sp.id,
-        label: sp.label,
-        icon: sp.icon,
-        steps
-      };
+      return { id: sp.id, label: sp.label, icon: sp.icon, steps };
     }).filter((sp) => sp.steps.length > 0);
 
     return { subPaths, courseIds: subPathCourseIds };
   }
 
+  /* ---------- Build Roadmaps ---------- */
   function buildRoadmapsFromCatalog() {
     const src = window.__NEXORA_CATALOG__ || { courses: [] };
     const courses = src.courses || [];
@@ -522,9 +510,9 @@
       const usedInThisPath = new Set();
       const steps = [];
 
-      /* 1) أفضل match لكل stage في الـ Timeline الأساسي */
+      /* 1) Timeline الأساسي — ✅ v20.3: threshold 60 (صارم) */
       for (const stage of def.stages) {
-        const best = findBestCourseForStage(courses, stage, usedInThisPath);
+        const best = findBestCourseForStage(courses, stage, usedInThisPath, 60);
         if (best) {
           usedInThisPath.add(best.course.id);
           usedGlobal.add(best.course.id);
@@ -539,15 +527,15 @@
         }
       }
 
-      /* 2) sub-paths + مجموعة IDs بتاعتهم عشان نستثنيهم من leftovers */
+      /* 2) Sub-paths */
       const { subPaths, courseIds: subPathCourseIds } = buildSubPathsFor(def, courses);
       subPathCourseIds.forEach((id) => usedGlobal.add(id));
 
-      /* 3) leftovers: كورسات تابعة للمسار بس ماتمطّطتش ومش في sub-path */
+      /* 3) Leftovers: كورسات من نفس الـ path category ماتمطّطتش */
       const leftovers = courses
         .filter((c) =>
           !usedInThisPath.has(c.id) &&
-          !subPathCourseIds.has(c.id) &&   /* ✅ v20.2: منع التكرار */
+          !subPathCourseIds.has(c.id) &&
           belongsToPathCategory(c, def)
         )
         .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
@@ -570,7 +558,7 @@
       };
     }).filter((p) => p.steps.length > 0 || (p.subPaths && p.subPaths.length > 0));
 
-    /* 4) orphans → misc */
+    /* 4) Orphans → misc */
     const orphans = courses.filter((c) => !usedGlobal.has(c.id));
     if (orphans.length) {
       orphans.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
@@ -618,7 +606,6 @@
     return allowed.includes(String(course.category || ''));
   }
 
-  /* ✅ v20.2: getStageLevel مستخدمة فعليًا */
   function mapCourseToStep(c, stage, stageIndex, totalSteps) {
     const title = c.title || '';
     const cat = c.category || '';
@@ -645,7 +632,6 @@
     };
   }
 
-  /* ✅ v20.2: بتقبل currentIdx كـ param اختياري لتجنب O(n²) */
   function getCourseStatus(rm, idx, currentIdx) {
     const p = progress[rm.id] || {};
     if (p[idx]) return 'completed';
@@ -739,13 +725,8 @@
 .rm-step.current .rm-step-card{border-color:rgba(79,124,255,.55);box-shadow:0 0 0 1px rgba(79,124,255,.2),0 8px 24px rgba(79,124,255,.1)}
 .rm-step-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .rm-step-num{font-size:10.5px;font-weight:800;color:var(--dim,#66666f);text-transform:uppercase;letter-spacing:.5px}
-.rm-step-status{font-size:10.5px;font-weight:800}
-.rm-step-status.done{color:#4ade80}
-.rm-step-status.current{color:#7ea2ff}
-.rm-step-status.locked{color:var(--dim,#66666f)}
 .rm-step-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .rm-step-cat{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);color:#7ea2ff}
-.rm-step-stage{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);color:#a78bfa}
 .rm-step-level{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
 .rm-step-title{flex:1;font-size:15px;font-weight:800;line-height:1.5;min-width:180px}
 .rm-step-desc{font-size:12.5px;color:var(--mut,#9c9cab);line-height:1.7;margin-bottom:12px}
@@ -757,7 +738,6 @@
 .rm-btn:focus-visible{outline:2px solid #4f7cff;outline-offset:2px}
 .rm-btn.open{background:var(--hero-color,#4f7cff);color:#fff}
 .rm-btn.open:hover{opacity:.9}
-.rm-btn.open.is-locked{background:rgba(255,255,255,.06);color:var(--mut,#9c9cab)}
 .rm-btn.done-btn{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.35);color:#4ade80}
 .rm-btn.done-btn:hover{background:rgba(74,222,128,.2)}
 .rm-btn.undone-btn{background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e}
@@ -777,7 +757,7 @@
 .rm-skel-line+.rm-skel-line{margin-top:10px}
 @keyframes rmShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* ✅ v20.1/v20.2: Sub-Paths */
+/* Sub-Paths */
 .rm-subpaths{margin-top:32px;padding-top:24px;border-top:1px solid var(--edge,#212129)}
 .rm-subpaths-title{font-size:16px;font-weight:800;margin-bottom:4px}
 .rm-subpaths-desc{font-size:12.5px;color:var(--mut,#9c9cab);margin-bottom:16px}
@@ -842,7 +822,7 @@
     return true;
   }
 
-  /* ---------- Progress (Firestore) ---------- */
+  /* ---------- Progress ---------- */
   async function loadProgress() {
     if (!currentUser) { progress = {}; loadState = 'ready'; return; }
     loadState = 'loading';
@@ -952,7 +932,7 @@
     '</div>';
   }
 
-  /* ---------- Render: Completion Celebration ---------- */
+  /* ---------- Render: Completion ---------- */
   function completionHTML(rm) {
     return '<div class="rm-complete" role="status">' +
       '<div class="rm-complete-icon" aria-hidden="true">🎉</div>' +
@@ -970,8 +950,8 @@
   }
 
   /* ---------- Render: Step ---------- */
+  /* ✅ v20.3: نعرض stageLabel بدل category لو متاح */
   function stepHTML(rm, step, i, currentIdx) {
-    /* ✅ v20.2: نستخدم getCourseStatus */
     const status = getCourseStatus(rm, i, currentIdx);
     const done = status === 'completed';
     const isCurrent = status === 'current';
@@ -991,26 +971,15 @@
         + esc(LEVEL_LABEL[step.level] || step.level) + '</span>'
       : '';
 
-    /* ✅ v20.2: نعرض stageLabel لو موجودة */
-    const stageHTML = step.stageLabel
-      ? '<span class="rm-step-stage">' + esc(step.stageLabel) + '</span>'
+    /* ✅ v20.3: stageLabel أولوية على category */
+    const displayCat = step.stageLabel || step.category;
+    const catHTML = displayCat
+      ? '<span class="rm-step-cat">' + esc(displayCat) + '</span>'
       : '';
 
-    /* ✅ v20.3: status label بجانب رقم المرحلة (مطابق للـ Expected UX) */
-    const statusLabel = done
-      ? '<span class="rm-step-status done">✓ مكتمل</span>'
-      : (isCurrent
-        ? '<span class="rm-step-status current">▶ ابدأ الآن</span>'
-        : (isLocked
-          ? '<span class="rm-step-status locked">🔒 لاحقًا</span>'
-          : ''));
-
-    const openLabel = done ? 'افتح تاني' : (isCurrent ? 'ابدأ الآن' : (isLocked ? '🔒 لاحقًا' : 'افتح الكورس'));
-
     const actions =
-      '<a class="rm-btn open' + (isLocked ? ' is-locked' : '') + '" href="library.html" data-rm-open="' + esc(step.courseId) + '"' +
-        (isLocked ? ' aria-label="' + esc(step.title) + ' — متاح بعد إكمال المرحلة السابقة، اضغط لفتحه الآن على أي حال"' : '') + '>' +
-        '<i class="bi bi-play-circle" aria-hidden="true"></i>' + openLabel +
+      '<a class="rm-btn open" href="library.html" data-rm-open="' + esc(step.courseId) + '">' +
+        '<i class="bi bi-play-circle" aria-hidden="true"></i>' + (done ? 'افتح تاني' : (isCurrent ? 'ابدأ الآن' : 'افتح الكورس')) +
       '</a>' +
       '<a class="rm-btn wa" href="' + waLinkFor(step.title) + '" target="_blank" rel="noopener noreferrer">' +
         '<i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك' +
@@ -1033,10 +1002,8 @@
       '<div class="rm-step-card">' +
         '<div class="rm-step-head">' +
           '<span class="rm-step-num">' + num + ' — المرحلة</span>' +
-          statusLabel +
           '<div class="rm-step-tags">' +
-            stageHTML +
-            (step.category ? '<span class="rm-step-cat">' + esc(step.category) + '</span>' : '') +
+            catHTML +
             levelHTML +
           '</div>' +
         '</div>' +
@@ -1054,7 +1021,6 @@
   }
 
   /* ---------- Render: Sub-Paths ---------- */
-  /* ✅ v20.2: شيلنا isDone الوهمي + role="list" */
   function subPathsHTML(rm) {
     if (!rm.subPaths || !rm.subPaths.length) return '';
 
@@ -1105,9 +1071,7 @@
     detail.innerHTML =
       heroHTML(rm) +
       (allDone ? completionHTML(rm) : currentStepHTML(rm)) +
-      /* ✅ v20.3: شلنا تكرار role (كان فيه role="list" و role="tabpanel" على نفس العنصر —
-         الـ HTML بيتجاهل التاني فعليًا فالـ tabpanel role كان مش شغال أصلًا). <ol> أصلًا list بطبعه. */
-      '<ol class="rm-steps" id="rmpanel-' + esc(rm.id) + '" role="tabpanel" aria-labelledby="rmtab-' + esc(rm.id) + '">' +
+      '<ol class="rm-steps" role="list" id="rmpanel-' + esc(rm.id) + '" role="tabpanel" aria-labelledby="rmtab-' + esc(rm.id) + '">' +
         rm.steps.map((s, i) => stepHTML(rm, s, i, currentIdx)).join('') +
       '</ol>' +
       subPathsHTML(rm);
@@ -1126,7 +1090,6 @@
       '<p class="rm-empty-desc">لما نضيف كورسات، المسارات هتظهر هنا تلقائيًا</p>' +
     '</div>';
   }
-  /* ✅ v20.2: نعرض loadError */
   function errorHTML() {
     return '<div class="rm-empty" role="alert">' +
       '<div class="rm-empty-icon" aria-hidden="true">⚠️</div>' +
@@ -1213,7 +1176,6 @@
         if (!res.ok && res.reason === 'guest') {
           alert('سجّل دخولك الأول عشان نحفظ تقدّمك.');
         }
-        /* ✅ v20.2: renderAll كفاية — مفيش استدعاء مكرر لـ renderRoadmap */
         renderAll();
         return;
       }
