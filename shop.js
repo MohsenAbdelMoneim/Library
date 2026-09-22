@@ -1,14 +1,14 @@
 /* ==========================================================
-   shop.js — v17
+   shop.js — v19
    Cart Page + Checkout + Wishlist + Course Details
-   ✅ v17: بيقرأ من window.__NEXORA_CATALOG__ (Firestore)
-   ✅ v17: إصلاح SyntaxError في renderCart
+   ✅ v19: انتظار DOM + API كامل + nexora:shop-ready
+   ✅ v19: بيقرأ من window.__NEXORA_CATALOG__ (Firestore)
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Shop — v17 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Shop — v19 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
   if (!window.firebase) { console.error('[SHOP] Firebase مش محمّل'); return; }
   if (!firebase.apps.length) {
@@ -29,12 +29,10 @@
   const PHONE = '01096295395';
   const WA = 'https://wa.me/201096295395';
 
-  /* ✅ الكتالوج بقى ييجي من Firestore */
   function getCatalogSource() {
     return window.__NEXORA_CATALOG__ || { courses: [], packages: [], byId: {}, packById: {} };
   }
 
-  /* ✅ wrapper يبني CATALOG و PACKS بنفس شكل shop.js القديم */
   function buildCatalogMaps() {
     const src = getCatalogSource();
     const CATALOG = {};
@@ -68,16 +66,10 @@
     return { CATALOG, PACKS };
   }
 
-  /* ✅ نسخة متغيرة عشان تتحدث مع Firestore */
   let _maps = buildCatalogMaps();
-  const CATALOG = new Proxy({}, {
-    get: (_, k) => _maps.CATALOG[k]
-  });
-  const PACKS = new Proxy({}, {
-    get: (_, k) => _maps.PACKS[k]
-  });
+  const CATALOG = new Proxy({}, { get: (_, k) => _maps.CATALOG[k] });
+  const PACKS = new Proxy({}, { get: (_, k) => _maps.PACKS[k] });
 
-  /* تحديث المابات لما Firestore يجيب البيانات */
   window.addEventListener('nexora:catalog-ready', () => {
     _maps = buildCatalogMaps();
     console.info('[SHOP] تم تحديث الكتالوج من Firestore');
@@ -98,7 +90,6 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  /* ---------- التخزين ---------- */
   const load = (k, fb) => {
     try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ?? fb; }
     catch { return fb; }
@@ -109,7 +100,14 @@
   let wishlist = load(WISH_KEY, []);
   cart = cart.filter((x) => typeof x === 'string');
 
-  const saveCart = () => { save(CART_KEY, cart); updateBadges(); if (currentView === 'cart') renderCart(); };
+  const saveCart = () => {
+    save(CART_KEY, cart);
+    updateBadges();
+    if (currentView === 'cart') renderCart();
+    try {
+      window.dispatchEvent(new CustomEvent('nexora:cart-changed'));
+    } catch (e) { /* تجاهل */ }
+  };
   const saveWish = () => { save(WISH_KEY, wishlist); updateBadges(); };
 
   const inCart = (id) => cart.includes(id);
@@ -135,12 +133,24 @@
     }, 0);
   }
 
+  function getItemInfo(id) {
+    const isPack = !!PACKS[id];
+    if (isPack) {
+      const p = PACKS[id];
+      return { id, type: 'pack', title: p.t, price: p.p, inst: p.inst, instN: p.instN, instT: p.instT, cat: 'باقة', ids: p.ids };
+    }
+    const c = CATALOG[id];
+    if (c) {
+      return { id, type: 'course', title: c.t, price: c.p, inst: c.inst, instN: c.instN, instT: c.instT, cat: c.cat, desc: c.d };
+    }
+    return null;
+  }
+
   function notify(msg, type = 'success', dur = 4200) {
     if (typeof window.showToast === 'function') window.showToast(msg, type, { duration: dur });
     else console.log('[SHOP]', msg);
   }
 
-  /* ---------- الأنماط ---------- */
   const STYLES = `
 .shop-wrap{max-width:1000px;margin:0 auto}
 .shop-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px}
@@ -205,16 +215,19 @@
 }
 `;
 
-  /* ---------- DOM ---------- */
   function ensureShopDOM() {
-    if (qs('#view-shop-cart')) return;
+    if (qs('#view-shop-cart')) return true;
+    const main = qs('main#content') || qs('main');
+    if (!main) {
+      console.warn('[SHOP] main#content مش موجود — هستنى…');
+      return false;
+    }
     if (!document.getElementById('nexShopStyles')) {
       const st = document.createElement('style');
       st.id = 'nexShopStyles';
       st.textContent = STYLES;
       document.head.appendChild(st);
     }
-    const main = qs('main#content') || qs('main');
     ['cart', 'checkout', 'wishlist', 'detail'].forEach((v) => {
       const sec = document.createElement('section');
       sec.id = 'view-shop-' + v;
@@ -223,6 +236,8 @@
       sec.innerHTML = '<div class="shop-wrap" id="shopInner-' + v + '"></div>';
       main.appendChild(sec);
     });
+    console.info('[SHOP] ✅ #view-shop-* اتعملوا');
+    return true;
   }
 
   let currentView = null;
@@ -245,17 +260,15 @@
     const total = calcTotal();
 
     const itemsHTML = cart.map(function (id) {
-      const isPack = !!PACKS[id];
-      const info = isPack
-        ? { t: PACKS[id].t, p: PACKS[id].p, cat: 'باقة' }
-        : { t: CATALOG[id]?.t, p: CATALOG[id]?.p, cat: CATALOG[id]?.cat };
+      const info = getItemInfo(id) || { title: id, price: 0, cat: '', type: 'course' };
+      const isPack = info.type === 'pack';
       return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:14px;padding:14px">' +
         '<span style="font-size:' + (isPack ? '22px' : '20px') + '">' + (isPack ? '📦' : '🎓') + '</span>' +
         '<div style="flex:1;min-width:150px">' +
-          '<p style="font-size:13.5px;font-weight:700">' + esc(info.t || id) + '</p>' +
+          '<p style="font-size:13.5px;font-weight:700">' + esc(info.title) + '</p>' +
           '<p style="font-size:11px;color:var(--mut,#9c9cab)">' + esc(info.cat || '') + '</p>' +
         '</div>' +
-        '<b style="color:#4ade80;font-size:14px">' + fmt(info.p) + '</b>' +
+        '<b style="color:#4ade80;font-size:14px">' + fmt(info.price) + '</b>' +
         '<button type="button" class="icon-btn" data-cart-remove="' + esc(id) + '" aria-label="إزالة" style="color:#f4636e"><i class="bi bi-trash3"></i></button>' +
       '</div>';
     }).join('');
@@ -317,9 +330,8 @@
     const phone0 = ((user?.email || '').split('@')[0]);
 
     const itemsRows = cart.map(function (id) {
-      const t = CATALOG[id]?.t ?? PACKS[id]?.t ?? id;
-      const p = CATALOG[id]?.p ?? PACKS[id]?.p ?? 0;
-      return '<div class="ck-line"><span>' + (PACKS[id] ? '📦 ' : '🎓 ') + esc(t) + '</span><span>' + fmt(p) + '</span></div>';
+      const info = getItemInfo(id) || { title: id, price: 0, type: 'course' };
+      return '<div class="ck-line"><span>' + (info.type === 'pack' ? '📦 ' : '🎓 ') + esc(info.title) + '</span><span>' + fmt(info.price) + '</span></div>';
     }).join('');
 
     inner.innerHTML =
@@ -366,15 +378,18 @@
       btn.disabled = true; btn.textContent = 'لحظة…';
       try {
         const orderId = 'NX-' + Date.now().toString(36).toUpperCase().slice(-6);
+        const items = cart.map((id) => {
+          const info = getItemInfo(id) || { title: id, price: 0, type: 'course' };
+          return {
+            type: info.type, id,
+            title: info.title,
+            price: info.price,
+            ...(info.type === 'pack' ? { courseIds: info.ids } : {})
+          };
+        });
         await db.collection('orders').add({
           orderId, userId: auth.currentUser.uid, name, phone,
-          items: cart.map((id) => ({
-            type: PACKS[id] ? 'pack' : 'course', id,
-            title: CATALOG[id]?.t ?? PACKS[id]?.t ?? id,
-            price: CATALOG[id]?.p ?? PACKS[id]?.p ?? 0,
-            ...(PACKS[id] ? { courseIds: PACKS[id].ids } : {})
-          })),
-          totalCash: total,
+          items, totalCash: total,
           payMethod: method, notes: qs('#ckNotes').value.trim(),
           status: 'pending', createdAt: new Date().toISOString()
         });
@@ -614,13 +629,66 @@
     installHook();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  /* ⏳ انتظر main#content و #sideNav */
+  function waitForDOM(retries = 50) {
+    const main = qs('main#content') || qs('main');
+    const nav = qs('#sideNav');
+    if (main && nav) {
+      console.info('[SHOP] DOM جاهز — boot');
+      boot();
+      return;
+    }
+    if (retries <= 0) {
+      console.warn('[SHOP] ⚠️ DOM مش جاهز بعد 5 ثواني — boot');
+      boot();
+      return;
+    }
+    setTimeout(() => waitForDOM(retries - 1), 100);
+  }
 
-  /* API عام */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => waitForDOM(), { once: true });
+  } else {
+    waitForDOM();
+  }
+
+  /* ==========================================================
+     ✅ API عام لـ catalog.js
+     ========================================================== */
   window.NexoraShop = {
+    /* السلة */
     addToCart: (id) => { if (!inCart(id)) { cart.push(id); saveCart(); } },
-    inCart, toggleWish, inWish,
-    openCart: () => { showView('cart'); renderCart(); }
+    removeFromCart: (id) => { cart = cart.filter((x) => x !== id); saveCart(); },
+    toggleCart,
+    inCart,
+    getCart: () => cart.slice(),
+    getCartCount: () => cart.length,
+    getCartTotal: () => calcTotal(),
+    getCartItems: () => cart.map(getItemInfo).filter(Boolean),
+    clearCart: () => { cart = []; saveCart(); },
+
+    /* المفضلة */
+    toggleWish,
+    inWish,
+    getWishlist: () => wishlist.slice(),
+
+    /* التنقل */
+    openCart: () => { showView('cart'); renderCart(); },
+    openWishlist: () => { showView('wishlist'); renderWishlist(); },
+
+    /* معلومات عنصر */
+    getItemInfo,
+
+    /* معلومات الكتالوج */
+    getCatalog: () => ({
+      CATALOG: _maps.CATALOG,
+      PACKS: _maps.PACKS
+    })
   };
+
+  /* ✅ نبه باقي الملفات إن NexoraShop جاهز */
+  try {
+    window.dispatchEvent(new CustomEvent('nexora:shop-ready'));
+    console.info('[SHOP] ✅ NexoraShop API جاهز');
+  } catch (e) { /* تجاهل */ }
 })();

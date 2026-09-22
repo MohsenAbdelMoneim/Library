@@ -28,7 +28,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="config.js?v=16"></script>
+  <script src="config.js?v=17"></script>
 
   <script>
     const log = (msg, cls) => {
@@ -53,7 +53,6 @@
 
       let ready = false;
 
-      /* ✅ دخول المالك عشان نقدر نكتب */
       (async () => {
         try {
           log('🔐 جاري تسجيل دخول المالك…');
@@ -66,7 +65,6 @@
         }
       })();
 
-      /* ===== البيانات ===== */
       const COURSES = [
         { id: 'frontend-diploma',   title: 'Frontend Diploma',        category: 'Frontend',      accessType: 'paid', cashPrice: 2500, installmentAmount: 650,  installmentCount: 4, installmentTotal: 2600, description: 'تعلم تطوير واجهات المواقع باحتراف من الصفر للاحتراف.', icon: '🌐', order: 1 },
         { id: 'backend-course',     title: 'Backend Course',          category: 'Backend',       accessType: 'paid', cashPrice: 2000, installmentAmount: 525,  installmentCount: 4, installmentTotal: 2100, description: 'ابنِ الخدمات الخلفية وقواعد البيانات باحتراف.', icon: '⚙️', order: 2 },
@@ -87,7 +85,6 @@
         { id: 'tech-master-pack',  title: 'Tech Master Pack',  courseIds: ['frontend-diploma','backend-course','fullstack-diploma','mobile-app-course','data-diploma','ai-ds-ml','cyber-course','uiux-course','media-buying'], cashPrice: 9999, installmentAmount: 2500, installmentCount: 4, installmentTotal: 10000, featured: true,  count: 9, order: 4 }
       ];
 
-      /* ===== الفحص ===== */
       document.getElementById('checkBtn').onclick = async () => {
         log('--- فحص ---');
         try {
@@ -100,7 +97,6 @@
         }
       };
 
-      /* ===== الرفع ===== */
       document.getElementById('seedBtn').onclick = async () => {
         if (!ready) {
           log('❌ لازم تسجل دخول الأول — استنى شوية وجرب تاني', 'err');
@@ -112,7 +108,6 @@
         log('--- بدء الرفع ---');
 
         try {
-          /* 1) الكورسات */
           log(`جاري رفع ${COURSES.length} كورس…`);
           const batch1 = db.batch();
           COURSES.forEach((c) => {
@@ -122,7 +117,6 @@
           await batch1.commit();
           log(`✅ تم رفع ${COURSES.length} كورس`, 'ok');
 
-          /* 2) الباقات */
           log(`جاري رفع ${PACKAGES.length} باقة…`);
           const batch2 = db.batch();
           PACKAGES.forEach((p) => {

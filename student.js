@@ -1,16 +1,14 @@
 /* ==========================================================
-   student.js — v15.2
+   student.js — v16
    Dashboard الطالب: أهلاً بيك يا [فلان] + كورساته المفعلة هو بس
-   (المالك owner@gymzone.com مش بيشوف الداشبورد ده خالص)
-   إصلاحات: TDZ state، capture listener، حماية DOM
+   ✅ v16: انتظار DOM + استخدام __NEXORA_CATALOG__
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Student — v15.2 ', 'background:#7c5cff;color:#fff;font-weight:bold');
+  console.log('%c Nexora Student — v16 ', 'background:#7c5cff;color:#fff;font-weight:bold');
 
-  /* ⚠️ انقل المفاتيح لملف config خارجي */
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
@@ -34,13 +32,11 @@
   const PHONE = '01096295395';
   const WA = 'https://wa.me/201096295395';
 
-  /* ---------- أدوات مساعدة ---------- */
   const qs  = (s) => document.querySelector(s);
   const qsa = (s) => [...document.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  /* ✅ مساعد آمن */
   function on(sel, evt, fn, opts) {
     const el = typeof sel === 'string' ? qs(sel) : sel;
     if (el) el.addEventListener(evt, fn, opts);
@@ -48,21 +44,31 @@
     return el;
   }
 
-  /* ✅ الوصول الآمن لـ state من app.js */
   function getAppState() {
     if (window.__nexoraState && Array.isArray(window.__nexoraState.resources)) {
       return window.__nexoraState;
     }
-    try {
-      if (typeof state !== 'undefined' && state && Array.isArray(state.resources)) {
-        return state;
-      }
-    } catch (e) { /* TDZ */ }
     return null;
   }
 
-  /* ---------- كتالوج الكورسات ---------- */
-  const CATALOG = {
+  /* ✅ نستخدم الكتالوج من Firestore */
+  function getCatalog() {
+    const src = window.__NEXORA_CATALOG__ || { courses: [], byId: {} };
+    const map = {};
+    (src.courses || []).forEach((c) => {
+      if (c && c.id) {
+        map[c.id] = {
+          title: c.title,
+          category: c.category || '—',
+          description: c.description || ''
+        };
+      }
+    });
+    return map;
+  }
+
+  /* Fallback لو Firestore مش جاهز */
+  const FALLBACK_CATALOG = {
     'frontend-diploma':  { title: 'Frontend Diploma',      category: 'Frontend',      description: 'تطوير واجهات المواقع من الصفر للاحتراف.' },
     'backend-course':    { title: 'Backend Course',        category: 'Backend',       description: 'الخدمات الخلفية وقواعد البيانات.' },
     'uiux-course':       { title: 'UI/UX Course',          category: 'UI/UX',         description: 'تصميم تجارب وواجهات استخدام.' },
@@ -74,7 +80,11 @@
     'fullstack-diploma': { title: 'Full Stack Diploma',    category: 'Full Stack',    description: 'واجهة + خلفية في دبلومة واحدة.' }
   };
 
-  /* ---------- الأنماط ---------- */
+  function catInfo(courseId) {
+    const live = getCatalog();
+    return live[courseId] || FALLBACK_CATALOG[courseId] || { title: courseId, category: '—', description: '' };
+  }
+
   const STYLES = `
 .nex-dash{max-width:1100px;margin:0 auto}
 .dash-hero{padding:24px 0 20px}
@@ -122,33 +132,34 @@
   }
 
   function ensureDashDOM() {
-    if (qs('#view-student')) return;
+    if (qs('#view-student')) return true;
     const main = qs('main#content') || qs('main');
     if (!main) {
-      console.warn('[STUDENT] main#content مش موجود');
-      return;
+      console.warn('[STUDENT] main#content مش موجود — هستنى…');
+      return false;
     }
     const section = document.createElement('section');
     section.id = 'view-student';
     section.className = 'hidden';
     section.setAttribute('aria-label', 'لوحة الطالب');
-    section.innerHTML = `<div class="nex-dash" id="studentDashInner"></div>`;
+    section.innerHTML = '<div class="nex-dash" id="studentDashInner"></div>';
     main.appendChild(section);
+    console.info('[STUDENT] ✅ #view-student اتعمل');
+    return true;
   }
 
   function emptyStateHTML() {
-    return `
-    <div class="empty-dash">
-      <div class="empty-icon">📚</div>
-      <p class="empty-t">لسه مفيش كورسات مضافة لحسابك</p>
-      <p class="empty-d">تقدر تتصفح الكورسات المتاحة وتختار المجال المناسب ليك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس لحسابك فورًا.</p>
-      <button type="button" class="empty-btn" id="goCatalogBtn"><i class="bi bi-compass" aria-hidden="true"></i>تصفح الكورسات</button>
-    </div>`;
+    return '' +
+    '<div class="empty-dash">' +
+      '<div class="empty-icon">📚</div>' +
+      '<p class="empty-t">لسه مفيش كورسات مضافة لحسابك</p>' +
+      '<p class="empty-d">تقدر تتصفح الكورسات المتاحة وتختار المجال المناسب ليك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس لحسابك فورًا.</p>' +
+      '<button type="button" class="empty-btn" id="goCatalogBtn"><i class="bi bi-compass" aria-hidden="true"></i>تصفح الكورسات</button>' +
+    '</div>';
   }
 
-  /* ---------- إيجاد رابط الكورس ---------- */
   function resolveCourseLink(enroll) {
-    const c = CATALOG[enroll.courseId] || { title: enroll.courseId };
+    const c = catInfo(enroll.courseId);
     const appState = getAppState();
     if (appState) {
       const r = appState.resources.find((x) => x.title === c.title);
@@ -161,31 +172,30 @@
   }
 
   function courseCardHTML(enroll) {
-    const c = CATALOG[enroll.courseId] || { title: enroll.courseId, category: '—', description: '' };
+    const c = catInfo(enroll.courseId);
     const done = enroll.progress === 100;
     const pct = Number(enroll.progress || 0);
-    return `
-    <article class="stu-card">
-      <div class="stu-top">
-        <span class="stu-cat">${esc(c.category)}</span>
-        <span class="stu-status ${done ? 'done' : 'active'}">${done ? 'مكتمل 🏆' : 'متاح ليك ✅'}</span>
-      </div>
-      <h3 class="stu-title">${esc(c.title)}</h3>
-      <p class="stu-desc">${esc(c.description)}</p>
-      ${pct > 0 ? `
-      <div class="prog-wrap">
-        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
-        <p class="prog-txt">تقدّمك: ${pct}%</p>
-      </div>` : ''}
-      <div class="stu-cta">
-        <button type="button" class="stu-open" data-course-id="${esc(enroll.courseId)}" data-course-title="${esc(c.title)}">
-          <i class="bi bi-play-circle" aria-hidden="true"></i>ابدأ التعلم
-        </button>
-      </div>
-    </article>`;
+    return '' +
+    '<article class="stu-card">' +
+      '<div class="stu-top">' +
+        '<span class="stu-cat">' + esc(c.category) + '</span>' +
+        '<span class="stu-status ' + (done ? 'done' : 'active') + '">' + (done ? 'مكتمل 🏆' : 'متاح ليك ✅') + '</span>' +
+      '</div>' +
+      '<h3 class="stu-title">' + esc(c.title) + '</h3>' +
+      '<p class="stu-desc">' + esc(c.description) + '</p>' +
+      (pct > 0 ?
+      '<div class="prog-wrap">' +
+        '<div class="prog-bar"><div class="prog-fill" style="width:' + pct + '%"></div></div>' +
+        '<p class="prog-txt">تقدّمك: ' + pct + '%</p>' +
+      '</div>' : '') +
+      '<div class="stu-cta">' +
+        '<button type="button" class="stu-open" data-course-id="' + esc(enroll.courseId) + '" data-course-title="' + esc(c.title) + '">' +
+          '<i class="bi bi-play-circle" aria-hidden="true"></i>ابدأ التعلم' +
+        '</button>' +
+      '</div>' +
+    '</article>';
   }
 
-  /* فتح الكورس */
   function openCourse(courseId, courseTitle) {
     const link = resolveCourseLink({ courseId });
     if (link.resource && link.url) {
@@ -197,7 +207,7 @@
       }
       return;
     }
-    window.open(WA + '?text=' + encodeURIComponent(`أهلاً 👋 فعّلوا لي كورس «${courseTitle}» في حسابي`), '_blank', 'noopener,noreferrer');
+    window.open(WA + '?text=' + encodeURIComponent('أهلاً 👋 فعّلوا لي كورس «' + courseTitle + '» في حسابي'), '_blank', 'noopener,noreferrer');
   }
 
   function renderDash(user, profile, enrollments) {
@@ -207,19 +217,19 @@
     const list = enrollments || [];
 
     const cards = list.length
-      ? `<div class="dash-grid">${list.map(courseCardHTML).join('')}</div>`
+      ? '<div class="dash-grid">' + list.map(courseCardHTML).join('') + '</div>'
       : emptyStateHTML();
 
-    inner.innerHTML = `
-    <div class="dash-hero">
-      <h2 class="dash-hello">أهلاً بيك يا ${esc(firstName)} 👋</h2>
-      <p class="dash-sub">دي الكورسات المتاحة ليك — ${list.length} كورس</p>
-      <div class="top-nav-row">
-        <a class="top-nav-chip" href="${WA}?text=${encodeURIComponent('أهلاً 👋 عايز أشترك في كورس جديد')}" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك في كورس جديد</a>
-        <button type="button" class="top-nav-chip out" id="studentLogout"><i class="bi bi-box-arrow-left" aria-hidden="true"></i>خروج</button>
-      </div>
-    </div>
-    ${cards}`;
+    inner.innerHTML =
+      '<div class="dash-hero">' +
+        '<h2 class="dash-hello">أهلاً بيك يا ' + esc(firstName) + ' 👋</h2>' +
+        '<p class="dash-sub">دي الكورسات المتاحة ليك — ' + list.length + ' كورس</p>' +
+        '<div class="top-nav-row">' +
+          '<a class="top-nav-chip" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 عايز أشترك في كورس جديد') + '" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك في كورس جديد</a>' +
+          '<button type="button" class="top-nav-chip out" id="studentLogout"><i class="bi bi-box-arrow-left" aria-hidden="true"></i>خروج</button>' +
+        '</div>' +
+      '</div>' +
+      cards;
 
     on('#studentLogout', 'click', async () => {
       await auth.signOut();
@@ -235,7 +245,6 @@
       b.addEventListener('click', () => openCourse(b.dataset.courseId, b.dataset.courseTitle)));
   }
 
-  /* ---------- تحميل بيانات الطالب ---------- */
   async function loadStudentData(user) {
     let profile = null;
     try {
@@ -250,7 +259,8 @@
         .where('status', '==', 'active')
         .get();
       enrollments = snap.docs.map((d) => d.data());
-            /* 🗝️ فتح كورسات Drive المرتبطة باشتراكات الطالب */
+
+      /* 🗝️ فتح كورسات Drive المرتبطة باشتراكات الطالب */
       const map = (window.__COURSE_LIBRARY_MAP__ || {});
       const titles = enrollments
         .map((en) => map[en.courseId])
@@ -260,13 +270,13 @@
         allowedTitles: new Set(titles),
         has(title) { return this.allowedTitles.has(title); }
       };
+      console.info('[STUDENT] ✅ حمّل', enrollments.length, 'كورس للطالب');
     } catch (e) {
       console.warn('[STUDENT] الاشتراكات:', e.code);
     }
     renderDash(user, profile, enrollments);
   }
 
-  /* ---------- بند "حسابي" ---------- */
   function ensureNav() {
     const nav = qs('#sideNav');
     if (!nav || qs('[data-nav="view:student"]')) return;
@@ -294,6 +304,7 @@
   }
 
   function showStudentView() {
+    if (!qs('#view-student')) ensureDashDOM();
     qsa('main#content > section:not(#view-student)').forEach((s) => s.classList.add('hidden'));
     const v = qs('#view-student');
     if (v) v.classList.remove('hidden');
@@ -304,7 +315,6 @@
     const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
   }
 
-  /* ✅ listener على #sideNav بدل document */
   function bindStudentNav() {
     const nav = qs('#sideNav');
     if (!nav || nav.__studentNavBound) return;
@@ -317,13 +327,23 @@
     });
   }
 
-  /* ---------- تشغيل ---------- */
+  function observeSideNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__studentObserver) return;
+    nav.__studentObserver = new MutationObserver(() => {
+      ensureNav();
+      bindStudentNav();
+    });
+    nav.__studentObserver.observe(nav, { childList: true });
+  }
+
   function boot() {
     injectStyles();
     ensureDashDOM();
     ensureNav();
     bindStudentNav();
     installSidebarHook();
+    observeSideNav();
 
     let autoOpened = false;
     auth.onAuthStateChanged((user) => {
@@ -334,7 +354,6 @@
         ensureNav();
         bindStudentNav();
         loadStudentData(user);
-        /* فتح الداشبورد تلقائيًا مرة واحدة بس */
         if (!autoOpened) {
           autoOpened = true;
           setTimeout(() => {
@@ -346,40 +365,45 @@
       } else {
         const inner = qs('#studentDashInner');
         if (inner) {
-          inner.innerHTML = `
-          <div class="dash-hero">
-            <h2 class="dash-hello">أهلاً بيك في Nexora Academy 👋</h2>
-            <p class="dash-sub">أنشئ حسابك أو سجّل دخولك لتشوف كورساتك وتقدّمك</p>
-            <div class="top-nav-row">
-              <a class="top-nav-chip" style="color:#fff;background:linear-gradient(135deg,#4f7cff,#7c5cff);border:none" href="auth.html"><i class="bi bi-person-plus" aria-hidden="true"></i>تسجيل / دخول</a>
-            </div>
-          </div>`;
+          inner.innerHTML =
+          '<div class="dash-hero">' +
+            '<h2 class="dash-hello">أهلاً بيك في Nexora Academy 👋</h2>' +
+            '<p class="dash-sub">أنشئ حسابك أو سجّل دخولك لتشوف كورساتك وتقدّمك</p>' +
+            '<div class="top-nav-row">' +
+              '<a class="top-nav-chip" style="color:#fff;background:linear-gradient(135deg,#4f7cff,#7c5cff);border:none" href="auth.html"><i class="bi bi-person-plus" aria-hidden="true"></i>تسجيل / دخول</a>' +
+            '</div>' +
+          '</div>';
         }
       }
     });
   }
 
-  /* ✅ التشغيل بعد DOM جاهز */
+  function waitForDOM(retries = 50) {
+    const main = qs('main#content') || qs('main');
+    const nav = qs('#sideNav');
+    if (main && nav) {
+      console.info('[STUDENT] DOM جاهز — boot');
+      boot();
+      return;
+    }
+    if (retries <= 0) {
+      console.warn('[STUDENT] ⚠️ DOM مش جاهز — boot');
+      boot();
+      return;
+    }
+    setTimeout(() => waitForDOM(retries - 1), 100);
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
+    document.addEventListener('DOMContentLoaded', () => waitForDOM(), { once: true });
   } else {
-    boot();
+    waitForDOM();
   }
 
-  /* ✅ ضمان إضافي */
-  window.addEventListener('load', () => {
-    ensureNav();
-    bindStudentNav();
-    installSidebarHook();
-  }, { once: true });
-
-  /* ✅ راقب السايدبار */
-  const nav = qs('#sideNav');
-  if (nav && !nav.__studentObserver) {
-    nav.__studentObserver = new MutationObserver(() => {
-      ensureNav();
-      bindStudentNav();
-    });
-    nav.__studentObserver.observe(nav, { childList: true });
-  }
+  window.NexoraStudent = {
+    show: showStudentView,
+    reload: () => {
+      if (auth.currentUser) loadStudentData(auth.currentUser);
+    }
+  };
 })();

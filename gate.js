@@ -1,21 +1,22 @@
 /* ==========================================================
-   gate.js — v15.2
-   بوابة الحماية + واتساب وفودافون كاش + إدارة المشتركين
-   (يوتيوب مفتوح للجميع — Drive للمشتركين فقط)
-   إصلاحات: كلمة السر من config، listener واحد للأحداث، حماية storage
+   gate.js — v16.1
+   بوابة الحماية + Firebase Auth + إدارة المشتركين
+   ✅ v16: بيتعرف على Firebase Auth + enrollments
+   ✅ v16: المودال ميفتحش تلقائيًا لو الطالب مسجل + عنده كورسات
+   ✅ v16.1: إصلاح مشكلة الإشعارات الثابتة (auto-dismiss مضمون)
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v15.2 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+  console.log('%c MCL Gate — v16.1 ', 'background:#4ade80;color:#052e12;font-weight:bold');
 
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
   const SUBS_LOCAL_KEY = 'my-course-library:subs-local';
   const SUBS_EXPORTED_KEY = 'my-course-library:subs-exported';
 
-  /* ⚠️ كلمة السر تجي من config.js خارجي — مش في الكود */
+  /* كلمة السر من config.js */
   const ADMIN_PASSWORD = (window.__OWNER_PASSWORD__ || '').trim();
 
   if (!ADMIN_PASSWORD) {
@@ -23,7 +24,7 @@
   }
 
   const MCL = window.MCL = {
-    version: '15.2',
+    version: '16.1',
     get ADMIN_PASSWORD() { return ADMIN_PASSWORD; },
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
@@ -79,14 +80,103 @@
     notify(okMsg || 'تم النسخ.', 'success');
   }
 
+  /* ==========================================================
+     ✅ إصلاح الإشعارات: auto-dismiss مضمون + مسح الإشعارات القديمة
+     ========================================================== */
   function notify(msg, type = 'info', duration = 4200, action = null) {
-    if (typeof window.showToast === 'function') { window.showToast(msg, type, { duration, action }); return; }
-    const box = qs('#toasts') || document.body;
+    const safeDuration = Math.max(1500, Number(duration) || 4200);
+
+    // 1) لو فيه دالة showToast أصلية: نادها + نضمن المسح
+    if (typeof window.showToast === 'function') {
+      try {
+        window.showToast(msg, type, { duration: safeDuration, action });
+      } catch (e) {
+        console.warn('[GATE] showToast فشلت، نستخدم fallback:', e);
+      }
+      // ضمان المسح حتى لو showToast سايبة الإشعار ثابت
+      setTimeout(() => {
+        qsa('.toast, #toasts .toast').forEach((el) => {
+          if (el.dataset && el.dataset.gateMsg === msg) el.remove();
+          else if (el.textContent && el.textContent.trim() === String(msg).trim()) el.remove();
+        });
+      }, safeDuration + 120);
+      return;
+    }
+
+    // 2) Fallback: إشعار مؤقت بنفسنا
+    let box = qs('#toasts');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'toasts';
+      box.style.cssText =
+        'position:fixed;top:16px;right:16px;z-index:9999;' +
+        'display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:90vw';
+      document.body.appendChild(box);
+    }
+
+    const colors = {
+      success: { bg: 'rgba(74,222,128,.12)',  border: 'rgba(74,222,128,.45)',  fg: '#4ade80', icon: '✓' },
+      error:   { bg: 'rgba(244,99,110,.12)',  border: 'rgba(244,99,110,.45)',  fg: '#f4636e', icon: '✕' },
+      warn:    { bg: 'rgba(240,181,62,.12)',  border: 'rgba(240,181,62,.45)',  fg: '#f0b53e', icon: '!' },
+      info:    { bg: 'rgba(236,236,241,.08)', border: 'rgba(46,46,57,.9)',     fg: '#ececf1', icon: 'i' }
+    };
+    const c = colors[type] || colors.info;
+
     const el = document.createElement('div');
     el.className = 'toast';
-    el.textContent = msg;
+    el.dataset.gateMsg = msg;
+    el.style.cssText =
+      'pointer-events:auto;display:flex;align-items:center;gap:8px;' +
+      `background:${c.bg};color:${c.fg};border:1px solid ${c.border};` +
+      'padding:10px 14px;border-radius:10px;font-size:13px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.4);direction:rtl;font-family:inherit;' +
+      'opacity:1;transition:opacity .2s ease,transform .2s ease;cursor:pointer';
+
+    const icon = document.createElement('span');
+    icon.textContent = c.icon;
+    icon.style.cssText = 'font-weight:700;flex-shrink:0';
+    el.appendChild(icon);
+
+    const textNode = document.createElement('span');
+    textNode.textContent = msg;
+    textNode.style.cssText = 'flex:1;min-width:0';
+    el.appendChild(textNode);
+
+    // زرار action (لو موجود)
+    if (action && action.label && typeof action.onClick === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = action.label;
+      btn.style.cssText =
+        'background:' + c.fg + ';color:#052e12;border:0;border-radius:6px;' +
+        'padding:3px 9px;font-size:11.5px;font-weight:700;cursor:pointer;flex-shrink:0';
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        dismiss();
+        try { action.onClick(); } catch (e) { console.warn(e); }
+      });
+      el.appendChild(btn);
+    }
+
     box.appendChild(el);
-    setTimeout(() => el.remove(), duration);
+
+    let timer = null;
+    let dismissed = false;
+
+    function dismiss() {
+      if (dismissed) return;
+      dismissed = true;
+      if (timer) clearTimeout(timer);
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(12px)';
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 200);
+    }
+
+    // ✅ مسح مضمون بعد المدة
+    timer = setTimeout(dismiss, safeDuration);
+
+    // ✅ مسح فوري بالضغط على الإشعار
+    el.addEventListener('click', dismiss);
   }
 
   function appConfirm(opts) {
@@ -100,7 +190,7 @@
   }
   MCL.emit = emit;
 
-  /* ---------- ✅ تخزين آمن (fallback لمتغيرات الذاكرة) ---------- */
+  /* ---------- تخزين آمن ---------- */
   function safeSessionGet(key) {
     try { return sessionStorage.getItem(key); }
     catch { return null; }
@@ -139,6 +229,91 @@
   }
   MCL.getSubscriberPhone = getSubscriberPhone;
 
+  /* ---------- 🆕 Firebase Auth + enrollments ---------- */
+  let fbUser = null;
+  let fbEnrollments = [];
+  let fbLoading = false;
+  let fbReady = false;
+
+  function isFirebaseUserLogged() {
+    return !!fbUser;
+  }
+  MCL.isFirebaseUserLogged = isFirebaseUserLogged;
+
+  function isOwnerEmail() {
+    const ownerEmail = window.__OWNER_EMAIL__ || 'owner@gymzone.com';
+    return fbUser && fbUser.email === ownerEmail;
+  }
+
+  function userHasCourse(courseTitle) {
+    if (!fbUser) return false;
+    if (isOwnerEmail()) return true;
+    const map = window.__COURSE_LIBRARY_MAP__ || {};
+    for (const enroll of fbEnrollments) {
+      const libTitle = map[enroll.courseId];
+      if (libTitle === courseTitle) return true;
+    }
+    return false;
+  }
+  MCL.userHasCourse = userHasCourse;
+
+  function hasAnyEnrollment() {
+    return fbEnrollments.length > 0;
+  }
+  MCL.hasAnyEnrollment = hasAnyEnrollment;
+
+  async function loadFirebaseEnrollments(uid) {
+    fbLoading = true;
+    try {
+      if (typeof firebase === 'undefined' || !firebase.firestore) {
+        fbEnrollments = [];
+        fbReady = true;
+        return;
+      }
+      const db = firebase.firestore();
+      const snap = await db.collection('enrollments')
+        .where('userId', '==', uid)
+        .where('status', '==', 'active')
+        .get();
+      fbEnrollments = snap.docs.map((d) => d.data());
+      console.info('[GATE] ✅ حمّل', fbEnrollments.length, 'اشتراك للطالب من Firestore');
+    } catch (e) {
+      console.warn('[GATE] فشل تحميل enrollments:', e.code);
+      fbEnrollments = [];
+    }
+    fbLoading = false;
+    fbReady = true;
+
+    emit();
+    if (typeof MCL.renderAll === 'function') MCL.renderAll();
+  }
+
+  function watchFirebaseAuth() {
+    if (typeof firebase === 'undefined' || !firebase.auth) {
+      console.warn('[GATE] Firebase Auth مش متاح — نتجاهل');
+      fbReady = true;
+      return;
+    }
+    try {
+      firebase.auth().onAuthStateChanged(async (user) => {
+        fbUser = user || null;
+        if (user) {
+          console.info('[GATE] ✅ طالب مسجل دخول:', user.email);
+          await loadFirebaseEnrollments(user.uid);
+        } else {
+          fbEnrollments = [];
+          fbReady = true;
+          console.info('[GATE] مفيش طالب مسجل دخول');
+        }
+        emit();
+        if (typeof MCL.renderAll === 'function') MCL.renderAll();
+      });
+    } catch (e) {
+      console.warn('[GATE] watchFirebaseAuth:', e.message);
+      fbReady = true;
+    }
+  }
+
   /* ---------- نموذج الحماية ---------- */
   function isProtected(r) { return !!r && r.source === 'Google Drive'; }
   MCL.isProtected = isProtected;
@@ -153,9 +328,14 @@
   function isResourceLocked(r) {
     if (!isProtected(r)) return false;
     if (isAdminActive()) return false;
+    if (isOwnerEmail()) return false;
+
+    if (fbUser && userHasCourse(r.title)) return false;
+
     const p = getSubscriberPhone();
-    if (!p) return true;
-    return !allowedFor(p, r);
+    if (p && allowedFor(p, r)) return false;
+
+    return true;
   }
   MCL.isResourceLocked = isResourceLocked;
 
@@ -166,26 +346,26 @@
   function requireUnlock(r, run) {
     if (!isResourceLocked(r)) { run(); return; }
 
-    /* 1) حساب مسجّل + الكورس ضمن اشتراكاته → افتح */
-    const acc = window.__accountAccess;
-    if (acc && acc.logged && acc.has(r.title)) { run(); return; }
+    if (fbUser && userHasCourse(r.title)) { run(); return; }
 
-    /* 2) اشتراك بالرقم (النظام القديم) → افتح */
     const p = getSubscriberPhone();
     if (p && allowedFor(p, r)) { run(); return; }
 
-    /* 3) مش مسجل خالص → صفحة تسجيل الدخول */
-    if (!acc || !acc.logged) {
-      notify('سجّل دخولك أو أنشئ حساب للوصول لكورسات Drive.', 'info', 3500);
-      setTimeout(() => { location.href = 'auth.html'; }, 900);
+    if (fbUser) {
+      notify(`«${r.title}» مش ضمن اشتراكك — كلمنا ونفعّله لحسابك.`, 'warn', 6000, {
+        label: 'واتساب',
+        onClick() { window.open(waLink(`أهلاً 👋 عايز أضيف كورس «${r.title}» لحسابي`), '_blank', 'noopener,noreferrer'); }
+      });
       return;
     }
 
-    /* 4) مسجل بس الكورس مش ضمن اشتراكه → واتساب */
-    notify(`«${r.title}» مش ضمن اشتراكك — كلمنا ونفعّله لحسابك.`, 'warn', 6000, {
-      label: 'واتساب',
-      onClick() { window.open(waLink(`أهلاً 👋 عايز أضيف كورس «${r.title}» لحسابي`), '_blank', 'noopener,noreferrer'); }
-    });
+    if (fbLoading) {
+      notify('لحظة — بنحمّل بيانات حسابك…', 'info', 3000);
+      return;
+    }
+
+    notify('سجّل دخولك أو أنشئ حساب للوصول لكورسات Drive.', 'info', 3500);
+    setTimeout(() => { location.href = 'auth.html'; }, 900);
   }
   MCL.requireUnlock = requireUnlock;
 
@@ -285,7 +465,6 @@
     modal.innerHTML = buildModalHTML();
     document.body.appendChild(modal);
 
-    /* ✅ listener واحد على #lockModal بدل document */
     modal.addEventListener('submit', (e) => {
       if (e.target && e.target.id === 'lockForm') {
         e.preventDefault();
@@ -308,7 +487,6 @@
       }
     });
 
-    /* شارات الهيدر */
     const host = qs('header .ms-auto') || qs('header');
     if (host) {
       let chip = qs('#lockChip');
@@ -322,7 +500,8 @@
         host.insertBefore(chip, host.firstChild);
       }
       chip.addEventListener('click', () => {
-        if (isAdminActive()) { notify('أنت في وضع المالك — كل الكورسات متاحة.', 'info'); return; }
+        if (isAdminActive() || isOwnerEmail()) { notify('أنت في وضع المالك — كل الكورسات متاحة.', 'info'); return; }
+        if (fbUser && hasAnyEnrollment()) { notify(`عندك ${fbEnrollments.length} كورس متاح في حسابك.`, 'info'); return; }
         const p = getSubscriberPhone();
         if (p) notify(`اشتراكك مفعّل برقم ${maskPhone(p)}.`, 'info');
         else openLockModal({ mode: 'gate' });
@@ -339,6 +518,12 @@
         chip.after(subChip);
       }
       subChip.addEventListener('click', () => {
+        if (fbUser) {
+          if (confirm('تسجيل الخروج من حسابك؟')) {
+            firebase.auth().signOut().then(() => location.reload());
+          }
+          return;
+        }
         const p = getSubscriberPhone();
         if (p) {
           setSubscriberPhone(null);
@@ -466,7 +651,6 @@
   /* ---------- المعالج المركزي ---------- */
   function handleLockSubmit(form) {
     const input = (form && form.querySelector('#lockPassword')) || qs('#lockPassword');
-    /* ✅ استخدام ADMIN_PASSWORD الحالية من المتغير المحلي */
     const adminPass = norm(ADMIN_PASSWORD);
     const pending = pendingAction;
     let ok = false, msg = '';
@@ -479,12 +663,10 @@
 
     if (lockMode === 'login') {
       const val = norm(input ? input.value : '');
-      console.info('[GATE] محاولة دخول مالك — طول:', val.length);
       if (val === adminPass) { setAdminMode(true); ok = true; msg = 'وضع المالك مفعّل — كل الأدوات متاحة الآن.'; }
     } else {
       const raw = norm(input ? input.value : '');
       const val = normPhone(raw);
-      console.info('[GATE] محاولة دخول مشترك — بعد التطبيع:', val);
 
       if (raw === adminPass) {
         setAdminMode(true);
@@ -501,8 +683,6 @@
     }
 
     if (!ok) {
-      console.warn('[GATE] مدخلات غير مطابقة. الوضع:', lockMode,
-        '| الأرقام المسجّلة:', Object.keys(MCL.subscriptions));
       showLockError();
       return;
     }
@@ -614,7 +794,7 @@
 
   /* ---------- شارات الهيدر ---------- */
   function renderChips() {
-    const admin = isAdminActive();
+    const admin = isAdminActive() || isOwnerEmail();
     const addBtn = qs('#addResourceBtn');
     if (addBtn) addBtn.classList.toggle('hidden', !admin);
     const qExp = qs('#quickExportBtn');
@@ -640,13 +820,22 @@
 
     const subChip = qs('#subChip');
     if (subChip) {
+      if (fbUser) {
+        subChip.classList.add('unlocked');
+        const ic = subChip.querySelector('i');
+        if (ic) ic.className = 'bi bi-person-check text-[12px]';
+        const txt = qs('#subChipText');
+        if (txt) txt.textContent = (fbUser.displayName || 'حسابي').slice(0, 12);
+        subChip.title = 'انقر للخروج من حسابك';
+        return;
+      }
       const p = getSubscriberPhone();
       subChip.classList.toggle('unlocked', !!p);
       const ic = subChip.querySelector('i');
       if (ic) ic.className = (p ? 'bi bi-person-check' : 'bi bi-person-badge') + ' text-[12px]';
       const txt = qs('#subChipText');
       if (txt) txt.textContent = p ? maskPhone(p) : 'دخول مشترك';
-      subChip.title = p ? 'انقر للخروج من الاشتراك' : 'دخول المشتركين برقم الموبايل';
+      subChip.title = p ? 'انقر للخروج من الاشتراك' : 'دخول المشتركين';
     }
 
     const adminChip = qs('#adminChip');
@@ -942,5 +1131,6 @@
   }
 
   /* ---------- تشغيل ---------- */
-   ensureGateDOM();
+  ensureGateDOM();
+  watchFirebaseAuth();
 })();

@@ -13,25 +13,26 @@
 *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 html {
-  overflow-x: clip;                    /* يمنع سكرول أفقي بدون كسر sticky */
+  overflow-x: clip;
   scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;      /* يمنع zoom تلقائي على iOS */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   background: #05060f;
   color: #ececf1;
-  max-width: 1080px;                   /* ✅ max-width بدل width */
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 60px 50px;
+  padding: 40px 50px 60px;
+  padding-top: calc(40px + 64px); /* ✅ مساحة للـ Navbar */
   overflow-x: clip;
   line-height: 1.6;
   background-image:
     radial-gradient(900px 500px at 85% -5%, rgba(79,124,255,.22), transparent 55%),
     radial-gradient(700px 450px at 5% 30%,  rgba(124,92,255,.14), transparent 55%),
     radial-gradient(800px 500px at 50% 105%, rgba(240,181,62,.12), transparent 55%);
-  background-attachment: fixed;        /* يخلي الخلفية ثابتة وأنيقة */
+  background-attachment: fixed;
 }
 
 img, svg { max-width: 100%; height: auto; display: block; }
@@ -272,7 +273,7 @@ a { color: inherit; }
 @media (max-width: 760px) {
   body {
     padding: 32px 18px;
-    padding-top: calc(32px + env(safe-area-inset-top, 0px));
+    padding-top: calc(32px + 64px);
     padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -487,6 +488,17 @@ a { color: inherit; }
   <div class="phone">01096295395</div>
   <a class="btn" href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer">📱 كلّمني الآن</a>
 </div>
+
+<!-- 1) config.js -->
+<script src="config.js?v=17"></script>
+
+<!-- 2) Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- 3) nav.js -->
+<script src="nav.js?v=3"></script>
 
 </body>
 </html>

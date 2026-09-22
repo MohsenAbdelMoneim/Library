@@ -33,72 +33,15 @@
         radial-gradient(800px 500px at 5% 30%, rgba(124,92,255,.10), transparent 55%),
         radial-gradient(900px 500px at 50% 105%, rgba(240,181,62,.08), transparent 55%);
       background-attachment: fixed;
+      padding-top: 64px; /* مساحة للـ nav.js */
     }
     a { color: inherit; text-decoration: none; }
     button { font-family: inherit; cursor: pointer; border: none; background: none; }
     img, svg { max-width: 100%; height: auto; display: block; }
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
-    /* Navbar */
-    .navbar {
-      position: sticky; top: 0; z-index: 50;
-      background: rgba(10,10,13,.85);
-      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--edge);
-    }
-    .navbar-inner {
-      max-width: 1200px; margin: 0 auto; padding: 0 24px;
-      height: 64px; display: flex; align-items: center; gap: 16px;
-    }
-    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-    .logo-mark {
-      width: 38px; height: 38px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      display: grid; place-items: center; font-size: 18px;
-      box-shadow: 0 6px 18px rgba(79,124,255,.35);
-    }
-    .logo-text h1 {
-      font-size: 14.5px; font-weight: 800;
-      background: linear-gradient(135deg, #fff, var(--accent));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-    .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
-    .nav-links { display: none; gap: 4px; margin-inline-start: 20px; }
-    .nav-links a {
-      padding: 8px 14px; border-radius: 10px;
-      font-size: 13px; color: var(--mut); transition: .15s;
-    }
-    .nav-links a:hover, .nav-links a.active { color: var(--ink); background: var(--raise); }
-    .nav-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
-    .btn-login {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: 38px; padding: 0 16px; border-radius: 10px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      color: #fff; font-size: 12.5px; font-weight: 700; transition: .15s;
-    }
-    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
-    .btn-menu {
-      display: grid; place-items: center;
-      width: 38px; height: 38px; border-radius: 10px;
-      border: 1px solid var(--edge); color: var(--mut);
-    }
-    .mobile-menu {
-      display: none; border-top: 1px solid var(--edge); background: var(--panel);
-    }
-    .mobile-menu.open { display: block; }
-    .mobile-menu a {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 24px; font-size: 13.5px; color: var(--mut);
-      border-bottom: 1px solid var(--edge);
-    }
-    .mobile-menu a:hover { color: var(--ink); background: var(--raise); }
-    @media (min-width: 900px) {
-      .nav-links { display: flex; }
-      .btn-menu { display: none; }
-    }
-
     /* Page Hero */
-    .page-hero { padding: 60px 0 40px; text-align: center; }
+    .page-hero { padding: 40px 0 40px; text-align: center; }
     .page-hero .badge {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 8px 16px; border-radius: 999px;
@@ -174,7 +117,6 @@
       font-size: 11.5px; color: var(--dim); margin-top: 2px; font-weight: 400;
     }
 
-    /* WhatsApp special */
     .info-card.wa {
       background: linear-gradient(135deg, rgba(37,211,102,.12), rgba(37,211,102,.05));
       border-color: rgba(37,211,102,.35);
@@ -199,9 +141,7 @@
     .form-card .form-sub {
       font-size: 13px; color: var(--mut); margin-bottom: 24px; line-height: 1.8;
     }
-    .fld {
-      margin-bottom: 16px;
-    }
+    .fld { margin-bottom: 16px; }
     .fld label {
       display: block;
       font-size: 12px; font-weight: 600;
@@ -374,10 +314,22 @@
       padding-top: 24px; text-align: center;
       color: var(--dim); font-size: 11.5px; line-height: 1.8;
     }
+    .footer .logo-wrap { display: flex; align-items: center; gap: 10px; }
+    .footer .logo-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-size: 18px;
+    }
+    .footer .logo-text h1 {
+      font-size: 14.5px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .footer .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
 
     @media (max-width: 640px) {
       .container { padding: 0 18px; }
-      .page-hero { padding: 40px 0 30px; }
+      .page-hero { padding: 30px 0 30px; }
       .form-card { padding: 24px 20px; }
       .info-card { padding: 18px; }
     }
@@ -394,35 +346,6 @@
   </style>
 </head>
 <body>
-
-  <nav class="navbar">
-    <div class="navbar-inner">
-      <a href="landing.html" class="logo-wrap">
-        <span class="logo-mark">🎓</span>
-        <div class="logo-text">
-          <h1>Nexora Academy</h1>
-          <p>LEARN · BUILD · GROW</p>
-        </div>
-      </a>
-      <div class="nav-links">
-        <a href="landing.html">الرئيسية</a>
-        <a href="index.html">الكورسات</a>
-        <a href="about.html">من نحن</a>
-        <a href="contact.html" class="active">اتصل بنا</a>
-      </div>
-      <div class="nav-actions">
-        <a href="auth.html" class="btn-login"><i class="bi bi-person-circle"></i><span>تسجيل الدخول</span></a>
-        <button class="btn-menu" id="menuBtn" aria-label="القائمة"><i class="bi bi-list"></i></button>
-      </div>
-    </div>
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="landing.html"><i class="bi bi-house"></i>الرئيسية</a>
-      <a href="index.html"><i class="bi bi-mortarboard"></i>الكورسات</a>
-      <a href="about.html"><i class="bi bi-info-circle"></i>من نحن</a>
-      <a href="contact.html"><i class="bi bi-telephone"></i>اتصل بنا</a>
-      <a href="auth.html"><i class="bi bi-person-circle"></i>تسجيل الدخول</a>
-    </div>
-  </nav>
 
   <header class="page-hero container">
     <div class="badge"><i class="bi bi-chat-dots"></i> تواصل معنا</div>
@@ -456,8 +379,7 @@
           <div class="info-icon"><i class="bi bi-envelope"></i></div>
           <div class="info-body">
             <h4>إيميل</h4>
-            <p dir="ltr" style="font-size:13px;">mt9276404@gmail.com
-</p>
+            <p dir="ltr" style="font-size:13px;">mt9276404@gmail.com</p>
             <p class="sub">هنرد خلال 24 ساعة</p>
           </div>
         </div>
@@ -572,7 +494,7 @@
           <h4>روابط سريعة</h4>
           <ul>
             <li><a href="landing.html">الرئيسية</a></li>
-            <li><a href="index.html">الكورسات</a></li>
+            <li><a href="library.html">الكورسات</a></li>
             <li><a href="about.html">من نحن</a></li>
             <li><a href="contact.html">اتصل بنا</a></li>
           </ul>
@@ -582,7 +504,7 @@
           <ul>
             <li><a href="auth.html">تسجيل الدخول</a></li>
             <li><a href="profile.html">الملف الشخصي</a></li>
-            <li><a href="index.html">كورساتي</a></li>
+            <li><a href="library.html">كورساتي</a></li>
           </ul>
         </div>
         <div>
@@ -603,33 +525,22 @@
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    /* Mobile Menu */
-    const menuBtn = document.getElementById('menuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    if (menuBtn && mobileMenu) {
-      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('open'));
-      mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
-    }
-
-    /* Reveal on scroll */
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          entry.classList.add('visible');
-          observer.unobserve(entry);
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
         }
       });
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-    /* FAQ */
     document.querySelectorAll('.faq-q').forEach(q => {
       q.addEventListener('click', () => {
         q.parentElement.classList.toggle('open');
       });
     });
 
-    /* Contact Form */
     const form = document.getElementById('contactForm');
     const notice = document.getElementById('cNotice');
 
@@ -673,7 +584,6 @@
         return;
       }
 
-      /* تجهيز رسالة واتساب */
       const waMsg =
         'أهلاً 👋\n\n' +
         '📌 *رسالة جديدة من موقع Nexora Academy*\n\n' +
@@ -694,5 +604,16 @@
       }, 800);
     });
   </script>
+
+  <!-- 1) config.js — الأول دايمًا -->
+  <script src="config.js?v=17"></script>
+
+  <!-- 2) Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- 3) nav.js -->
+  <script src="nav.js?v=3"></script>
 </body>
 </html>

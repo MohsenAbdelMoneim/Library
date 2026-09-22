@@ -1,13 +1,19 @@
 /* ==========================================================
-   admin.js — v16
+   admin.js — v17
    لوحة إدارة Nexora: الطلاب + الاشتراكات + حالة الدفع
-   ✅ v16: إصلاح watchAdminGuard + قراءة الكتالوج من Firestore
+   ✅ v17: انتظار DOM + إصلاح مشكلة عدم ظهور الطلاب
+   ✅ v17: بيقرأ الكتالوج من Firestore
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Admin — v16 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Admin — v17 ', 'background:#e8961e;color:#161204;font-weight:bold');
+
+  if (typeof firebase === 'undefined') {
+    console.error('[ADMIN] Firebase SDK مش محمّل');
+    return;
+  }
 
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
@@ -22,7 +28,7 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  /* ✅ الكتالوج بقى ييجي من Firestore */
+  /* ✅ الكتالوج من Firestore */
   function getCatalogMap() {
     const src = window.__NEXORA_CATALOG__ || { courses: [] };
     const map = {};
@@ -97,9 +103,12 @@
 
   /* ---------- DOM ---------- */
   function ensureAdminDOM() {
-    if (qs('#view-admin')) return;
+    if (qs('#view-admin')) return true;
     const main = qs('main#content') || qs('main');
-    if (!main) return;
+    if (!main) {
+      console.warn('[ADMIN] main#content مش موجود — هستنى…');
+      return false;
+    }
     if (!document.getElementById('nexAdminStyles')) {
       const st = document.createElement('style');
       st.id = 'nexAdminStyles';
@@ -112,6 +121,8 @@
     section.setAttribute('aria-label', 'لوحة الإدارة');
     section.innerHTML = '<div class="admin-wrap" id="adminInner"></div>';
     main.appendChild(section);
+    console.info('[ADMIN] ✅ #view-admin اتعمل');
+    return true;
   }
 
   /* ---------- تحميل البيانات ---------- */
@@ -123,7 +134,7 @@
       ]);
       adminState.students = stSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
       adminState.enrollments = enSnap.docs.map((d) => ({ docId: d.id, ...d.data() }));
-      console.info('[ADMIN] الطلاب:', adminState.students.length, '| الاشتراكات:', adminState.enrollments.length);
+      console.info('[ADMIN] ✅ الطلاب:', adminState.students.length, '| الاشتراكات:', adminState.enrollments.length);
     } catch (e) {
       console.error('[ADMIN] تحميل البيانات:', e.code);
     }
@@ -134,104 +145,100 @@
   function studentRowHTML(s) {
     const enrolls = adminState.enrollments.filter((e) => e.userId === s.uid && e.status === 'active');
     const initial = (s.name || '؟').trim().charAt(0);
-    return `
-    <div class="stu-row">
-      <span class="stu-avatar">${esc(initial)}</span>
-      <div class="stu-info">
-        <p class="stu-name">${esc(s.name || 'بدون اسم')}</p>
-        <p class="stu-meta">${esc(s.phone || '—')}</p>
-      </div>
-      <span class="stu-count">${enrolls.length} كورس</span>
-      <button type="button" class="stu-manage" data-manage="${esc(s.uid)}">
-        <i class="bi bi-gear"></i>إدارة الاشتراكات
-      </button>
-    </div>`;
+    return '' +
+    '<div class="stu-row">' +
+      '<span class="stu-avatar">' + esc(initial) + '</span>' +
+      '<div class="stu-info">' +
+        '<p class="stu-name">' + esc(s.name || 'بدون اسم') + '</p>' +
+        '<p class="stu-meta">' + esc(s.phone || '—') + '</p>' +
+      '</div>' +
+      '<span class="stu-count">' + enrolls.length + ' كورس</span>' +
+      '<button type="button" class="stu-manage" data-manage="' + esc(s.uid) + '">' +
+        '<i class="bi bi-gear"></i>إدارة الاشتراكات' +
+      '</button>' +
+    '</div>';
   }
 
   function enrollRowHTML(s) {
     const mine = adminState.enrollments.filter((e) => e.userId === s.uid);
-    const rows = mine.map((e) => `
-      <div class="enr-row">
-        <div class="enr-fld" style="flex:1;min-width:160px">
-          <label>الكورس</label>
-          <p style="font-size:12.5px;font-weight:700;padding-top:10px">${esc(PAID_CATALOG[e.courseId] || e.courseId)}</p>
-        </div>
-        <div class="enr-status ${e.status === 'active' ? 'active' : 'cancelled'}">${e.status === 'active' ? 'فعّال ✅' : 'ملغي ❌'}</div>
-        <div class="enr-fld">
-          <label>نوع الدفع</label>
-          <select data-enr-field="paymentType" data-enr-doc="${esc(e.docId)}">
-            <option value="cash" ${e.paymentType === 'cash' ? 'selected' : ''}>كاش</option>
-            <option value="installment" ${e.paymentType === 'installment' ? 'selected' : ''}>تقسيط</option>
-          </select>
-        </div>
-        <div class="enr-fld">
-          <label>حالة الدفع</label>
-          <select data-enr-field="paymentStatus" data-enr-doc="${esc(e.docId)}">
-            <option value="paid" ${e.paymentStatus === 'paid' ? 'selected' : ''}>مدفوع</option>
-            <option value="partial" ${e.paymentStatus === 'partial' ? 'selected' : ''}>جزئي</option>
-            <option value="pending" ${e.paymentStatus === 'pending' ? 'selected' : ''}>معلّق</option>
-          </select>
-        </div>
-        <div class="enr-fld">
-          <label>الدفعات المدفوعة</label>
-          <input type="number" min="0" max="10" value="${e.paidInstallments ?? 0}" data-enr-field="paidInstallments" data-enr-doc="${esc(e.docId)}" style="width:80px">
-        </div>
-        <div class="enr-fld">
-          <label>ينتهي في</label>
-          <input type="date" value="${e.expiresAt || ''}" data-enr-field="expiresAt" data-enr-doc="${esc(e.docId)}">
-        </div>
-        <div class="enr-fld" style="flex:1;min-width:140px">
-          <label>ملاحظات</label>
-          <input type="text" value="${esc(e.notes || '')}" placeholder="ملاحظة داخلية…" data-enr-field="notes" data-enr-doc="${esc(e.docId)}">
-        </div>
-        <button type="button" class="enr-btn danger" data-cancel-enr="${esc(e.docId)}">
-          ${e.status === 'active' ? 'إلغاء الاشتراك' : 'إعادة تفعيل'}
-        </button>
-        <p class="enr-meta" style="flex-basis:100%">مسجّل: ${fmtDate(e.enrolledAt)}</p>
-      </div>`).join('');
+    const rows = mine.map((e) =>
+      '<div class="enr-row">' +
+        '<div class="enr-fld" style="flex:1;min-width:160px">' +
+          '<label>الكورس</label>' +
+          '<p style="font-size:12.5px;font-weight:700;padding-top:10px">' + esc(PAID_CATALOG[e.courseId] || e.courseId) + '</p>' +
+        '</div>' +
+        '<div class="enr-status ' + (e.status === 'active' ? 'active' : 'cancelled') + '">' + (e.status === 'active' ? 'فعّال ✅' : 'ملغي ❌') + '</div>' +
+        '<div class="enr-fld">' +
+          '<label>نوع الدفع</label>' +
+          '<select data-enr-field="paymentType" data-enr-doc="' + esc(e.docId) + '">' +
+            '<option value="cash" ' + (e.paymentType === 'cash' ? 'selected' : '') + '>كاش</option>' +
+            '<option value="installment" ' + (e.paymentType === 'installment' ? 'selected' : '') + '>تقسيط</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>حالة الدفع</label>' +
+          '<select data-enr-field="paymentStatus" data-enr-doc="' + esc(e.docId) + '">' +
+            '<option value="paid" ' + (e.paymentStatus === 'paid' ? 'selected' : '') + '>مدفوع</option>' +
+            '<option value="partial" ' + (e.paymentStatus === 'partial' ? 'selected' : '') + '>جزئي</option>' +
+            '<option value="pending" ' + (e.paymentStatus === 'pending' ? 'selected' : '') + '>معلّق</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>الدفعات المدفوعة</label>' +
+          '<input type="number" min="0" max="10" value="' + (e.paidInstallments ?? 0) + '" data-enr-field="paidInstallments" data-enr-doc="' + esc(e.docId) + '" style="width:80px">' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>ينتهي في</label>' +
+          '<input type="date" value="' + (e.expiresAt || '') + '" data-enr-field="expiresAt" data-enr-doc="' + esc(e.docId) + '">' +
+        '</div>' +
+        '<div class="enr-fld" style="flex:1;min-width:140px">' +
+          '<label>ملاحظات</label>' +
+          '<input type="text" value="' + esc(e.notes || '') + '" placeholder="ملاحظة داخلية…" data-enr-field="notes" data-enr-doc="' + esc(e.docId) + '">' +
+        '</div>' +
+        '<button type="button" class="enr-btn danger" data-cancel-enr="' + esc(e.docId) + '">' +
+          (e.status === 'active' ? 'إلغاء الاشتراك' : 'إعادة تفعيل') +
+        '</button>' +
+        '<p class="enr-meta" style="flex-basis:100%">مسجّل: ' + fmtDate(e.enrolledAt) + '</p>' +
+      '</div>').join('');
 
     const courseOpts = Object.entries(PAID_CATALOG).map(([id, t]) =>
-      `<option value="${esc(id)}">${esc(t)}</option>`).join('');
+      '<option value="' + esc(id) + '">' + esc(t) + '</option>').join('');
 
-    return `
-    <div class="admin-panel" data-student-panel="${esc(s.uid)}" style="display:none">
-      <h3 class="admin-h"><i class="bi bi-mortarboard"></i>اشتراكات ${esc(s.name || 'الطالب')} <span class="stu-meta" dir="ltr">(${esc(s.phone)})</span></h3>
-      ${rows || '<p class="admin-empty">مفيش اشتراكات لسه — أضف أول اشتراك من تحت 👇</p>'}
-
-      <div class="enr-row" style="border-style:dashed">
-        <div class="enr-fld" style="flex:1;min-width:200px">
-          <label>إضافة اشتراك جديد — الكورس</label>
-          <select id="newEnrCourse-${esc(s.uid)}">
-            ${courseOpts}
-          </select>
-        </div>
-        <div class="enr-fld">
-          <label>نوع الدفع</label>
-          <select id="newEnrPay-${esc(s.uid)}">
-            <option value="cash">كاش</option>
-            <option value="installment">تقسيط</option>
-          </select>
-        </div>
-        <div class="enr-fld">
-          <label>حالة الدفع</label>
-          <select id="newEnrStatus-${esc(s.uid)}">
-            <option value="paid">مدفوع</option>
-            <option value="partial">جزئي</option>
-            <option value="pending">معلّق</option>
-          </select>
-        </div>
-        <div class="enr-fld">
-          <label>ينتهي في (اختياري)</label>
-          <input type="date" id="newEnrExp-${esc(s.uid)}">
-        </div>
-        <button type="button" class="enr-btn" data-add-enr="${esc(s.uid)}"><i class="bi bi-plus-lg"></i>تفعيل الاشتراك</button>
-      </div>
-
-      <div class="admin-note">
-        💡 الاشتراك بيتفعّل فورًا على السحابة — الطالب هيلاقي الكورس في حسابه خلال ثواني.
-        للاستفسارات: <a href="tel:${PHONE}" style="color:#4f7cff;direction:ltr;unicode-bidi:embed">${PHONE}</a>
-      </div>
-    </div>`;
+    return '' +
+    '<div class="admin-panel" data-student-panel="' + esc(s.uid) + '" style="display:none">' +
+      '<h3 class="admin-h"><i class="bi bi-mortarboard"></i>اشتراكات ' + esc(s.name || 'الطالب') + ' <span class="stu-meta" dir="ltr">(' + esc(s.phone) + ')</span></h3>' +
+      (rows || '<p class="admin-empty">مفيش اشتراكات لسه — أضف أول اشتراك من تحت 👇</p>') +
+      '<div class="enr-row" style="border-style:dashed">' +
+        '<div class="enr-fld" style="flex:1;min-width:200px">' +
+          '<label>إضافة اشتراك جديد — الكورس</label>' +
+          '<select id="newEnrCourse-' + esc(s.uid) + '">' + courseOpts + '</select>' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>نوع الدفع</label>' +
+          '<select id="newEnrPay-' + esc(s.uid) + '">' +
+            '<option value="cash">كاش</option>' +
+            '<option value="installment">تقسيط</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>حالة الدفع</label>' +
+          '<select id="newEnrStatus-' + esc(s.uid) + '">' +
+            '<option value="paid">مدفوع</option>' +
+            '<option value="partial">جزئي</option>' +
+            '<option value="pending">معلّق</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="enr-fld">' +
+          '<label>ينتهي في (اختياري)</label>' +
+          '<input type="date" id="newEnrExp-' + esc(s.uid) + '">' +
+        '</div>' +
+        '<button type="button" class="enr-btn" data-add-enr="' + esc(s.uid) + '"><i class="bi bi-plus-lg"></i>تفعيل الاشتراك</button>' +
+      '</div>' +
+      '<div class="admin-note">' +
+        '💡 الاشتراك بيتفعّل فورًا على السحابة — الطالب هيلاقي الكورس في حسابه خلال ثواني. ' +
+        'للاستفسارات: <a href="tel:' + PHONE + '" style="color:#4f7cff;direction:ltr;unicode-bidi:embed">' + PHONE + '</a>' +
+      '</div>' +
+    '</div>';
   }
 
   function renderAdmin() {
@@ -242,25 +249,22 @@
       .filter((s) => !filter || (s.name || '').toLowerCase().includes(filter) || (s.phone || '').includes(filter))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
 
-    inner.innerHTML = `
-    <div class="admin-tabs">
-      <button class="admin-tab active" data-admin-tab="students">الطلاب (${adminState.students.length})</button>
-      <button class="admin-tab" data-admin-tab="all-enrollments">كل الاشتراكات (${adminState.enrollments.length})</button>
-    </div>
-
-    <div data-admin-panel="students">
-      <input class="admin-search" id="adminSearch" type="search"
-             placeholder="ابحث باسم الطالب أو رقم موبايله…" value="${esc(adminState.filter)}">
-      <div id="studentsList">
-        ${students.length ? students.map(studentRowHTML).join('') : '<p class="admin-empty">مفيش طلاب مسجّلين لسه.</p>'}
-      </div>
-    </div>
-
-    <div data-admin-panel="all-enrollments" class="hidden">
-      ${adminState.students.length
+    inner.innerHTML =
+    '<div class="admin-tabs">' +
+      '<button class="admin-tab active" data-admin-tab="students">الطلاب (' + adminState.students.length + ')</button>' +
+      '<button class="admin-tab" data-admin-tab="all-enrollments">كل الاشتراكات (' + adminState.enrollments.length + ')</button>' +
+    '</div>' +
+    '<div data-admin-panel="students">' +
+      '<input class="admin-search" id="adminSearch" type="search" placeholder="ابحث باسم الطالب أو رقم موبايله…" value="' + esc(adminState.filter) + '">' +
+      '<div id="studentsList">' +
+        (students.length ? students.map(studentRowHTML).join('') : '<p class="admin-empty">مفيش طلاب مسجّلين لسه.</p>') +
+      '</div>' +
+    '</div>' +
+    '<div data-admin-panel="all-enrollments" class="hidden">' +
+      (adminState.students.length
         ? adminState.students.map(enrollRowHTML).join('')
-        : '<p class="admin-empty">مفيش طلاب لسه.</p>'}
-    </div>`;
+        : '<p class="admin-empty">مفيش طلاب لسه.</p>') +
+    '</div>';
 
     const searchEl = qs('#adminSearch');
     if (searchEl) searchEl.addEventListener('input', debounceAdmin((e) => {
@@ -283,7 +287,7 @@
       qsa('[data-admin-panel]').forEach((p) =>
         p.classList.toggle('hidden', p.dataset.adminPanel !== 'all-enrollments'));
       qsa('[data-student-panel]').forEach((p) => { p.style.display = 'none'; });
-      const panel = qs(`[data-student-panel="${uid}"]`);
+      const panel = qs('[data-student-panel="' + uid + '"]');
       if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     }));
 
@@ -299,16 +303,17 @@
 
   /* ---------- عمليات الاشتراكات ---------- */
   async function addEnrollment(uid) {
-    const courseId = qs(`#newEnrCourse-${uid}`)?.value;
-    const paymentType = qs(`#newEnrPay-${uid}`)?.value;
-    const paymentStatus = qs(`#newEnrStatus-${uid}`)?.value;
-    const expiresAt = qs(`#newEnrExp-${uid}`)?.value || null;
+    const courseId = qs('#newEnrCourse-' + uid)?.value;
+    const paymentType = qs('#newEnrPay-' + uid)?.value;
+    const paymentStatus = qs('#newEnrStatus-' + uid)?.value;
+    const expiresAt = qs('#newEnrExp-' + uid)?.value || null;
 
     const dup = adminState.enrollments.find(
       (e) => e.userId === uid && e.courseId === courseId && e.status === 'active'
     );
     if (dup) {
-      alert('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.');
+      if (typeof window.showToast === 'function') window.showToast('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.', 'warn');
+      else alert('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.');
       return;
     }
 
@@ -325,10 +330,12 @@
         notes: ''
       });
       console.info('[ADMIN] ✅ الاشتراك اتفعّل');
+      if (typeof window.showToast === 'function') window.showToast('تم تفعيل الاشتراك ✅', 'success');
       await loadAll();
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      alert('فشل التفعيل: ' + e.code);
+      if (typeof window.showToast === 'function') window.showToast('فشل التفعيل: ' + e.code, 'error');
+      else alert('فشل التفعيل: ' + e.code);
     }
   }
 
@@ -342,7 +349,8 @@
       await loadAll();
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      alert('فشل التعديل: ' + e.code);
+      if (typeof window.showToast === 'function') window.showToast('فشل التعديل: ' + e.code, 'error');
+      else alert('فشل التعديل: ' + e.code);
     }
   }
 
@@ -358,11 +366,12 @@
       console.info('[ADMIN] اتحدّث:', field);
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      alert('فشل الحفظ: ' + e.code);
+      if (typeof window.showToast === 'function') window.showToast('فشل الحفظ: ' + e.code, 'error');
+      else alert('فشل الحفظ: ' + e.code);
     }
   }
 
-  /* ---------- بند القايمة ---------- */
+  /* ---------- السايدبار ---------- */
   function ensureNavEntry() {
     const nav = qs('#sideNav');
     if (!nav || qs('[data-nav="view:admin"]')) return;
@@ -377,7 +386,6 @@
     dataBtn.after(btn);
   }
 
-  /* ✅ listener على #sideNav بس */
   function bindAdminNav() {
     const nav = qs('#sideNav');
     if (!nav || nav.__adminNavBound) return;
@@ -387,6 +395,7 @@
       if (!b) return;
       e.preventDefault();
       if (!(window.MCL && MCL.isAdminActive())) return;
+      if (!qs('#view-admin')) ensureAdminDOM();
       qsa('main#content > section:not(#view-admin)').forEach((s) => s.classList.add('hidden'));
       const v = qs('#view-admin'); if (v) v.classList.remove('hidden');
       const pt = qs('#pageTitle'); if (pt) pt.textContent = 'لوحة الإدارة';
@@ -398,7 +407,6 @@
     });
   }
 
-  /* ✅ حماية: قفل الأدمن لما المستخدم يخرج من Firebase */
   function watchAdminGuard() {
     auth.onAuthStateChanged((user) => {
       if (!user && window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive()) {
@@ -410,37 +418,61 @@
     });
   }
 
-  /* ---------- تشغيل ---------- */
+  function installSidebarHook() {
+    if (window.__admSidebarHooked) return;
+    if (typeof window.renderSidebar !== 'function') return;
+    window.__admSidebarHooked = true;
+    const orig = window.renderSidebar;
+    window.renderSidebar = function () {
+      try { orig(); } catch (e) { console.error('[ADMIN] renderSidebar:', e); }
+      ensureNavEntry();
+      bindAdminNav();
+    };
+  }
+
+  function observeSideNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__admObserver) return;
+    nav.__admObserver = new MutationObserver(() => {
+      ensureNavEntry();
+      bindAdminNav();
+    });
+    nav.__admObserver.observe(nav, { childList: true });
+  }
+
   function boot() {
     ensureAdminDOM();
     watchAdminGuard();
     ensureNavEntry();
     bindAdminNav();
-
-    let waited = 0;
-    const readyTimer = setInterval(() => {
-      waited++;
-      const ready = typeof window.renderSidebar === 'function' && qs('#sideNav')?.children.length;
-      if (ready || waited > 100) {
-        clearInterval(readyTimer);
-        ensureNavEntry();
-        bindAdminNav();
-        if (!window.__admSidebarHooked && typeof window.renderSidebar === 'function') {
-          const orig = window.renderSidebar;
-          window.__admSidebarHooked = true;
-          window.renderSidebar = function () {
-            orig();
-            ensureNavEntry();
-            bindAdminNav();
-          };
-        }
-      }
-    }, 100);
-
-    auth.onAuthStateChanged((user) => {
-      if (user) { ensureNavEntry(); bindAdminNav(); }
-    });
+    installSidebarHook();
+    observeSideNav();
   }
 
-  boot();
+  /* ⏳ انتظر DOM */
+  function waitForDOM(retries = 50) {
+    const main = qs('main#content') || qs('main');
+    const nav = qs('#sideNav');
+    if (main && nav) {
+      console.info('[ADMIN] DOM جاهز — boot');
+      boot();
+      return;
+    }
+    if (retries <= 0) {
+      console.warn('[ADMIN] ⚠️ DOM مش جاهز — boot');
+      boot();
+      return;
+    }
+    setTimeout(() => waitForDOM(retries - 1), 100);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => waitForDOM(), { once: true });
+  } else {
+    waitForDOM();
+  }
+
+  window.NexoraAdmin = {
+    reload: loadAll
+  };
 })();

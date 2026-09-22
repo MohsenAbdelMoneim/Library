@@ -1,14 +1,13 @@
 /* ==========================================================
-   orders.js — v16.1
-   حجوزات الطالب: المالك يراجع ويؤكد (تفعيل تلقائي للكورسات)
-   والطالب يتابع حالة حجوزه
-   إصلاحات: setInterval→MutationObserver، confirm/alert→openConfirm
+   orders.js — v17
+   حجوزات الطالب + تأكيد المالك (تفعيل تلقائي للكورسات)
+   ✅ v17: انتظار DOM + إصلاح كل المشاكل
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Orders — v16.1 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Orders — v17 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
   /* ✅ فحص Firebase */
   if (typeof firebase === 'undefined') {
@@ -16,7 +15,6 @@
     return;
   }
 
-  /* ⚠️ انقل المفاتيح لملف config خارجي */
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
     apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
     authDomain: "gymzone-f53f1.firebaseapp.com",
@@ -41,31 +39,20 @@
   const fmt = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('ar-EG-u-nu-latn') : '—';
 
-  /* ✅ مساعد آمن */
-  function on(sel, evt, fn, opts) {
-    const el = typeof sel === 'string' ? qs(sel) : sel;
-    if (el) el.addEventListener(evt, fn, opts);
-    else console.warn('[ORDERS][WIRE] عنصر غير موجود:', sel);
-    return el;
-  }
-
-  /* ✅ مساعد تأكيد — يستخدم openConfirm لو موجودة */
-  function askConfirm(opts) {
-    if (typeof window.openConfirm === 'function') {
-      window.openConfirm(opts);
-      return;
-    }
-    /* fallback */
-    if (window.confirm(opts.message)) opts.onConfirm();
-  }
-
-  /* ✅ مساعد إشعار — يستخدم showToast لو موجودة */
   function notify(msg, type = 'info', duration = 4500) {
     if (typeof window.showToast === 'function') {
       window.showToast(msg, type, { duration });
       return;
     }
     console.log('[ORDERS]', msg);
+  }
+
+  function askConfirm(opts) {
+    if (typeof window.openConfirm === 'function') {
+      window.openConfirm(opts);
+      return;
+    }
+    if (window.confirm(opts.message)) opts.onConfirm();
   }
 
   let orders = [];
@@ -96,11 +83,11 @@
 `;
 
   function ensureDOM() {
-    if (qs('#view-orders')) return;
+    if (qs('#view-orders')) return true;
     const main = qs('main#content') || qs('main');
     if (!main) {
-      console.warn('[ORDERS] main#content مش موجود — مش هيتضاف');
-      return;
+      console.warn('[ORDERS] main#content مش موجود — هستنى…');
+      return false;
     }
     if (!document.getElementById('nexOrdersStyles')) {
       const st = document.createElement('style');
@@ -112,14 +99,17 @@
     section.id = 'view-orders';
     section.className = 'hidden';
     section.setAttribute('aria-label', 'الحجوزات');
-    section.innerHTML = `<div class="od-wrap" id="ordersInner"></div>`;
+    section.innerHTML = '<div class="od-wrap" id="ordersInner"></div>';
     main.appendChild(section);
+    console.info('[ORDERS] ✅ #view-orders اتعمل');
+    return true;
   }
 
   async function loadOrders() {
     try {
       const snap = await db.collection('orders').orderBy('createdAt', 'desc').get();
       orders = snap.docs.map((d) => ({ docId: d.id, ...d.data() }));
+      console.info('[ORDERS] حمّل', orders.length, 'حجز');
     } catch (e) {
       console.warn('[ORDERS]', e.code);
       orders = [];
@@ -133,12 +123,13 @@
       rejected:  ['مرفوض ❌', 'rejected']
     };
     const m = map[s] || map.pending;
-    return `<span class="od-status ${m[1]}">${m[0]}</span>`;
+    return '<span class="od-status ' + m[1] + '">' + m[0] + '</span>';
   }
 
   function itemsHTML(o) {
+    if (!o.items || !o.items.length) return '—';
     return o.items.map((i) =>
-      `• ${i.type === 'pack' ? '📦 باقة' : '🎓'} ${esc(i.title)} — <b style="color:#4ade80">${fmt(i.price)}</b>`
+      '• ' + (i.type === 'pack' ? '📦 باقة' : '🎓') + ' ' + esc(i.title) + ' — <b style="color:#4ade80">' + fmt(i.price) + '</b>'
     ).join('<br>');
   }
 
@@ -148,14 +139,14 @@
     if (!inner) return;
     const pending = orders.filter((o) => o.status === 'pending');
     const done = orders.filter((o) => o.status !== 'pending');
-    inner.innerHTML = `
-    <div style="padding:4px 0 16px">
-      <h2 style="font-size:20px;font-weight:800">الحجوزات 🧾</h2>
-      <p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">
-        "تأكيد وتفعيل" = إضافة كل كورسات الطلب لحساب الطالب فورًا</p>
-    </div>
-    ${pending.length ? pending.map(orderAdminHTML).join('') : '<p class="od-empty">مفيش حجوزات جديدة.</p>'}
-    ${done.length ? `<h3 style="font-size:14px;font-weight:800;margin:22px 0 10px">سجل الحجوزات السابقة</h3>${done.map(orderAdminHTML).join('')}` : ''}`;
+    inner.innerHTML =
+      '<div style="padding:4px 0 16px">' +
+        '<h2 style="font-size:20px;font-weight:800">الحجوزات 🧾</h2>' +
+        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">' +
+          '"تأكيد وتفعيل" = إضافة كل كورسات الطلب لحساب الطالب فورًا</p>' +
+      '</div>' +
+      (pending.length ? pending.map(orderAdminHTML).join('') : '<p class="od-empty">مفيش حجوزات جديدة.</p>') +
+      (done.length ? '<h3 style="font-size:14px;font-weight:800;margin:22px 0 10px">سجل الحجوزات السابقة</h3>' + done.map(orderAdminHTML).join('') : '');
 
     qsa('#ordersInner [data-confirm]').forEach((b) =>
       b.addEventListener('click', () => confirmOrder(b.dataset.confirm)));
@@ -164,22 +155,22 @@
   }
 
   function orderAdminHTML(o) {
-    return `
-    <div class="od-card">
-      <div class="od-head">
-        <span class="od-name">${esc(o.name || 'طالب')}</span>
-        <span class="od-meta">${esc(o.phone || '')}</span>
-        ${statusChip(o.status)}
-        <span class="od-meta" style="margin-inline-start:auto">${fmtDate(o.createdAt)}</span>
-      </div>
-      <div class="od-items">${itemsHTML(o)}</div>
-      <div class="od-total">الإجمالي: ${fmt(o.totalCash)}</div>
-      ${o.status === 'pending' ? `
-      <div class="od-actions">
-        <button type="button" class="od-btn ok" data-confirm="${esc(o.docId)}"><i class="bi bi-check2-circle" aria-hidden="true"></i>تأكيد وتفعيل الكورسات</button>
-        <button type="button" class="od-btn no" data-reject="${esc(o.docId)}"><i class="bi bi-x-circle" aria-hidden="true"></i>رفض</button>
-      </div>` : ''}
-    </div>`;
+    return '' +
+    '<div class="od-card">' +
+      '<div class="od-head">' +
+        '<span class="od-name">' + esc(o.name || 'طالب') + '</span>' +
+        '<span class="od-meta">' + esc(o.phone || '') + '</span>' +
+        statusChip(o.status) +
+        '<span class="od-meta" style="margin-inline-start:auto">' + fmtDate(o.createdAt) + '</span>' +
+      '</div>' +
+      '<div class="od-items">' + itemsHTML(o) + '</div>' +
+      '<div class="od-total">الإجمالي: ' + fmt(o.totalCash || 0) + '</div>' +
+      (o.status === 'pending' ?
+      '<div class="od-actions">' +
+        '<button type="button" class="od-btn ok" data-confirm="' + esc(o.docId) + '"><i class="bi bi-check2-circle"></i>تأكيد وتفعيل الكورسات</button>' +
+        '<button type="button" class="od-btn no" data-reject="' + esc(o.docId) + '"><i class="bi bi-x-circle"></i>رفض</button>' +
+      '</div>' : '') +
+    '</div>';
   }
 
   /* ---------- عرض الطالب ---------- */
@@ -187,24 +178,25 @@
     const inner = qs('#ordersInner');
     if (!inner || !currentUser) return;
     const mine = orders.filter((o) => o.userId === currentUser.uid);
-    inner.innerHTML = `
-    <div style="padding:4px 0 16px">
-      <h2 style="font-size:20px;font-weight:800">حجوزاتي 🧾</h2>
-      <p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">تابع حالة حجوزاتك هنا — بعد تأكيد الدفع الكورسات تظهر في "حسابي"</p>
-    </div>
-    ${mine.length ? mine.map((o) => `
-      <div class="od-card">
-        <div class="od-head">
-          <span class="od-name">${itemsOneLine(o)}</span>
-          ${statusChip(o.status)}
-          <span class="od-meta" style="margin-inline-start:auto">${fmtDate(o.createdAt)}</span>
-        </div>
-        <div class="od-total">الإجمالي: ${fmt(o.totalCash)}</div>
-      </div>`).join('')
-    : '<p class="od-empty">مفيش حجوزات لسه — اختار كورس من "الكورسات والباقات" واضغط "أضف للسلة" 🛒</p>'}`;
+    inner.innerHTML =
+      '<div style="padding:4px 0 16px">' +
+        '<h2 style="font-size:20px;font-weight:800">حجوزاتي 🧾</h2>' +
+        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">تابع حالة حجوزاتك هنا — بعد تأكيد الدفع الكورسات تظهر في "حسابي"</p>' +
+      '</div>' +
+      (mine.length ? mine.map((o) =>
+        '<div class="od-card">' +
+          '<div class="od-head">' +
+            '<span class="od-name">' + itemsOneLine(o) + '</span>' +
+            statusChip(o.status) +
+            '<span class="od-meta" style="margin-inline-start:auto">' + fmtDate(o.createdAt) + '</span>' +
+          '</div>' +
+          '<div class="od-total">الإجمالي: ' + fmt(o.totalCash || 0) + '</div>' +
+        '</div>').join('')
+      : '<p class="od-empty">مفيش حجوزات لسه — اختار كورس من "الكورسات والباقات" واضغط "أضف للسلة" 🛒</p>');
   }
 
   function itemsOneLine(o) {
+    if (!o.items || !o.items.length) return '—';
     return o.items.map((i) => esc(i.title)).join(' + ');
   }
 
@@ -215,7 +207,7 @@
 
     askConfirm({
       title: 'تأكيد الحجز',
-      message: `تأكيد حجز «${o.name}»؟ هيتم تفعيل كل كورسات الطلب على حسابه فورًا.`,
+      message: 'تأكيد حجز «' + o.name + '»؟ هيتم تفعيل كل كورسات الطلب على حسابه فورًا.',
       confirmLabel: 'تأكيد وتفعيل',
       danger: false,
       onConfirm: () => performConfirmOrder(o)
@@ -231,7 +223,7 @@
       const active = new Set(existing.docs.map((d) => d.data().courseId));
 
       const courseIds = [];
-      o.items.forEach((i) => {
+      (o.items || []).forEach((i) => {
         if (i.type === 'course') courseIds.push(i.id);
         else if (i.type === 'pack' && Array.isArray(i.courseIds)) courseIds.push(...i.courseIds);
       });
@@ -318,6 +310,7 @@
   }
 
   function showOrders(mode) {
+    if (!qs('#view-orders')) ensureDOM();
     qsa('main#content > section:not(#view-orders)').forEach((s) => s.classList.add('hidden'));
     const view = qs('#view-orders');
     if (view) view.classList.remove('hidden');
@@ -330,7 +323,6 @@
     loadOrders().then(() => { isOwnerView ? renderOwner() : renderStudent(); });
   }
 
-  /* ✅ listener واحد على #sideNav بدل document */
   function bindOrdersNav() {
     const nav = qs('#sideNav');
     if (!nav || nav.__ordersNavBound) return;
@@ -344,7 +336,6 @@
     });
   }
 
-  /* ✅ إعادة حقن البنود بعد كل رسم للسايدبار */
   function installHook() {
     if (window.__ordersSidebarHooked) return;
     if (typeof window.renderSidebar !== 'function') return;
@@ -357,12 +348,9 @@
     };
   }
 
-  /* ✅ MutationObserver بدل setInterval كل ثانيتين */
   function observeAdminState() {
-    /* نراقب تغيّر adminChip في الهيدر */
     const chip = qs('#adminChip');
     if (!chip) {
-      /* fallback: polling أبطأ (10 ثواني) */
       setInterval(() => {
         if (window.MCL && MCL.isAdminActive()) {
           ensureNav();
@@ -378,52 +366,57 @@
     observer.observe(chip, { attributes: true, attributeFilter: ['class'] });
   }
 
-  /* ---------- التشغيل ---------- */
-    /* ---------- التشغيل ---------- */
-  function boot() {
-    ensureDOM();
-
-    /* الهوك والبنود: مؤجّلين لحد ما app.js يعرّف renderSidebar ويملأ sideNav */
-    let waited = 0;
-    const readyTimer = setInterval(() => {
-      waited++;
-      const ready = typeof window.renderSidebar === 'function' && qs('#sideNav')?.children.length;
-      if (ready || waited > 100) {   /* أمان: 10 ثواني كحد أقصى */
-        clearInterval(readyTimer);
-        installHook();
-        ensureNav();
-        bindOrdersNav();
-      }
-    }, 100);
-
-    auth.onAuthStateChanged(async (user) => {
-      currentUser = user;
-      installHook();
+  function observeSideNav() {
+    const nav = qs('#sideNav');
+    if (!nav || nav.__ordersObserver) return;
+    nav.__ordersObserver = new MutationObserver(() => {
       ensureNav();
       bindOrdersNav();
-      if (user && user.email !== OWNER_EMAIL) await loadOrders();
     });
+    nav.__ordersObserver.observe(nav, { childList: true });
+  }
 
+  function boot() {
+    ensureDOM();
+    installHook();
+    ensureNav();
+    bindOrdersNav();
     observeAdminState();
+    observeSideNav();
+  }
 
-    /* مراقبة السايدبار للتغييرات */
-    const tryNav = setInterval(() => {
-      const nav = qs('#sideNav');
-      if (!nav) return;
-      clearInterval(tryNav);
-      if (!nav.__ordersObserver) {
-        nav.__ordersObserver = new MutationObserver(() => {
-          ensureNav();
-          bindOrdersNav();
-        });
-        nav.__ordersObserver.observe(nav, { childList: true });
-      }
-    }, 200);
+  /* ⏳ انتظر main#content و #sideNav */
+  function waitForDOM(retries = 50) {
+    const main = qs('main#content') || qs('main');
+    const nav = qs('#sideNav');
+    if (main && nav) {
+      console.info('[ORDERS] DOM جاهز — boot');
+      boot();
+      return;
+    }
+    if (retries <= 0) {
+      console.warn('[ORDERS] ⚠️ DOM مش جاهز — boot');
+      boot();
+      return;
+    }
+    setTimeout(() => waitForDOM(retries - 1), 100);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
+    document.addEventListener('DOMContentLoaded', () => waitForDOM(), { once: true });
   } else {
-    boot();
+    waitForDOM();
   }
+
+  auth.onAuthStateChanged(async (user) => {
+    currentUser = user;
+    ensureNav();
+    bindOrdersNav();
+    if (user && user.email !== OWNER_EMAIL) await loadOrders();
+  });
+
+  window.NexoraOrders = {
+    show: showOrders,
+    reload: loadOrders
+  };
 })();

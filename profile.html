@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#0a0a0d">
   <meta name="description" content="الملف الشخصي — Nexora Academy">
   <title>الملف الشخصي — Nexora Academy</title>
-  <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
+
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="favicon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +23,7 @@
       --accent: #f0b53e; --accent2: #f7c85f;
       --blue: #4f7cff; --purple: #7c5cff;
       --green: #4ade80; --red: #e5484d;
+      --nav-h: 64px;
     }
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html { overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
@@ -33,167 +36,118 @@
         radial-gradient(800px 500px at 5% 30%, rgba(124,92,255,.10), transparent 55%),
         radial-gradient(900px 500px at 50% 105%, rgba(240,181,62,.08), transparent 55%);
       background-attachment: fixed;
+      padding-top: var(--nav-h);
     }
     a { color: inherit; text-decoration: none; }
     button { font-family: inherit; cursor: pointer; border: none; background: none; }
     img, svg { max-width: 100%; height: auto; display: block; }
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
-    /* Navbar */
-    .navbar {
-      position: sticky; top: 0; z-index: 50;
-      background: rgba(10,10,13,.85);
-      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--edge);
+    /* ✅ Skip link */
+    .skip-link {
+      position: absolute; top: -100px; inset-inline-start: 16px;
+      background: var(--accent); color: #052e12; padding: 10px 16px;
+      border-radius: 8px; font-weight: 700; z-index: 1000; transition: top .2s;
     }
-    .navbar-inner {
-      max-width: 1200px; margin: 0 auto; padding: 0 24px;
-      height: 64px; display: flex; align-items: center; gap: 16px;
-    }
-    .logo-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-    .logo-mark {
-      width: 38px; height: 38px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      display: grid; place-items: center; font-size: 18px;
-      box-shadow: 0 6px 18px rgba(79,124,255,.35);
-    }
-    .logo-text h1 {
-      font-size: 14.5px; font-weight: 800;
-      background: linear-gradient(135deg, #fff, var(--accent));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-    .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
-    .nav-links { display: none; gap: 4px; margin-inline-start: 20px; }
-    .nav-links a {
-      padding: 8px 14px; border-radius: 10px;
-      font-size: 13px; color: var(--mut); transition: .15s;
-    }
-    .nav-links a:hover, .nav-links a.active { color: var(--ink); background: var(--raise); }
-    .nav-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; }
-    .btn-login {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: 38px; padding: 0 16px; border-radius: 10px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      color: #fff; font-size: 12.5px; font-weight: 700; transition: .15s;
-    }
-    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
-    .btn-menu {
-      display: grid; place-items: center;
-      width: 38px; height: 38px; border-radius: 10px;
-      border: 1px solid var(--edge); color: var(--mut);
-    }
-    .mobile-menu {
-      display: none; border-top: 1px solid var(--edge); background: var(--panel);
-    }
-    .mobile-menu.open { display: block; }
-    .mobile-menu a {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 24px; font-size: 13.5px; color: var(--mut);
-      border-bottom: 1px solid var(--edge);
-    }
-    .mobile-menu a:hover { color: var(--ink); background: var(--raise); }
-    @media (min-width: 900px) {
-      .nav-links { display: flex; }
-      .btn-menu { display: none; }
+    .skip-link:focus { top: 16px; }
+
+    /* Focus visible */
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 12px;
     }
 
-    /* Main */
     main { padding: 40px 0 60px; }
 
-    /* Loading State */
-    .loading-state {
-      text-align: center;
-      padding: 80px 20px;
-      color: var(--dim);
-      font-size: 14px;
+    /* ====== Loading Skeleton ====== */
+    .skeleton-wrap { padding: 20px 0; }
+    .skel-card {
+      background: rgba(16,16,21,.6);
+      border: 1px solid var(--edge);
+      border-radius: 20px;
+      padding: 22px;
+      margin-bottom: 16px;
     }
-    .loading-state i {
-      font-size: 32px;
-      display: block;
-      margin-bottom: 12px;
-      color: var(--blue);
-      animation: spin 1s linear infinite;
+    .skel-line {
+      height: 14px; border-radius: 6px;
+      background: linear-gradient(90deg, var(--edge) 0%, var(--raise) 50%, var(--edge) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .skel-line + .skel-line { margin-top: 10px; }
+    .skel-line.w-30 { width: 30%; }
+    .skel-line.w-50 { width: 50%; }
+    .skel-line.w-70 { width: 70%; }
+    .skel-line.w-90 { width: 90%; }
+    .skel-avatar {
+      width: 88px; height: 88px; border-radius: 24px;
+      background: linear-gradient(90deg, var(--edge) 0%, var(--raise) 50%, var(--edge) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-    /* Guest State */
+    /* ====== Guest State ====== */
     .guest-state {
-      text-align: center;
-      padding: 80px 20px;
+      text-align: center; padding: 80px 20px;
       background: rgba(16,16,21,.6);
       border: 1px dashed var(--edge2);
       border-radius: 22px;
-      max-width: 500px;
-      margin: 0 auto;
+      max-width: 500px; margin: 0 auto;
     }
-    .guest-state .gi {
-      font-size: 52px;
-      margin-bottom: 16px;
-    }
-    .guest-state h2 {
-      font-size: 22px;
-      font-weight: 900;
-      margin-bottom: 10px;
-    }
-    .guest-state p {
-      color: var(--mut);
-      font-size: 14px;
-      line-height: 1.8;
-      margin-bottom: 24px;
-    }
+    .guest-state .gi { font-size: 52px; margin-bottom: 16px; }
+    .guest-state h2 { font-size: 22px; font-weight: 900; margin-bottom: 10px; }
+    .guest-state p { color: var(--mut); font-size: 14px; line-height: 1.8; margin-bottom: 24px; }
 
-    /* Profile Hero */
+    .btn-login {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 48px; padding: 0 28px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; font-size: 14px; font-weight: 700; transition: .15s;
+    }
+    .btn-login:hover { opacity: .9; transform: translateY(-1px); }
+
+    /* ====== Error State ====== */
+    .error-state {
+      text-align: center; padding: 60px 20px;
+      background: rgba(229,72,77,.06);
+      border: 1px solid rgba(229,72,77,.3);
+      border-radius: 22px;
+      max-width: 500px; margin: 0 auto;
+    }
+    .error-state .ei { font-size: 48px; margin-bottom: 14px; color: #f4636e; }
+    .error-state h2 { font-size: 20px; font-weight: 900; margin-bottom: 8px; }
+    .error-state p { color: var(--mut); font-size: 13.5px; line-height: 1.8; margin-bottom: 20px; }
+    .error-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+    /* ====== Profile Hero ====== */
     .profile-hero {
       background: linear-gradient(135deg, rgba(79,124,255,.15), rgba(124,92,255,.15));
       border: 1px solid rgba(79,124,255,.3);
-      border-radius: 24px;
-      padding: 32px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 24px;
+      border-radius: 24px; padding: 32px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 24px;
       margin-bottom: 32px;
     }
     .profile-avatar {
-      width: 88px; height: 88px;
-      border-radius: 24px;
+      width: 88px; height: 88px; border-radius: 24px;
       background: linear-gradient(135deg, var(--blue), var(--purple));
       display: grid; place-items: center;
-      font-size: 34px;
-      font-weight: 900;
-      color: #fff;
+      font-size: 34px; font-weight: 900; color: #fff;
       box-shadow: 0 10px 30px rgba(79,124,255,.4);
       flex-shrink: 0;
     }
-    .profile-info {
-      flex-grow: 1;
-      min-width: 200px;
-    }
-    .profile-info h1 {
-      font-size: clamp(20px, 3vw, 26px);
-      font-weight: 900;
-      margin-bottom: 6px;
-    }
+    .profile-info { flex-grow: 1; min-width: 200px; }
+    .profile-info h1 { font-size: clamp(20px, 3vw, 26px); font-weight: 900; margin-bottom: 6px; }
     .profile-info .phone {
-      font-size: 13.5px;
-      color: var(--mut);
+      font-size: 13.5px; color: var(--mut);
       font-family: 'IBM Plex Mono', monospace;
-      direction: ltr;
-      margin-bottom: 12px;
+      direction: ltr; margin-bottom: 12px;
     }
-    .profile-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .profile-badges { display: flex; flex-wrap: wrap; gap: 8px; }
     .badge-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 700;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px;
+      font-size: 11.5px; font-weight: 700;
       background: rgba(74,222,128,.1);
       border: 1px solid rgba(74,222,128,.3);
       color: var(--green);
@@ -203,22 +157,18 @@
       border-color: rgba(240,181,62,.3);
       color: var(--accent);
     }
-
-    .profile-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .badge-chip.info {
+      background: rgba(79,124,255,.1);
+      border-color: rgba(79,124,255,.3);
+      color: #7ea2ff;
     }
+
+    .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-profile {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 44px;
-      padding: 0 20px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 700;
-      transition: .15s;
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 44px; padding: 0 20px; border-radius: 12px;
+      font-size: 13px; font-weight: 700; transition: .15s;
+      font-family: inherit;
     }
     .btn-profile.primary {
       background: linear-gradient(135deg, var(--blue), var(--purple));
@@ -226,46 +176,32 @@
     }
     .btn-profile.primary:hover { transform: translateY(-2px); opacity: .9; }
     .btn-profile.ghost {
-      border: 1px solid var(--edge2);
-      color: var(--ink);
+      border: 1px solid var(--edge2); color: var(--ink);
     }
     .btn-profile.ghost:hover { background: var(--raise); border-color: var(--accent); color: var(--accent); }
     .btn-profile.danger {
-      border: 1px solid rgba(229,72,77,.4);
-      color: #f4636e;
+      border: 1px solid rgba(229,72,77,.4); color: #f4636e;
     }
     .btn-profile.danger:hover { background: rgba(229,72,77,.12); }
 
-    /* Section */
-    .section-block {
-      margin-bottom: 32px;
-    }
+    /* ====== Sections ====== */
+    .section-block { margin-bottom: 32px; }
     .section-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
     }
     .section-head h2 {
-      font-size: 20px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-size: 20px; font-weight: 900;
+      display: flex; align-items: center; gap: 10px;
     }
     .section-head h2 i { color: var(--accent); }
     .section-head .count {
-      font-size: 12px;
-      color: var(--mut);
+      font-size: 12px; color: var(--mut);
       background: var(--raise);
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-weight: 600;
+      padding: 4px 12px; border-radius: 999px; font-weight: 600;
     }
 
-    /* Courses Grid */
+    /* ====== Course Cards ====== */
     .courses-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -274,11 +210,8 @@
     .course-item {
       background: rgba(16,16,21,.85);
       border: 1px solid var(--edge);
-      border-radius: 18px;
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      border-radius: 18px; padding: 22px;
+      display: flex; flex-direction: column; gap: 12px;
       transition: .2s;
     }
     .course-item:hover {
@@ -288,10 +221,8 @@
     }
     .course-status {
       align-self: flex-start;
-      font-size: 10.5px;
-      font-weight: 700;
-      padding: 4px 12px;
-      border-radius: 999px;
+      font-size: 10.5px; font-weight: 700;
+      padding: 4px 12px; border-radius: 999px;
       background: rgba(74,222,128,.1);
       border: 1px solid rgba(74,222,128,.3);
       color: var(--green);
@@ -301,99 +232,74 @@
       border-color: rgba(240,181,62,.3);
       color: var(--accent);
     }
-    .course-item h3 {
-      font-size: 16px;
-      font-weight: 800;
-      line-height: 1.4;
+    .course-item h3 { font-size: 16px; font-weight: 800; line-height: 1.4; }
+    .course-item .cat { font-size: 11.5px; color: var(--mut); }
+    .course-item .progress-wrap {
+      height: 6px; background: var(--bg);
+      border-radius: 999px; overflow: hidden;
+      border: 1px solid var(--edge);
     }
-    .course-item .cat {
-      font-size: 11.5px;
-      color: var(--mut);
+    .course-item .progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--green), #22c55e);
+      border-radius: 999px;
+      transition: width .4s;
+    }
+    .course-item .progress-label {
+      font-size: 10.5px; color: var(--dim); font-weight: 600;
+      display: flex; justify-content: space-between;
     }
     .course-item .cta {
-      margin-top: auto;
-      padding-top: 12px;
+      margin-top: auto; padding-top: 12px;
       border-top: 1px solid var(--edge);
-      display: flex;
-      gap: 8px;
+      display: flex; gap: 8px;
     }
     .btn-course {
       flex: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      height: 40px;
-      border-radius: 11px;
-      font-size: 12.5px;
-      font-weight: 700;
-      transition: .15s;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; height: 40px; border-radius: 11px;
+      font-size: 12.5px; font-weight: 700; transition: .15s;
     }
     .btn-course.open {
       background: linear-gradient(135deg, var(--blue), var(--purple));
       color: #fff;
     }
     .btn-course.open:hover { opacity: .9; }
-    .btn-course.info {
-      background: rgba(79,124,255,.12);
-      border: 1px solid rgba(79,124,255,.35);
-      color: #7ea2ff;
-    }
-    .btn-course.info:hover { background: rgba(79,124,255,.22); }
 
-    /* Empty State */
+    /* ====== Empty ====== */
     .empty-state {
-      text-align: center;
-      padding: 60px 20px;
+      text-align: center; padding: 60px 20px;
       background: rgba(16,16,21,.6);
       border: 1px dashed var(--edge2);
       border-radius: 20px;
     }
-    .empty-state .ei {
-      font-size: 48px;
-      margin-bottom: 14px;
-    }
-    .empty-state h3 {
-      font-size: 18px;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
+    .empty-state .ei { font-size: 48px; margin-bottom: 14px; }
+    .empty-state h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
     .empty-state p {
-      font-size: 13px;
-      color: var(--mut);
-      line-height: 1.8;
-      margin-bottom: 20px;
+      font-size: 13px; color: var(--mut);
+      line-height: 1.8; margin-bottom: 20px;
     }
 
-    /* Stats Row */
+    /* ====== Stats ====== */
     .stats-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-      margin-bottom: 32px;
+      gap: 12px; margin-bottom: 32px;
     }
     .stat-mini {
       background: rgba(16,16,21,.85);
       border: 1px solid var(--edge);
-      border-radius: 16px;
-      padding: 18px;
+      border-radius: 16px; padding: 18px;
       text-align: center;
     }
     .stat-mini .num {
-      font-size: 26px;
-      font-weight: 900;
+      font-size: 26px; font-weight: 900;
       background: linear-gradient(135deg, var(--blue), var(--accent));
       -webkit-background-clip: text; background-clip: text; color: transparent;
       font-variant-numeric: tabular-nums;
     }
-    .stat-mini .lbl {
-      font-size: 11.5px;
-      color: var(--mut);
-      margin-top: 4px;
-      font-weight: 600;
-    }
+    .stat-mini .lbl { font-size: 11.5px; color: var(--mut); margin-top: 4px; font-weight: 600; }
 
-    /* Footer */
+    /* ====== Footer ====== */
     .footer {
       border-top: 1px solid var(--edge);
       padding: 40px 0 24px; margin-top: 60px;
@@ -403,9 +309,7 @@
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 32px; margin-bottom: 32px;
     }
-    .footer h4 {
-      font-size: 13px; font-weight: 800; margin-bottom: 14px; color: var(--ink);
-    }
+    .footer h4 { font-size: 13px; font-weight: 800; margin-bottom: 14px; color: var(--ink); }
     .footer ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
     .footer ul a { font-size: 12.5px; color: var(--mut); transition: .15s; }
     .footer ul a:hover { color: var(--accent); }
@@ -414,106 +318,139 @@
       padding-top: 24px; text-align: center;
       color: var(--dim); font-size: 11.5px; line-height: 1.8;
     }
+    .footer .logo-wrap {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .footer .logo-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: grid; place-items: center; font-size: 18px;
+    }
+    .footer .logo-text .brand {
+      font-size: 14.5px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .footer .logo-text p { font-size: 9.5px; color: var(--dim); letter-spacing: 1px; }
 
+    /* ====== Mobile ====== */
     @media (max-width: 640px) {
       .container { padding: 0 18px; }
       main { padding: 24px 0 40px; }
       .profile-hero { padding: 22px; gap: 16px; }
       .profile-avatar { width: 70px; height: 70px; font-size: 26px; border-radius: 20px; }
-      .btn-profile { width: 100%; justify-content: center; }
+      .profile-actions { width: 100%; }
+      .btn-profile { flex: 1; justify-content: center; }
       .courses-grid { grid-template-columns: 1fr; }
     }
 
-    .reveal {
+    @media (max-width: 768px) {
+      body { background-attachment: scroll; }
+    }
+
+    /* ====== Reveal (آمن) ====== */
+    .reveal { opacity: 1; transform: none; }
+    .reveal.will-reveal {
       opacity: 0; transform: translateY(20px);
       transition: opacity .6s ease, transform .6s ease;
     }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal.will-reveal.visible { opacity: 1; transform: translateY(0); }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
-      .reveal { opacity: 1; transform: none; }
+      .reveal, .reveal.will-reveal { opacity: 1 !important; transform: none !important; }
+      .skel-line, .skel-avatar { animation: none !important; }
     }
   </style>
 </head>
 <body>
 
-  <nav class="navbar">
-    <div class="navbar-inner">
-      <a href="landing.html" class="logo-wrap">
-        <span class="logo-mark">🎓</span>
-        <div class="logo-text">
-          <h1>Nexora Academy</h1>
-          <p>LEARN · BUILD · GROW</p>
+  <a href="#main" class="skip-link">تخطى إلى المحتوى</a>
+
+  <main class="container" id="main">
+
+    <!-- ====== Loading Skeleton ====== -->
+    <div class="skeleton-wrap" id="loadingState" aria-live="polite" aria-busy="true">
+      <div class="skel-card">
+        <div style="display:flex;gap:16px;align-items:center;">
+          <div class="skel-avatar" style="margin-bottom:0;"></div>
+          <div style="flex:1;">
+            <div class="skel-line w-50"></div>
+            <div class="skel-line w-30"></div>
+          </div>
         </div>
-      </a>
-      <div class="nav-links">
-        <a href="landing.html">الرئيسية</a>
-        <a href="index.html">الكورسات</a>
-        <a href="about.html">من نحن</a>
-        <a href="contact.html">اتصل بنا</a>
       </div>
-      <div class="nav-actions">
-        <a href="auth.html" class="btn-login" id="navAuthBtn">
-          <i class="bi bi-person-circle"></i>
-          <span id="navAuthText">تسجيل الدخول</span>
-        </a>
-        <button class="btn-menu" id="menuBtn" aria-label="القائمة"><i class="bi bi-list"></i></button>
+      <div class="skel-card">
+        <div class="skel-line w-30"></div>
+        <div class="skel-line w-90"></div>
+      </div>
+      <div class="skel-card">
+        <div class="skel-line w-30"></div>
+        <div class="skel-line w-90"></div>
+        <div class="skel-line w-70"></div>
       </div>
     </div>
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="landing.html"><i class="bi bi-house"></i>الرئيسية</a>
-      <a href="index.html"><i class="bi bi-mortarboard"></i>الكورسات</a>
-      <a href="about.html"><i class="bi bi-info-circle"></i>من نحن</a>
-      <a href="contact.html"><i class="bi bi-telephone"></i>اتصل بنا</a>
-      <a href="profile.html"><i class="bi bi-person-badge"></i>حسابي</a>
-    </div>
-  </nav>
 
-  <main class="container">
-
-    <!-- Loading -->
-    <div class="loading-state" id="loadingState">
-      <i class="bi bi-arrow-clockwise"></i>
-      جاري تحميل بياناتك…
-    </div>
-
-    <!-- Guest -->
+    <!-- ====== Guest ====== -->
     <div class="guest-state" id="guestState" style="display:none;">
-      <div class="gi">🔒</div>
+      <div class="gi" aria-hidden="true">🔒</div>
       <h2>لازم تسجّل دخول</h2>
       <p>عشان تشوف ملفك الشخصي وكورساتك، سجّل دخولك الأول.</p>
-      <a href="auth.html" class="btn-login" style="display:inline-flex;height:48px;padding:0 28px;">
-        <i class="bi bi-person-plus"></i>
+      <a href="auth.html" class="btn-login">
+        <i class="bi bi-person-plus" aria-hidden="true"></i>
         <span>تسجيل الدخول</span>
       </a>
     </div>
 
-    <!-- Profile Content -->
+    <!-- ====== Error ====== -->
+    <div class="error-state" id="errorState" style="display:none;" role="alert">
+      <div class="ei" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></div>
+      <h2>حصلت مشكلة في التحميل</h2>
+      <p id="errorMsg">مش قادرين نحمّل بياناتك دلوقتي. تأكد من اتصالك بالإنترنت وجرّب تاني.</p>
+      <div class="error-actions">
+        <button type="button" class="btn-profile primary" id="retryBtn">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          حاول تاني
+        </button>
+        <a href="contact.html" class="btn-profile ghost">
+          <i class="bi bi-headset" aria-hidden="true"></i>
+          كلّمنا
+        </a>
+      </div>
+    </div>
+
+    <!-- ====== Profile Content ====== -->
     <div id="profileContent" style="display:none;">
-      <!-- Hero -->
       <div class="profile-hero reveal">
-        <div class="profile-avatar" id="pAvatar">؟</div>
+        <div class="profile-avatar" id="pAvatar" aria-hidden="true">؟</div>
         <div class="profile-info">
           <h1 id="pName">—</h1>
           <p class="phone" id="pPhone">—</p>
           <div class="profile-badges">
-            <span class="badge-chip"><i class="bi bi-patch-check-fill"></i>حساب نشط</span>
-            <span class="badge-chip warn" id="pRole"><i class="bi bi-person"></i>طالب</span>
+            <span class="badge-chip" id="pActive">
+              <i class="bi bi-patch-check-fill" aria-hidden="true"></i>حساب نشط
+            </span>
+            <span class="badge-chip warn" id="pRole">
+              <i class="bi bi-person" aria-hidden="true"></i>طالب
+            </span>
+            <span class="badge-chip info" id="pJoined" style="display:none;">
+              <i class="bi bi-calendar-check" aria-hidden="true"></i>
+              <span id="pJoinedText">—</span>
+            </span>
           </div>
         </div>
         <div class="profile-actions">
-          <a href="index.html" class="btn-profile primary">
-            <i class="bi bi-mortarboard"></i>
+          <a href="library.html" class="btn-profile primary">
+            <i class="bi bi-mortarboard" aria-hidden="true"></i>
             كورساتي
           </a>
-          <button class="btn-profile danger" id="logoutBtn">
-            <i class="bi bi-box-arrow-left"></i>
+          <button type="button" class="btn-profile danger" id="logoutBtn">
+            <i class="bi bi-box-arrow-left" aria-hidden="true"></i>
             خروج
           </button>
         </div>
       </div>
 
-      <!-- Stats -->
       <div class="stats-row reveal" id="statsRow">
         <div class="stat-mini">
           <div class="num" id="sEnrolls">0</div>
@@ -533,15 +470,12 @@
         </div>
       </div>
 
-      <!-- Courses -->
       <div class="section-block reveal">
         <div class="section-head">
-          <h2><i class="bi bi-book"></i> كورساتي المفعّلة</h2>
+          <h2><i class="bi bi-book" aria-hidden="true"></i> كورساتي المفعّلة</h2>
           <span class="count" id="enrollsCount">0 كورس</span>
         </div>
-        <div class="courses-grid" id="coursesGrid">
-          <!-- تُملأ ديناميكيًا -->
-        </div>
+        <div class="courses-grid" id="coursesGrid"></div>
       </div>
     </div>
 
@@ -551,10 +485,10 @@
     <div class="container">
       <div class="footer-grid">
         <div>
-          <div class="logo-wrap" style="margin-bottom:12px;">
-            <span class="logo-mark">🎓</span>
+          <div class="logo-wrap">
+            <span class="logo-mark" aria-hidden="true">🎓</span>
             <div class="logo-text">
-              <h1>Nexora Academy</h1>
+              <div class="brand">Nexora Academy</div>
               <p>LEARN · BUILD · GROW</p>
             </div>
           </div>
@@ -562,30 +496,30 @@
             منصة تعليمية احترافية متخصصة في تعليم مهارات المستقبل.
           </p>
         </div>
-        <div>
+        <nav aria-label="روابط سريعة">
           <h4>روابط سريعة</h4>
           <ul>
             <li><a href="landing.html">الرئيسية</a></li>
-            <li><a href="index.html">الكورسات</a></li>
+            <li><a href="library.html">الكورسات</a></li>
             <li><a href="about.html">من نحن</a></li>
             <li><a href="contact.html">اتصل بنا</a></li>
           </ul>
-        </div>
-        <div>
+        </nav>
+        <nav aria-label="حسابي">
           <h4>حسابي</h4>
           <ul>
             <li><a href="auth.html">تسجيل الدخول</a></li>
             <li><a href="profile.html">الملف الشخصي</a></li>
-            <li><a href="index.html">كورساتي</a></li>
+            <li><a href="library.html">كورساتي</a></li>
           </ul>
-        </div>
-        <div>
+        </nav>
+        <nav aria-label="تواصل معنا">
           <h4>تواصل معنا</h4>
           <ul>
-            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone"></i> 01096295395</a></li>
-            <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> واتساب</a></li>
+            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone" aria-hidden="true"></i> 01096295395</a></li>
+            <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i> واتساب</a></li>
           </ul>
-        </div>
+        </nav>
       </div>
       <div class="footer-bottom">
         <p>© <span id="year"></span> Nexora Academy — جميع الحقوق محفوظة</p>
@@ -594,187 +528,314 @@
     </div>
   </footer>
 
-  <script src="config.js?v=17"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Scripts -->
+  <script src="config.js?v=18" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer></script>
+  <script src="nav.js?v=18" defer></script>
 
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
+  <script defer>
+  (function () {
+    'use strict';
 
-    /* Mobile Menu */
-    const menuBtn = document.getElementById('menuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    if (menuBtn && mobileMenu) {
-      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('open'));
-      mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.remove('open')));
+    /* ===== Helpers ===== */
+    const $  = (s) => document.querySelector(s);
+    const $$ = (s) => [...document.querySelectorAll(s)];
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
+      (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+    /* ✅ Timeout wrapper للـQueries */
+    function withTimeout(promise, ms = 8000) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), ms))
+      ]);
     }
 
-    /* Reveal */
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.classList.add('visible');
-          observer.unobserve(entry);
-        }
-      });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    /* ✅ Firestore Timestamp → ms */
+    function toMs(value) {
+      if (!value) return null;
+      if (typeof value.toDate === 'function') return value.toDate().getTime();
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const t = new Date(value).getTime();
+        return Number.isFinite(t) ? t : null;
+      }
+      if (value.seconds != null) return value.seconds * 1000;
+      return null;
+    }
 
-    /* Firebase Init */
+    /* ✅ أيام بشكل آمن */
+    function safeDays(ms) {
+      if (!ms) return 0;
+      const diff = Date.now() - ms;
+      if (!Number.isFinite(diff) || diff < 0) return 0;
+      return Math.floor(diff / 86400000);
+    }
+
+    /* ===== Year ===== */
+    const yearEl = $('#year');
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+    /* ===== Reveal ===== */
+    if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');   // ✅ target مش entry
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      $$('.reveal').forEach((el) => {
+        el.classList.add('will-reveal');
+        observer.observe(el);
+      });
+    }
+
+    /* ===== Firebase Check ===== */
     const cfg = window.__FIREBASE_CONFIG__;
-    if (!cfg) {
-      document.getElementById('loadingState').innerHTML = '<i class="bi bi-exclamation-triangle" style="animation:none;color:var(--red)"></i>خطأ: config.js ناقص';
-    } else {
-      firebase.initializeApp(cfg);
-      const auth = firebase.auth();
-      const db = firebase.firestore();
-
-      const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
-        (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-
-      const loadingState = document.getElementById('loadingState');
-      const guestState = document.getElementById('guestState');
-      const profileContent = document.getElementById('profileContent');
-
-      /* Course catalog (from Firestore later) */
-      function getCatalogMap() {
-        const src = window.__NEXORA_CATALOG__ || { courses: [], byId: {} };
-        const map = {};
-        (src.courses || []).forEach(c => { if (c.id) map[c.id] = c; });
-        return map;
-      }
-
-      /* Resolve course link from library resources */
-      function resolveCourseLink(courseId, catalogMap) {
-        const c = catalogMap[courseId];
-        if (!c) return null;
-        const libTitle = (window.__COURSE_LIBRARY_MAP__ || {})[courseId];
-        if (!libTitle) return null;
-        return libTitle;
-      }
-
-      function courseCardHTML(enroll, catalogMap) {
-        const c = catalogMap[enroll.courseId] || { title: enroll.courseId, category: '—' };
-        const done = enroll.progress === 100;
-        return `
-          <article class="course-item">
-            <span class="course-status ${done ? 'done' : ''}">
-              ${done ? 'مكتمل 🏆' : 'متاح ليك ✅'}
-            </span>
-            <h3>${esc(c.title)}</h3>
-            <p class="cat">${esc(c.category || '')}</p>
-            <div class="cta">
-              <a href="index.html" class="btn-course open">
-                <i class="bi bi-play-circle"></i>
-                ابدأ التعلم
-              </a>
-            </div>
-          </article>`;
-      }
-
-      function renderProfile(user, profileData, enrollments, orders) {
-        const catalogMap = getCatalogMap();
-        const firstName = (profileData?.name || user.displayName || 'صديقنا').split(' ')[0];
-        const fullName = profileData?.name || user.displayName || 'مستخدم';
-        const phone = profileData?.phone || (user.email || '').split('@')[0] || '—';
-
-        /* Hero */
-        document.getElementById('pAvatar').textContent = fullName.charAt(0).toUpperCase();
-        document.getElementById('pName').textContent = fullName;
-        document.getElementById('pPhone').textContent = phone;
-
-        /* Stats */
-        const totalEnrolls = enrollments.length;
-        const totalOrders = orders.length;
-        const uniquePaths = 0; /* يمكن حسابه بعدين */
-        const daysSince = profileData?.createdAt
-          ? Math.floor((Date.now() - new Date(profileData.createdAt).getTime()) / 86400000)
-          : 0;
-
-        document.getElementById('sEnrolls').textContent = totalEnrolls;
-        document.getElementById('sOrders').textContent = totalOrders;
-        document.getElementById('sPaths').textContent = uniquePaths || 0;
-        document.getElementById('sDays').textContent = daysSince;
-        document.getElementById('enrollsCount').textContent = totalEnrolls + ' كورس';
-
-        /* Courses */
-        const grid = document.getElementById('coursesGrid');
-        if (enrollments.length) {
-          grid.innerHTML = enrollments.map(e => courseCardHTML(e, catalogMap)).join('');
-        } else {
-          grid.innerHTML = `
-            <div class="empty-state" style="grid-column:1/-1;">
-              <div class="ei">📚</div>
-              <h3>لسه مفيش كورسات مفعّلة</h3>
-              <p>تصفح الكورسات المتاحة واختار اللي يناسبك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس فورًا.</p>
-              <a href="index.html" class="btn-profile primary" style="display:inline-flex;">
-                <i class="bi bi-compass"></i>
-                تصفح الكورسات
-              </a>
-            </div>`;
-        }
-
-        /* Show content */
-        loadingState.style.display = 'none';
-        guestState.style.display = 'none';
-        profileContent.style.display = 'block';
-
-        /* Nav bar update */
-        const navAuthText = document.getElementById('navAuthText');
-        if (navAuthText) navAuthText.textContent = firstName;
-      }
-
-      /* Logout */
-      document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-        if (!confirm('تسجيل الخروج؟')) return;
-        await auth.signOut();
-        location.href = 'landing.html';
-      });
-
-      /* Auth state */
-      auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          loadingState.style.display = 'none';
-          guestState.style.display = 'block';
-          profileContent.style.display = 'none';
-          return;
-        }
-
-        try {
-          /* Profile */
-          let profileData = null;
-          try {
-            const doc = await db.collection('students').doc(user.uid).get();
-            if (doc.exists) profileData = doc.data();
-          } catch (e) { console.warn('profile:', e.code); }
-
-          /* Enrollments */
-          let enrollments = [];
-          try {
-            const snap = await db.collection('enrollments')
-              .where('userId', '==', user.uid)
-              .where('status', '==', 'active')
-              .get();
-            enrollments = snap.docs.map(d => d.data());
-          } catch (e) { console.warn('enrollments:', e.code); }
-
-          /* Orders */
-          let orders = [];
-          try {
-            const snap = await db.collection('orders')
-              .where('userId', '==', user.uid)
-              .get();
-            orders = snap.docs.map(d => d.data());
-          } catch (e) { console.warn('orders:', e.code); }
-
-          renderProfile(user, profileData, enrollments, orders);
-        } catch (err) {
-          console.error('profile load:', err);
-          loadingState.innerHTML = '<i class="bi bi-exclamation-triangle" style="animation:none;color:var(--red)"></i>حصل خطأ في التحميل';
-        }
-      });
+    if (typeof firebase === 'undefined' || !cfg) {
+      $('#loadingState').style.display = 'none';
+      $('#errorState').style.display = 'block';
+      $('#errorMsg').textContent = 'الإعدادات ناقصة. تواصل مع الدعم.';
+      return;
     }
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    /* ===== States ===== */
+    const loadingState   = $('#loadingState');
+    const guestState     = $('#guestState');
+    const errorState     = $('#errorState');
+    const errorMsg       = $('#errorMsg');
+    const profileContent = $('#profileContent');
+    const retryBtn       = $('#retryBtn');
+
+    function showLoading() {
+      loadingState.style.display = 'block';
+      loadingState.setAttribute('aria-busy', 'true');
+      guestState.style.display = 'none';
+      errorState.style.display = 'none';
+      profileContent.style.display = 'none';
+    }
+    function showGuest() {
+      loadingState.style.display = 'none';
+      guestState.style.display = 'block';
+      errorState.style.display = 'none';
+      profileContent.style.display = 'none';
+    }
+    function showError(msg) {
+      loadingState.style.display = 'none';
+      guestState.style.display = 'none';
+      errorState.style.display = 'block';
+      profileContent.style.display = 'none';
+      if (msg) errorMsg.textContent = msg;
+    }
+    function showProfile() {
+      loadingState.style.display = 'none';
+      guestState.style.display = 'none';
+      errorState.style.display = 'none';
+      profileContent.style.display = 'block';
+      loadingState.setAttribute('aria-busy', 'false');
+    }
+
+    /* ===== Catalog ===== */
+    function getCatalogMap() {
+      const src = window.__NEXORA_CATALOG__ || { courses: [] };
+      const map = {};
+      (src.courses || []).forEach((c) => { if (c.id) map[c.id] = c; });
+      return map;
+    }
+
+    /* ===== Course Card ===== */
+    function courseCardHTML(enroll, catalogMap) {
+      const c = catalogMap[enroll.courseId] || { title: enroll.courseId, category: '—' };
+      /* ✅ progress: ندعم 0-100 و 0-1 */
+      let pct = Number(enroll.progress);
+      if (!Number.isFinite(pct)) pct = 0;
+      if (pct > 0 && pct <= 1) pct = Math.round(pct * 100);
+      pct = Math.max(0, Math.min(100, Math.round(pct)));
+      const done = pct >= 100;
+
+      const title = esc(c.title || 'كورس');
+      const wa = (() => {
+        const phone = (window.MCL && MCL.CONTACT_PHONE) || '01096295395';
+        const intl = String(phone).replace(/^0/, '20');
+        return 'https://wa.me/' + intl + '?text=' +
+               encodeURIComponent('أهلاً 👋 بخصوص كورس «' + (c.title || '') + '»');
+      })();
+
+      return `
+        <article class="course-item">
+          <span class="course-status ${done ? 'done' : ''}">
+            ${done ? 'مكتمل 🏆' : 'متاح ليك ✅'}
+          </span>
+          <h3>${title}</h3>
+          <p class="cat">${esc(c.category || '')}</p>
+          ${!done ? `
+            <div class="progress-wrap" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-fill" style="width:${pct}%"></div>
+            </div>
+            <div class="progress-label">
+              <span>تقدّمك</span>
+              <span>${pct}%</span>
+            </div>
+          ` : ''}
+          <div class="cta">
+            <a href="library.html" class="btn-course open">
+              <i class="bi bi-play-circle" aria-hidden="true"></i>
+              ${done ? 'راجع الكورس' : 'ابدأ التعلم'}
+            </a>
+          </div>
+        </article>`;
+    }
+
+    /* ===== Render Profile ===== */
+    function renderProfile(user, profileData, enrollments, orders, pathsCount) {
+      const catalogMap = getCatalogMap();
+      const rawName = (profileData && profileData.name) || user.displayName || '';
+      const fullName = rawName.trim() || 'مستخدم';
+      const firstName = fullName.split(' ')[0] || 'مستخدم';
+      const phone = (profileData && profileData.phone)
+                    || (user.email ? user.email.split('@')[0] : '')
+                    || '—';
+
+      $('#pAvatar').textContent = fullName.charAt(0).toUpperCase();
+      $('#pName').textContent = fullName;
+      $('#pPhone').textContent = phone;
+
+      /* ✅ Badges ديناميكية */
+      const pActive = $('#pActive');
+      if (user.emailVerified) {
+        pActive.innerHTML = '<i class="bi bi-patch-check-fill" aria-hidden="true"></i>إيميل موثّق';
+      } else {
+        pActive.classList.remove('badge-chip');
+        pActive.classList.add('badge-chip', 'warn');
+        pActive.innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i>إيميل غير موثّق';
+      }
+
+      /* ✅ تاريخ التسجيل */
+      const createdMs = toMs(profileData && profileData.createdAt);
+      if (createdMs) {
+        $('#pJoined').style.display = 'inline-flex';
+        try {
+          const d = new Date(createdMs);
+          $('#pJoinedText').textContent = d.toLocaleDateString('ar-EG', {
+            year: 'numeric', month: 'short', day: 'numeric'
+          });
+        } catch {
+          $('#pJoinedText').textContent = '—';
+        }
+      }
+
+      /* ✅ Stats */
+      const totalEnrolls = enrollments.length;
+      const totalOrders = orders.length;
+      const daysSince = safeDays(createdMs);
+
+      $('#sEnrolls').textContent = totalEnrolls;
+      $('#sOrders').textContent = totalOrders;
+      $('#sPaths').textContent = pathsCount || 0;
+      $('#sDays').textContent = daysSince;
+      $('#enrollsCount').textContent = totalEnrolls + ' كورس';
+
+      /* ✅ Courses Grid */
+      const grid = $('#coursesGrid');
+      if (enrollments.length) {
+        grid.innerHTML = enrollments.map((e) => courseCardHTML(e, catalogMap)).join('');
+      } else {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1;">
+            <div class="ei" aria-hidden="true">📚</div>
+            <h3>لسه مفيش كورسات مفعّلة</h3>
+            <p>تصفح الكورسات المتاحة واختار اللي يناسبك.<br>ولو دفعت بالفعل، كلمنا ونفعّل الكورس فورًا.</p>
+            <a href="library.html" class="btn-profile primary" style="display:inline-flex;">
+              <i class="bi bi-compass" aria-hidden="true"></i>
+              تصفح الكورسات
+            </a>
+          </div>`;
+      }
+
+      showProfile();
+
+      const navAuthText = $('#navAuthText');
+      if (navAuthText) navAuthText.textContent = firstName;
+    }
+
+    /* ===== Logout ===== */
+    $('#logoutBtn')?.addEventListener('click', async () => {
+      if (!confirm('تسجيل الخروج؟')) return;
+      try { await auth.signOut(); } catch (e) { console.warn('signOut:', e); }
+      location.href = 'landing.html';
+    });
+
+    /* ===== Retry ===== */
+    retryBtn?.addEventListener('click', () => location.reload());
+
+    /* ===== Load Profile Data ===== */
+    async function loadProfileData(user) {
+      showLoading();
+
+      /* ✅ 3 Queries متوازية + Timeout */
+      const [profileRes, enrollsRes, ordersRes, progressRes] = await Promise.allSettled([
+        withTimeout(db.collection('students').doc(user.uid).get()),
+        withTimeout(db.collection('enrollments')
+          .where('userId', '==', user.uid)
+          .where('status', '==', 'active')
+          .get()),
+        withTimeout(db.collection('orders')
+          .where('userId', '==', user.uid)
+          .get()),
+        withTimeout(db.collection('roadmapProgress').doc(user.uid).get())
+      ]);
+
+      /* استخرج البيانات */
+      const profileData = profileRes.status === 'fulfilled' && profileRes.value.exists
+        ? profileRes.value.data()
+        : null;
+
+      const enrollments = enrollsRes.status === 'fulfilled'
+        ? enrollsRes.value.docs.map((d) => ({ id: d.id, ...d.data() }))
+        : [];
+
+      const orders = ordersRes.status === 'fulfilled'
+        ? ordersRes.value.docs.map((d) => ({ id: d.id, ...d.data() }))
+        : [];
+
+      /* ✅ عدد المسارات اللي فيها تقدّم */
+      let pathsCount = 0;
+      if (progressRes.status === 'fulfilled' && progressRes.value.exists) {
+        const steps = progressRes.value.data().steps || {};
+        pathsCount = Object.values(steps).filter((s) =>
+          s && typeof s === 'object' && Object.values(s).some(Boolean)
+        ).length;
+      }
+
+      /* ✅ لو أهم Query فشلت (enrollments) → error state */
+      if (enrollsRes.status === 'rejected') {
+        showError('مش قادرين نحمّل كورساتك. تأكد من الاتصال وجرّب تاني.');
+        return;
+      }
+
+      renderProfile(user, profileData, enrollments, orders, pathsCount);
+    }
+
+    /* ===== Auth Listener ===== */
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) { showGuest(); return; }
+      try {
+        await loadProfileData(user);
+      } catch (err) {
+        console.error('profile load:', err);
+        showError('حصل خطأ غير متوقع. جرّب تاني.');
+      }
+    });
+  })();
   </script>
 </body>
 </html>

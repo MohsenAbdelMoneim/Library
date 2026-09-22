@@ -14,19 +14,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <style>
-    /* ---------- Reset ---------- */
-    *, *::before, *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      overflow-x: clip;                      /* ✅ يمنع سكرول أفقي */
-      -webkit-text-size-adjust: 100%;        /* ✅ يمنع zoom تلقائي على iOS */
-      scroll-behavior: smooth;
-    }
-
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: clip; -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
     body {
       font-family: 'IBM Plex Sans Arabic', sans-serif;
       background:
@@ -35,7 +24,7 @@
         #0a0a0d;
       color: #ececf1;
       min-height: 100vh;
-      min-height: 100dvh;                    /* ✅ يشتغل صح مع شريط عنوان iOS */
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -44,21 +33,17 @@
       padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
       overflow-x: clip;
     }
-
-    /* ---------- الكارت ---------- */
     .auth-card {
       width: 100%;
       max-width: 420px;
       background: rgba(16,16,21,.85);
-      -webkit-backdrop-filter: blur(20px);   /* ✅ قبل النسخة القياسية */
+      -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
       border: 1px solid rgba(79,124,255,.2);
       border-radius: 24px;
       padding: 36px 28px;
       box-shadow: 0 24px 64px rgba(0,0,0,.5);
     }
-
-    /* ---------- الشعار ---------- */
     .logo-row {
       display: flex;
       align-items: center;
@@ -66,43 +51,33 @@
       gap: 10px;
       margin-bottom: 8px;
     }
-
     .logo-badge {
-      width: 52px;
-      height: 52px;
+      width: 52px; height: 52px;
       border-radius: 16px;
-      display: grid;
-      place-items: center;
+      display: grid; place-items: center;
       background: linear-gradient(135deg, #4f7cff, #7c5cff);
       font-size: 24px;
       box-shadow: 0 8px 24px rgba(79,124,255,.35);
       flex-shrink: 0;
     }
-
     .brand {
-      font-size: 22px;
-      font-weight: 800;
+      font-size: 22px; font-weight: 800;
       background: linear-gradient(135deg, #4f7cff, #f0b53e);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
-
     .tagline {
       text-align: center;
       font-size: 12.5px;
       color: #9c9cab;
       margin-bottom: 28px;
     }
-
-    /* ---------- النصوص ---------- */
     .welcome {
-      font-size: 19px;
-      font-weight: 700;
+      font-size: 19px; font-weight: 700;
       text-align: center;
       margin-bottom: 6px;
     }
-
     .sub {
       text-align: center;
       font-size: 12.5px;
@@ -110,10 +85,7 @@
       margin-bottom: 22px;
       line-height: 1.7;
     }
-
-    /* ---------- الحقول ---------- */
     .fld { margin-bottom: 14px; }
-
     .fld label {
       display: block;
       font-size: 12px;
@@ -121,7 +93,6 @@
       margin-bottom: 6px;
       font-weight: 500;
     }
-
     .fld input {
       width: 100%;
       height: 46px;
@@ -134,27 +105,19 @@
       transition: border-color .15s, box-shadow .15s;
       font-family: inherit;
     }
-
     .fld input:focus {
       outline: none;
       border-color: rgba(79,124,255,.6);
       box-shadow: 0 0 0 3px rgba(79,124,255,.12);
     }
-
-    .fld input.invalid {
-      border-color: rgba(229,72,77,.6);
-    }
-
+    .fld input.invalid { border-color: rgba(229,72,77,.6); }
     .fld .err {
       font-size: 11px;
       color: #f4636e;
       margin-top: 5px;
       display: none;
     }
-
     .fld .err.show { display: block; }
-
-    /* ---------- زر الإرسال ---------- */
     .submit {
       width: 100%;
       height: 48px;
@@ -168,22 +131,18 @@
       cursor: pointer;
       transition: opacity .15s, transform .1s;
       font-family: inherit;
-      touch-action: manipulation;            /* ✅ يمنع تأخير اللمس */
+      touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-
     .submit:hover { opacity: .9; }
     .submit:active { transform: translateY(1px); }
     .submit:disabled { opacity: .6; cursor: not-allowed; }
-
-    /* ---------- التبديل بين النماذج ---------- */
     .switch {
       text-align: center;
       font-size: 12.5px;
       color: #9c9cab;
       margin-top: 18px;
     }
-
     .switch button {
       background: none;
       border: none;
@@ -195,10 +154,7 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-
     .switch button:hover { text-decoration: underline; }
-
-    /* ---------- الإشعارات ---------- */
     .notice {
       display: none;
       margin-top: 14px;
@@ -207,27 +163,22 @@
       font-size: 12px;
       line-height: 1.7;
     }
-
     .notice.err {
       display: block;
       background: rgba(229,72,77,.1);
       border: 1px solid rgba(229,72,77,.3);
       color: #f4636e;
     }
-
     .notice.ok {
       display: block;
       background: rgba(74,222,128,.1);
       border: 1px solid rgba(74,222,128,.3);
       color: #4ade80;
     }
-
-    /* ---------- نسيت كلمة المرور ---------- */
     .forgot {
       text-align: center;
       margin-top: 10px;
     }
-
     .forgot button {
       background: none;
       border: none;
@@ -238,10 +189,7 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-
     .forgot button:hover { color: #4f7cff; }
-
-    /* ---------- المساعدة ---------- */
     .help-line {
       text-align: center;
       margin-top: 24px;
@@ -251,7 +199,6 @@
       color: #66666f;
       line-height: 1.8;
     }
-
     .help-line a {
       color: #f0b53e;
       font-weight: 700;
@@ -259,14 +206,11 @@
       direction: ltr;
       unicode-bidi: embed;
     }
-
     .help-line a:hover { text-decoration: underline; }
-
     .home-link {
       text-align: center;
       margin-top: 10px;
     }
-
     .home-link a {
       color: #9c9cab;
       font-size: 11.5px;
@@ -277,41 +221,25 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-
     .home-link a:hover { color: #4f7cff; }
-
-    /* ---------- الموبايل ---------- */
     @media (max-width: 420px) {
       body {
         padding: 12px;
         padding-top: calc(12px + env(safe-area-inset-top, 0px));
         padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       }
-
-      .auth-card {
-        padding: 28px 20px;
-        border-radius: 20px;
-      }
-
+      .auth-card { padding: 28px 20px; border-radius: 20px; }
       .brand { font-size: 19px; }
       .logo-badge { width: 46px; height: 46px; font-size: 22px; }
       .welcome { font-size: 17px; }
-
-      .fld input { height: 48px; font-size: 16px; }   /* ✅ 16px يمنع iOS zoom */
+      .fld input { height: 48px; font-size: 16px; }
       .submit { height: 52px; font-size: 15px; }
     }
-
-    /* ✅ على iOS: input بـ font-size < 16px بيعمل zoom تلقائي */
     @supports (-webkit-touch-callout: none) {
       .fld input { font-size: 16px; }
     }
-
-    /* ---------- تقليل الحركة ---------- */
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation: none !important;
-        transition: none !important;
-      }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
       html { scroll-behavior: auto; }
     }
   </style>
@@ -333,27 +261,13 @@
       <form id="loginForm" novalidate>
         <div class="fld">
           <label for="loginPhone">رقم الموبايل</label>
-          <input
-            id="loginPhone"
-            type="tel"
-            inputmode="numeric"
-            dir="ltr"
-            placeholder="01xxxxxxxxx"
-            autocomplete="tel"
-            required
-          >
+          <input id="loginPhone" type="tel" inputmode="numeric" dir="ltr" placeholder="01xxxxxxxxx" autocomplete="tel" required>
           <p class="err" id="loginPhoneErr">اكتب رقم موبايل صحيح (11 رقم يبدأ بـ 01)</p>
         </div>
 
         <div class="fld">
           <label for="loginPass">كلمة المرور</label>
-          <input
-            id="loginPass"
-            type="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            required
-          >
+          <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" required>
           <p class="err" id="loginPassErr">كلمة المرور مطلوبة</p>
         </div>
 
@@ -379,40 +293,19 @@
       <form id="registerForm" novalidate>
         <div class="fld">
           <label for="regName">الاسم</label>
-          <input
-            id="regName"
-            type="text"
-            placeholder="اسمك الكامل"
-            autocomplete="name"
-            required
-          >
+          <input id="regName" type="text" placeholder="اسمك الكامل" autocomplete="name" required>
           <p class="err" id="regNameErr">اكتب اسمك (حرفين على الأقل)</p>
         </div>
 
         <div class="fld">
           <label for="regPhone">رقم الموبايل</label>
-          <input
-            id="regPhone"
-            type="tel"
-            inputmode="numeric"
-            dir="ltr"
-            placeholder="01xxxxxxxxx"
-            autocomplete="tel"
-            required
-          >
+          <input id="regPhone" type="tel" inputmode="numeric" dir="ltr" placeholder="01xxxxxxxxx" autocomplete="tel" required>
           <p class="err" id="regPhoneErr">رقم موبايل مصري صحيح (11 رقم يبدأ بـ 01)</p>
         </div>
 
         <div class="fld">
           <label for="regPass">كلمة المرور</label>
-          <input
-            id="regPass"
-            type="password"
-            placeholder="6 أحرف على الأقل"
-            autocomplete="new-password"
-            minlength="6"
-            required
-          >
+          <input id="regPass" type="password" placeholder="6 أحرف على الأقل" autocomplete="new-password" minlength="6" required>
           <p class="err" id="regPassErr">6 أحرف على الأقل</p>
         </div>
 
@@ -433,7 +326,7 @@
     </div>
 
     <div class="home-link">
-      <a href="index.html">
+      <a href="landing.html">
         <i class="bi bi-arrow-right" aria-hidden="true"></i>
         الرجوع للرئيسية
       </a>
@@ -441,13 +334,15 @@
   </div>
 
   <!-- ========== السكربتات ========== -->
-  <!-- 1) Firebase SDK -->
+  <!-- 1) config.js — الأول دايمًا -->
+  <script src="config.js?v=17"></script>
+
+  <!-- 2) Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-  <!-- 2) config.js (لازم تضيفه — مش مرفوع على GitHub) -->
-  <script src="config.js"></script> 
-<script src="auth.js?v=15.2"></script>
+  <!-- 3) auth.js -->
+  <script src="auth.js?v=16"></script>
 </body>
 </html>

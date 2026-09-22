@@ -1,8 +1,7 @@
 /* ==========================================================
-   My Course Library — app.js (v17)
+   My Course Library — app.js (v18)
    نواة المكتبة — الحماية في gate.js — المزامنة في cloud.js
-   ✅ v17: الكتالوج بقى من window.__NEXORA_CATALOG__ (Firestore)
-   ✅ v17: showToast بيتعامل مع #toasts المفقود
+   ✅ v18: انتظار DOM + تحسينات + إصلاحات
    ========================================================== */
 
 'use strict';
@@ -17,7 +16,6 @@ function getCatalogSource() {
   };
 }
 
-/* ✅ wrapper يبني PAID_CATALOG و PACKAGES بنفس شكل app.js القديم */
 let PAID_CATALOG = [];
 let PACKAGES = [];
 
@@ -47,10 +45,8 @@ function rebuildCatalogFromFirestore() {
   }));
 }
 
-/* نسخة أولية من البيانات */
 rebuildCatalogFromFirestore();
 
-/* ✅ نعيد البناء لما Firestore يجيب البيانات */
 window.addEventListener('nexora:catalog-ready', () => {
   rebuildCatalogFromFirestore();
   console.info('[APP] تم تحديث الكتالوج من Firestore:', PAID_CATALOG.length, 'كورس،', PACKAGES.length, 'باقة');
@@ -61,7 +57,6 @@ window.addEventListener('nexora:catalog-update', () => {
   rebuildCatalogFromFirestore();
 });
 
-/* ---------- أدوات الكتالوج ---------- */
 const fmtEGP = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
 
 function getPaidCourse(id) {
@@ -162,7 +157,6 @@ const state = {
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let statsAnimated = false;
 
-/* ---------- أدوات ---------- */
 const qs  = (s) => document.querySelector(s);
 const qsa = (s) => [...document.querySelectorAll(s)];
 
@@ -233,7 +227,6 @@ function statusBadge(status) {
     <span class="w-1.5 h-1.5 rounded-full ${m.pulse ? 'pulse-dot' : ''}" style="background:${m.color}"></span>${m.label}</span>`;
 }
 
-/* ---------- روابط مساعدة لـ gate.js و cloud.js ---------- */
 function protectedResources() {
   return state.resources.filter((r) => MCL.isProtected(r));
 }
@@ -245,7 +238,6 @@ function countLockedVisible() {
   return protectedResources().filter((r) => MCL.isResourceLocked(r)).length;
 }
 
-/* ---------- التخزين ---------- */
 function loadResources() {
   let stored = null;
   try { stored = localStorage.getItem(STORAGE_KEY); } catch (err) { /* التخزين غير متاح */ }
@@ -282,7 +274,6 @@ function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ layout: state.layout })); } catch { /* تجاهل */ }
 }
 
-/* ---------- البحث / الفلترة / الترتيب ---------- */
 function searchResources(resources, query) {
   if (!query) return resources.slice();
   const n = query.toLowerCase();
@@ -326,7 +317,6 @@ function resetFilters() {
   renderAll();
 }
 
-/* ---------- CRUD ---------- */
 function getResourceById(id) {
   return state.resources.find((r) => r.id === id) || null;
 }
@@ -424,7 +414,6 @@ function toggleFavorite(id) {
   updateDashboard();
 }
 
-/* ---------- التحقق ---------- */
 function fieldError(name, value) {
   switch (name) {
     case 'title':    return String(value ?? '').trim() ? null : 'عنوان المورد مطلوب.';
@@ -474,7 +463,6 @@ function findDuplicateUrl(url, excludeId) {
   return state.resources.find((r) => r.id !== excludeId && r.url.trim().toLowerCase() === n) || null;
 }
 
-/* ---------- العرض ---------- */
 function navItem({ nav, icon, label, count, active, accent, dot }) {
   const lead = dot
     ? `<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${dot}"></span>`
@@ -540,9 +528,11 @@ function updateDashboard() {
   const animate = !statsAnimated && !prefersReduced;
   for (const [sel, val] of Object.entries(values)) {
     const el = qs(sel);
+    if (!el) continue;
     if (animate) animateCount(el, val); else el.textContent = val;
   }
-  qs('#s-cats').textContent = new Set(rs.map((r) => r.category)).size;
+  const catsEl = qs('#s-cats');
+  if (catsEl) catsEl.textContent = new Set(rs.map((r) => r.category)).size;
 
   const clean = hasActiveFilters() === false;
   qsa('#statsBar [data-stat]').forEach((b) => {
@@ -693,12 +683,16 @@ function emptyStateHTML() {
 function renderResources(opts = {}) {
   const animate = opts.animate !== false;
   const container = qs('#cardsContainer');
+  if (!container) return;
   const list = sortResources(filterResources(state.resources));
 
-  qs('#resultsMeta').textContent = `يعرض ${list.length} من ${state.resources.length} مورد`;
+  const meta = qs('#resultsMeta');
+  if (meta) meta.textContent = `يعرض ${list.length} من ${state.resources.length} مورد`;
   const clearBtn = qs('#clearFiltersBtn');
-  clearBtn.classList.toggle('hidden', !hasActiveFilters());
-  clearBtn.classList.toggle('flex', hasActiveFilters());
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', !hasActiveFilters());
+    clearBtn.classList.toggle('flex', hasActiveFilters());
+  }
   updateHeaderMeta(list.length);
 
   if (!list.length) {
@@ -717,6 +711,7 @@ function renderResources(opts = {}) {
 
 function updateHeaderMeta(count) {
   const t = qs('#pageTitle'), s = qs('#pageSub');
+  if (!t || !s) return;
   if (state.view === 'files') { t.textContent = 'ملفات مهمة';    s.textContent = 'مستندات Word المهمة الخاصة بك'; return; }
   if (state.view === 'data')  { t.textContent = 'إدارة البيانات'; s.textContent = 'نسخ احتياطي · استيراد · استرجاع'; return; }
   if (state.view === 'subs')  { t.textContent = 'المشتركون';      s.textContent = 'إدارة اشتراكات أرقام الموبايل'; return; }
@@ -727,25 +722,25 @@ function updateHeaderMeta(count) {
 
 function syncControls() {
   const s = qs('#searchInput');
-  if (document.activeElement !== s) s.value = state.search;
-  qs('#filterSource').value = state.source;
-  qs('#filterStatus').value = state.status;
-  qs('#sortSelect').value = state.sort;
-  qs('#viewGrid').setAttribute('aria-pressed', String(state.layout === 'grid'));
-  qs('#viewList').setAttribute('aria-pressed', String(state.layout === 'list'));
+  if (s && document.activeElement !== s) s.value = state.search;
+  const fs = qs('#filterSource'); if (fs) fs.value = state.source;
+  const fst = qs('#filterStatus'); if (fst) fst.value = state.status;
+  const ss = qs('#sortSelect'); if (ss) ss.value = state.sort;
+  const vg = qs('#viewGrid'); if (vg) vg.setAttribute('aria-pressed', String(state.layout === 'grid'));
+  const vl = qs('#viewList'); if (vl) vl.setAttribute('aria-pressed', String(state.layout === 'list'));
 }
 
 function applyViewVisibility() {
-  qs('#view-library').classList.toggle('hidden', state.view !== 'library');
-  qs('#view-files').classList.toggle('hidden',   state.view !== 'files');
-  qs('#view-data').classList.toggle('hidden',    state.view !== 'data');
+  const lib = qs('#view-library'); if (lib) lib.classList.toggle('hidden', state.view !== 'library');
+  const files = qs('#view-files'); if (files) files.classList.toggle('hidden', state.view !== 'files');
+  const data = qs('#view-data'); if (data) data.classList.toggle('hidden', state.view !== 'data');
   const subs = qs('#view-subs');
   if (subs) subs.classList.toggle('hidden', state.view !== 'subs');
 }
 
 function renderDataView() {
-  qs('#exportCount').textContent = state.resources.length;
-  qs('#restoreCount').textContent = state.resources.length;
+  const ec = qs('#exportCount'); if (ec) ec.textContent = state.resources.length;
+  const rc = qs('#restoreCount'); if (rc) rc.textContent = state.resources.length;
 }
 
 function renderAll(opts = {}) {
@@ -772,7 +767,6 @@ function switchView(v) {
   window.scrollTo(0, 0);
 }
 
-/* ---------- Toasts ---------- */
 function showToast(message, type = 'success', { duration = 3800, action = null } = {}) {
   const meta = {
     success: ['bi-check-circle-fill', '#4ade80'],
@@ -813,10 +807,10 @@ function showToast(message, type = 'success', { duration = 3800, action = null }
   while (box.children.length > 4) box.firstElementChild.remove();
 }
 
-/* ---------- المودالات ---------- */
 let lastFocused = null;
 
 function openModal(modal, focusEl) {
+  if (!modal) return;
   lastFocused = document.activeElement;
   modal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
@@ -824,6 +818,7 @@ function openModal(modal, focusEl) {
 }
 
 function closeModal(modal) {
+  if (!modal) return;
   modal.classList.add('hidden');
   document.body.classList.remove('overflow-hidden');
   if (lastFocused && lastFocused.focus) lastFocused.focus();
@@ -832,22 +827,26 @@ function closeModal(modal) {
 let confirmCb = null;
 
 function openConfirm({ title, message, confirmLabel = 'تأكيد', danger = false, onConfirm }) {
-  qs('#confirmTitle').textContent = title;
-  qs('#confirmMsg').textContent = message;
+  const ct = qs('#confirmTitle'); if (ct) ct.textContent = title;
+  const cm = qs('#confirmMsg'); if (cm) cm.textContent = message;
   const ok = qs('#confirmOk');
-  ok.textContent = confirmLabel;
-  ok.className = danger ? 'btn-danger' : 'btn-accent';
+  if (ok) {
+    ok.textContent = confirmLabel;
+    ok.className = danger ? 'btn-danger' : 'btn-accent';
+  }
   const icon = qs('#confirmIcon');
-  icon.className = 'icon-tile ' + (danger ? '!border-red/30 !text-red' : '!border-accent/30 !text-accent');
-  icon.innerHTML = `<i class="bi ${danger ? 'bi-exclamation-triangle-fill' : 'bi-check2-circle'}"></i>`;
+  if (icon) {
+    icon.className = 'icon-tile ' + (danger ? '!border-red/30 !text-red' : '!border-accent/30 !text-accent');
+    icon.innerHTML = `<i class="bi ${danger ? 'bi-exclamation-triangle-fill' : 'bi-check2-circle'}"></i>`;
+  }
   confirmCb = onConfirm;
   openModal(qs('#confirmModal'), qs('#confirmCancel'));
 }
 
-/* ---------- نموذج المورد ---------- */
 function setFieldError(name, msg) {
   const errEl = qs('#e-' + name);
   const input = qs('#f-' + name);
+  if (!errEl || !input) return;
   if (msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
@@ -860,7 +859,7 @@ function setFieldError(name, msg) {
 
 function clearFormErrors() {
   ['title', 'category', 'source', 'url', 'status'].forEach((f) => setFieldError(f, null));
-  qs('#dupBox').classList.add('hidden');
+  const dup = qs('#dupBox'); if (dup) dup.classList.add('hidden');
   state.confirmedDup = false;
   state.urlMasked = false;
 }
@@ -871,27 +870,27 @@ function openResourceModal(id = null) {
   const r = id ? getResourceById(id) : null;
   state.editingOriginalUrl = r ? r.url : '';
   state.urlMasked = !!(r && MCL.isResourceLocked(r));
-  qs('#resourceModalTitle').textContent = r ? 'تعديل المورد' : 'إضافة مورد جديد';
-  qs('#saveResourceBtn').textContent = r ? 'حفظ التعديلات' : 'إضافة المورد';
-  qs('#f-title').value = r ? r.title : '';
+  const mt = qs('#resourceModalTitle'); if (mt) mt.textContent = r ? 'تعديل المورد' : 'إضافة مورد جديد';
+  const sb = qs('#saveResourceBtn'); if (sb) sb.textContent = r ? 'حفظ التعديلات' : 'إضافة المورد';
+  const ft = qs('#f-title'); if (ft) ft.value = r ? r.title : '';
   const hintEl = qs('#urlMaskHint');
+  const fu = qs('#f-url');
   if (state.urlMasked) {
-    qs('#f-url').value = '••••••••••••••••';
+    if (fu) fu.value = '••••••••••••••••';
     if (hintEl) hintEl.classList.remove('hidden');
   } else {
-    qs('#f-url').value = r ? r.url : '';
+    if (fu) fu.value = r ? r.url : '';
     if (hintEl) hintEl.classList.add('hidden');
   }
-  qs('#f-category').value = r ? r.category : '';
-  qs('#f-source').value = r ? r.source : '';
-  qs('#f-status').value = r ? r.status : 'Not Started';
-  qs('#f-cover').value = r ? r.cover : '';
-  qs('#f-description').value = r ? r.description : '';
-  qs('#f-notes').value = r ? r.notes : '';
+  const fc = qs('#f-category'); if (fc) fc.value = r ? r.category : '';
+  const fs = qs('#f-source'); if (fs) fs.value = r ? r.source : '';
+  const fst = qs('#f-status'); if (fst) fst.value = r ? r.status : 'Not Started';
+  const fcov = qs('#f-cover'); if (fcov) fcov.value = r ? r.cover : '';
+  const fd = qs('#f-description'); if (fd) fd.value = r ? r.description : '';
+  const fn = qs('#f-notes'); if (fn) fn.value = r ? r.notes : '';
   openModal(qs('#resourceModal'), qs('#f-title'));
 }
 
-/* ---------- إدارة البيانات (للمالك) ---------- */
 function exportData() {
   MCL.requireAdmin(() => {
     const payload = {
@@ -988,7 +987,6 @@ function restoreInitialResources() {
   });
 }
 
-/* ---------- ربط الأحداث ---------- */
 function setLayout(layout) {
   if (state.layout === layout) return;
   state.layout = layout;
@@ -998,29 +996,30 @@ function setLayout(layout) {
 }
 
 function openDrawer() {
-  qs('#sidebar').classList.add('open');
-  qs('#overlay').classList.remove('hidden');
+  const sb = qs('#sidebar'); if (sb) sb.classList.add('open');
+  const ov = qs('#overlay'); if (ov) ov.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
-  qs('#menuBtn').setAttribute('aria-expanded', 'true');
+  const mb = qs('#menuBtn'); if (mb) mb.setAttribute('aria-expanded', 'true');
 }
 
 function closeDrawer() {
-  qs('#sidebar').classList.remove('open');
-  qs('#overlay').classList.add('hidden');
+  const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
+  const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
   if (!qsa('.modal:not(.hidden)').length) document.body.classList.remove('overflow-hidden');
-  qs('#menuBtn').setAttribute('aria-expanded', 'false');
+  const mb = qs('#menuBtn'); if (mb) mb.setAttribute('aria-expanded', 'false');
 }
 
 function wireEvents() {
-  qs('#menuBtn').addEventListener('click', openDrawer);
-  qs('#closeSidebarBtn').addEventListener('click', closeDrawer);
-  qs('#overlay').addEventListener('click', closeDrawer);
-  qs('#addResourceBtn').addEventListener('click', () => MCL.requireAdmin(() => openResourceModal()));
-  qs('#quickExportBtn').addEventListener('click', exportData);
+  const mb = qs('#menuBtn'); if (mb) mb.addEventListener('click', openDrawer);
+  const csb = qs('#closeSidebarBtn'); if (csb) csb.addEventListener('click', closeDrawer);
+  const ov = qs('#overlay'); if (ov) ov.addEventListener('click', closeDrawer);
+  const arb = qs('#addResourceBtn'); if (arb) arb.addEventListener('click', () => MCL.requireAdmin(() => openResourceModal()));
+  const qeb = qs('#quickExportBtn'); if (qeb) qeb.addEventListener('click', exportData);
 
   matchMedia('(min-width: 1024px)').addEventListener('change', (mq) => { if (mq.matches) closeDrawer(); });
 
-  qs('#sideNav').addEventListener('click', (e) => {
+  const nav = qs('#sideNav');
+  if (nav) nav.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-nav]');
     if (!btn) return;
     const raw = btn.dataset.nav;
@@ -1042,7 +1041,8 @@ function wireEvents() {
     closeDrawer();
   });
 
-  qs('#statsBar').addEventListener('click', (e) => {
+  const statsBar = qs('#statsBar');
+  if (statsBar) statsBar.addEventListener('click', (e) => {
     const b = e.target.closest('[data-stat]');
     if (!b) return;
     const k = b.dataset.stat;
@@ -1057,24 +1057,29 @@ function wireEvents() {
     renderAll();
   });
 
-  qs('#searchInput').addEventListener('input', debounce((e) => {
-    state.search = e.target.value.trim();
-    renderAll();
-  }, 180));
-  qs('#searchInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (e.target.value) { e.target.value = ''; state.search = ''; renderAll(); }
-      e.target.blur();
-    }
-  });
-  qs('#filterSource').addEventListener('change', (e) => { state.source = e.target.value; renderAll(); });
-  qs('#filterStatus').addEventListener('change', (e) => { state.status = e.target.value; renderAll(); });
-  qs('#sortSelect').addEventListener('change',  (e) => { state.sort = e.target.value; renderAll(); });
-  qs('#clearFiltersBtn').addEventListener('click', resetFilters);
-  qs('#viewGrid').addEventListener('click', () => setLayout('grid'));
-  qs('#viewList').addEventListener('click', () => setLayout('list'));
+  const si = qs('#searchInput');
+  if (si) {
+    si.addEventListener('input', debounce((e) => {
+      state.search = e.target.value.trim();
+      renderAll();
+    }, 180));
+    si.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (e.target.value) { e.target.value = ''; state.search = ''; renderAll(); }
+        e.target.blur();
+      }
+    });
+  }
 
-  qs('#cardsContainer').addEventListener('click', (e) => {
+  const fs = qs('#filterSource'); if (fs) fs.addEventListener('change', (e) => { state.source = e.target.value; renderAll(); });
+  const fst = qs('#filterStatus'); if (fst) fst.addEventListener('change', (e) => { state.status = e.target.value; renderAll(); });
+  const ss = qs('#sortSelect'); if (ss) ss.addEventListener('change', (e) => { state.sort = e.target.value; renderAll(); });
+  const cfb = qs('#clearFiltersBtn'); if (cfb) cfb.addEventListener('click', resetFilters);
+  const vg = qs('#viewGrid'); if (vg) vg.addEventListener('click', () => setLayout('grid'));
+  const vl = qs('#viewList'); if (vl) vl.addEventListener('click', () => setLayout('list'));
+
+  const cc = qs('#cardsContainer');
+  if (cc) cc.addEventListener('click', (e) => {
     const clear = e.target.closest('[data-action="clear-filters"]');
     if (clear) { resetFilters(); return; }
     const card = e.target.closest('[data-id]');
@@ -1112,7 +1117,7 @@ function wireEvents() {
   });
 
   const form = qs('#resourceForm');
-  form.addEventListener('submit', (e) => {
+  if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
     const masked = !!state.editingId && state.urlMasked;
     const data = {
@@ -1151,50 +1156,59 @@ function wireEvents() {
     closeModal(qs('#resourceModal'));
   });
 
-  qs('#f-url').addEventListener('focus', () => {
-    if (state.urlMasked) qs('#f-url').select();
-  });
-  qs('#f-url').addEventListener('input', () => {
-    if (state.urlMasked && qs('#f-url').value !== '••••••••••••••••') state.urlMasked = false;
-    qs('#dupBox').classList.add('hidden');
-    state.confirmedDup = false;
-  });
-  qs('#dupConfirmBtn').addEventListener('click', () => {
+  const fu = qs('#f-url');
+  if (fu) {
+    fu.addEventListener('focus', () => {
+      if (state.urlMasked) fu.select();
+    });
+    fu.addEventListener('input', () => {
+      if (state.urlMasked && fu.value !== '••••••••••••••••') state.urlMasked = false;
+      qs('#dupBox').classList.add('hidden');
+      state.confirmedDup = false;
+    });
+  }
+  const dcb = qs('#dupConfirmBtn');
+  if (dcb) dcb.addEventListener('click', () => {
     state.confirmedDup = true;
     form.requestSubmit();
   });
   qsa('#resourceModal [data-close-resource]').forEach((el) =>
     el.addEventListener('click', () => closeModal(qs('#resourceModal'))));
 
-  qs('#confirmOk').addEventListener('click', () => {
+  const cok = qs('#confirmOk');
+  if (cok) cok.addEventListener('click', () => {
     const cb = confirmCb; confirmCb = null;
     closeModal(qs('#confirmModal'));
     if (cb) cb();
   });
-  qs('#confirmCancel').addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
-  qs('#confirmModal [data-close-confirm]').addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
+  const ccl = qs('#confirmCancel');
+  if (ccl) ccl.addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
+  const ccm = qs('#confirmModal [data-close-confirm]');
+  if (ccm) ccm.addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
 
-  qs('#exportBtn').addEventListener('click', exportData);
-  qs('#restoreBtn').addEventListener('click', restoreInitialResources);
+  const eb = qs('#exportBtn'); if (eb) eb.addEventListener('click', exportData);
+  const rb = qs('#restoreBtn'); if (rb) rb.addEventListener('click', restoreInitialResources);
 
   const dz = qs('#dropZone'), fi = qs('#importFile');
-  dz.addEventListener('click', () => fi.click());
-  dz.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
-  });
-  ['dragenter', 'dragover'].forEach((ev) =>
-    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
-  ['dragleave', 'drop'].forEach((ev) =>
-    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
-  dz.addEventListener('drop', (e) => {
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) importData(f);
-  });
-  fi.addEventListener('change', () => {
-    const f = fi.files[0];
-    if (f) importData(f);
-    fi.value = '';
-  });
+  if (dz && fi) {
+    dz.addEventListener('click', () => fi.click());
+    dz.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+    });
+    ['dragenter', 'dragover'].forEach((ev) =>
+      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach((ev) =>
+      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', (e) => {
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) importData(f);
+    });
+    fi.addEventListener('change', () => {
+      const f = fi.files[0];
+      if (f) importData(f);
+      fi.value = '';
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1207,24 +1221,24 @@ function wireEvents() {
         } else closeModal(openModalEl);
         return;
       }
-      if (qs('#sidebar').classList.contains('open')) { closeDrawer(); return; }
+      const sb = qs('#sidebar');
+      if (sb && sb.classList.contains('open')) { closeDrawer(); return; }
       return;
     }
+    const rm = qs('#resourceModal'), cm = qs('#confirmModal'), lm = qs('#lockModal');
     if (e.key === '/' && !isTypingTarget(e.target)
-        && qs('#resourceModal').classList.contains('hidden')
-        && qs('#confirmModal').classList.contains('hidden')
-        && qs('#lockModal').classList.contains('hidden')) {
+        && rm && rm.classList.contains('hidden')
+        && cm && cm.classList.contains('hidden')
+        && lm && lm.classList.contains('hidden')) {
       e.preventDefault();
       const s = qs('#searchInput');
-      s.focus();
-      s.select();
+      if (s) { s.focus(); s.select(); }
     }
   });
 }
 
-/* ---------- الإقلاع ---------- */
 function init() {
-  console.log('%c My Course Library — v17 ', 'background:#f0b53e;color:#161204;font-weight:bold');
+  console.log('%c My Course Library — v18 ', 'background:#f0b53e;color:#161204;font-weight:bold');
 
   const required = ['isAdminActive', 'isProtected', 'isResourceLocked',
                     'requireAdmin', 'requireUnlock', 'loadSubscriptions',
@@ -1253,11 +1267,12 @@ function init() {
     const b = document.createElement('span');
     b.id = 'mclVersionBadge';
     b.className = 'text-accent font-mono';
-    b.textContent = ' — v17';
+    b.textContent = ' — v18';
     fp.appendChild(b);
   }
 
-  qs('#f-category').insertAdjacentHTML('beforeend',
+  const fc = qs('#f-category');
+  if (fc) fc.insertAdjacentHTML('beforeend',
     CATEGORIES.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(''));
 
   loadSettings();
