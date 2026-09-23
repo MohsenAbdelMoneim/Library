@@ -1,14 +1,21 @@
 /* ==========================================================
-   shop.js — v19
+   shop.js — v20
    Cart Page + Checkout + Wishlist + Course Details
-   ✅ v19: انتظار DOM + API كامل + nexora:shop-ready
-   ✅ v19: بيقرأ من window.__NEXORA_CATALOG__ (Firestore)
+   ✅ v20: نهاية حرب أزرار الكتالوج — شلنا الـcapture listener
+          اللي كان بيسرق قلوب .nex-card من catalog.js (toggle مزدوج)
+   ✅ v20: إصلاح bindShopEvents — كان بياخد Element ويستخدمه كـselector
+          → أزرار wishlist/detail كانت ميتة تمامًا
+   ✅ v20: فتح التفاصيل من data attrs على الكارت (مفيش مطابقة نصية)
+   ✅ v20: تفاصيل الباقات شغالة (getItemInfo أولاً)
+   ✅ v20: شاشة النجاح مؤمّنة من تحديث الكتالوج (علم orderDoneId)
+   ✅ v20: السلة بتتفضى بعد نجاح الكتابة + منع التكرار
+   ✅ v20: إخفاء أقسام المتجر عند التنقل لغيره (مفيش محتوى مزدوج)
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Shop — v19 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Shop — v20 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
   if (!window.firebase) { console.error('[SHOP] Firebase مش محمّل'); return; }
   if (!firebase.apps.length) {
@@ -29,6 +36,7 @@
   const PHONE = '01096295395';
   const WA = 'https://wa.me/201096295395';
 
+  /* ---------- الكتالوج ---------- */
   function getCatalogSource() {
     return window.__NEXORA_CATALOG__ || { courses: [], packages: [], byId: {}, packById: {} };
   }
@@ -68,22 +76,9 @@
 
   let _maps = buildCatalogMaps();
   const CATALOG = new Proxy({}, { get: (_, k) => _maps.CATALOG[k] });
-  const PACKS = new Proxy({}, { get: (_, k) => _maps.PACKS[k] });
+  const PACKS   = new Proxy({}, { get: (_, k) => _maps.PACKS[k] });
 
-  window.addEventListener('nexora:catalog-ready', () => {
-    _maps = buildCatalogMaps();
-    console.info('[SHOP] تم تحديث الكتالوج من Firestore');
-    if (currentView === 'cart') renderCart();
-    if (currentView === 'checkout') renderCheckout();
-    if (currentView === 'wishlist') renderWishlist();
-  });
-  window.addEventListener('nexora:catalog-update', () => {
-    _maps = buildCatalogMaps();
-    if (currentView === 'cart') renderCart();
-    if (currentView === 'checkout') renderCheckout();
-    if (currentView === 'wishlist') renderWishlist();
-  });
-
+  /* ---------- أدوات ---------- */
   const fmt = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
   const qs  = (s) => document.querySelector(s);
   const qsa = (s) => [...document.querySelectorAll(s)];
@@ -96,28 +91,44 @@
   };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* تجاهل */ } };
 
-  let cart = load(CART_KEY, []);
-  let wishlist = load(WISH_KEY, []);
-  cart = cart.filter((x) => typeof x === 'string');
+  /* ✅ v20: منع التكرار عند التحميل — Set semantics */
+  let cart     = [...new Set(load(CART_KEY, []).filter((x) => typeof x === 'string'))];
+  let wishlist = load(WISH_KEY, []).filter((x) => typeof x === 'string');
+
+  let currentView = null;
+  let currentDetailId = null;
+  let orderDoneId = null;   /* ✅ v20: شاشة النجاح لسه ظاهرة؟ */
+
+  function notify(msg, type = 'success', dur = 4200) {
+    if (typeof window.showToast === 'function') window.showToast(msg, type, { duration: dur });
+    else console.log('[SHOP]', msg);
+  }
+
+  /* ---------- عمليات السلة/المفضلة ---------- */
+  const inCart = (id) => cart.includes(id);
+  const inWish = (id) => wishlist.includes(id);
 
   const saveCart = () => {
     save(CART_KEY, cart);
     updateBadges();
-    if (currentView === 'cart') renderCart();
-    try {
-      window.dispatchEvent(new CustomEvent('nexora:cart-changed'));
-    } catch (e) { /* تجاهل */ }
+    if (currentView === 'cart' && !orderDoneId) renderCart();
+    try { window.dispatchEvent(new CustomEvent('nexora:cart-changed')); } catch { /* تجاهل */ }
   };
   const saveWish = () => { save(WISH_KEY, wishlist); updateBadges(); };
-
-  const inCart = (id) => cart.includes(id);
-  const inWish = (id) => wishlist.includes(id);
 
   function toggleCart(id) {
     if (inCart(id)) cart = cart.filter((x) => x !== id);
     else cart.push(id);
     saveCart();
   }
+
+  /* ✅ v20: مش بيعمل تكرار أبدًا (كان push أعمى) */
+  function addToCart(id) {
+    if (!id || inCart(id)) return;
+    cart.push(id);
+    saveCart();
+  }
+
   function toggleWish(id) {
     if (inWish(id)) wishlist = wishlist.filter((x) => x !== id);
     else wishlist.push(id);
@@ -125,18 +136,10 @@
     notify(inWish(id) ? 'اتضافت للمفضلة ❤️' : 'اتشالت من المفضلة');
   }
 
-  function calcTotal() {
-    return cart.reduce((s, id) => {
-      const p = CATALOG[id]?.p ?? PACKS[id]?.p;
-      if (p == null) console.warn('[SHOP] عنصر بدون سعر في السلة:', id);
-      return s + (p || 0);
-    }, 0);
-  }
-
   function getItemInfo(id) {
-    const isPack = !!PACKS[id];
-    if (isPack) {
-      const p = PACKS[id];
+    /* ✅ v20: الباقات أولاً — تفاصيل الباقة كانت بتقع */
+    const p = PACKS[id];
+    if (p) {
       return { id, type: 'pack', title: p.t, price: p.p, inst: p.inst, instN: p.instN, instT: p.instT, cat: 'باقة', ids: p.ids };
     }
     const c = CATALOG[id];
@@ -146,21 +149,35 @@
     return null;
   }
 
-  function notify(msg, type = 'success', dur = 4200) {
-    if (typeof window.showToast === 'function') window.showToast(msg, type, { duration: dur });
-    else console.log('[SHOP]', msg);
+  function calcTotal() {
+    return cart.reduce((s, id) => {
+      const info = getItemInfo(id);
+      return s + (info ? (info.price || 0) : 0);
+    }, 0);
   }
 
+  /* ---------- تحديث الكتالوج الوارد ---------- */
+  function refreshMapsAndViews() {
+    _maps = buildCatalogMaps();
+    /* ✅ v20: ما نمسحش شاشة النجاح لو لسه ظاهرة */
+    if (orderDoneId) return;
+    if (currentView === 'cart') renderCart();
+    if (currentView === 'checkout') renderCheckout();
+    if (currentView === 'wishlist') renderWishlist();
+    if (currentView === 'detail' && currentDetailId) renderDetail(currentDetailId);
+  }
+  window.addEventListener('nexora:catalog-ready', () => { refreshMapsAndViews(); console.info('[SHOP] الكتالوج اتحدّث'); });
+  window.addEventListener('nexora:catalog-update', refreshMapsAndViews);
+
+  /* ---------- التنسيقات ---------- */
   const STYLES = `
 .shop-wrap{max-width:1000px;margin:0 auto}
 .shop-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:20px}
-.shop-toolbar input[type="search"],.shop-toolbar select{height:42px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);border-radius:12px;color:var(--ink,#ececf1);font-size:13px;padding:0 12px;font-family:inherit}
-.shop-toolbar input[type="search"]{flex:1;min-width:180px}
 .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
 .shop-card{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px}
 .shop-card .sc-top{display:flex;justify-content:space-between;align-items:flex-start}
-.sc-cat{font-size:10.5px;font-weight:700;color:#7ea2ff;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);padding:3px 10px;border-radius:999px}
-.sc-wish{background:none;border:none;font-size:19px;cursor:pointer;color:var(--dim,#66666f);padding:2px}
+.sc-cat{font-size:10.5px;font-weight:700;color:#7ea2ff;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);padding:3px 10px;border-radius:999px;align-self:flex-start}
+.sc-wish{background:none;border:none;font-size:19px;cursor:pointer;color:var(--dim,#66666f);padding:2px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .sc-wish.on{color:#f4636e}
 .sc-title{font-size:16.5px;font-weight:800;cursor:pointer;line-height:1.4}
 .sc-title:hover{color:#7ea2ff}
@@ -168,7 +185,7 @@
 .sc-price{font-size:19px;font-weight:900;color:#4ade80}
 .sc-inst{font-size:11.5px;color:var(--mut,#9c9cab)}
 .sc-btns{display:flex;gap:8px;margin-top:auto;padding-top:6px}
-.btn-sc{flex:1;height:42px;border-radius:11px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;transition:.15s}
+.btn-sc{flex:1;height:42px;border-radius:11px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;transition:.15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .btn-sc.add{background:rgba(79,124,255,.15);border:1px solid rgba(79,124,255,.4);color:#7ea2ff}
 .btn-sc.add:hover{background:rgba(79,124,255,.28)}
 .btn-sc.add.added{background:linear-gradient(135deg,#4ade80,#22c55e);border-color:transparent;color:#052e12}
@@ -179,7 +196,7 @@
 .shop-empty .ei{font-size:42px;margin-bottom:10px}
 .shop-empty .et{font-size:16px;font-weight:800;margin-bottom:6px}
 .shop-empty .ed{font-size:12.5px;color:var(--mut,#9c9cab);line-height:1.8;margin-bottom:16px}
-.btn-main{display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 22px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit}
+.btn-main{display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 22px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .ck-grid{display:grid;grid-template-columns:1fr;gap:16px}
 @media(min-width:900px){.ck-grid{grid-template-columns:1.2fr .8fr}}
 .ck-box{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:20px}
@@ -207,14 +224,15 @@
 .detail-desc{font-size:14px;color:var(--mut,#9c9cab);line-height:1.9;margin:10px 0 16px}
 .detail-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .dmeta{font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);color:var(--mut,#9c9cab)}
+.detail-pack-list{font-size:12.5px;color:var(--mut,#9c9cab);line-height:2;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);border-radius:12px;padding:12px 16px;margin-bottom:16px}
 @media (max-width:640px){
   .shop-grid{grid-template-columns:1fr}
-  .shop-toolbar{flex-direction:column;align-items:stretch}
   .detail-title{font-size:20px}
   .btn-sc{height:46px}
 }
 `;
 
+  /* ---------- DOM ---------- */
   function ensureShopDOM() {
     if (qs('#view-shop-cart')) return true;
     const main = qs('main#content') || qs('main');
@@ -240,10 +258,8 @@
     return true;
   }
 
-  let currentView = null;
-  let currentDetailId = null;
-
   function showView(v) {
+    orderDoneId = (v === 'checkout' && orderDoneId) ? orderDoneId : null;
     currentView = v;
     qsa('main#content > section').forEach((s) => s.classList.add('hidden'));
     const el = qs('#view-shop-' + v);
@@ -253,7 +269,24 @@
     const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
   }
 
-  /* ---------- Cart Page ---------- */
+  /* ✅ v20: التنقل لغير المتجر → نخبي أقسام المتجر
+     (كانت بتفضل ظاهرة جنب المكتبة — نفس باگ orders) */
+  function bindGlobalNavWatch() {
+    if (document.__shopNavWatch) return;
+    document.__shopNavWatch = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav]');
+      if (!b) return;
+      const v = b.dataset.nav || '';
+      if (v === 'view:wishlist') return; /* بتاعنا */
+      qsa('#view-shop-cart, #view-shop-checkout, #view-shop-wishlist, #view-shop-detail')
+        .forEach((s) => s.classList.add('hidden'));
+      if (currentView) currentView = null;
+      orderDoneId = null;
+    }, true);
+  }
+
+  /* ---------- صفحة السلة ---------- */
   function renderCart() {
     const inner = qs('#shopInner-cart');
     if (!inner) return;
@@ -277,7 +310,7 @@
       '<div class="shop-empty">' +
         '<div class="ei">🛒</div>' +
         '<p class="et">السلة فاضية</p>' +
-        '<p class="ed">اختار كورس أو باقة من الكتالوج واضغط "أضف للسلة"</p>' +
+        '<p class="ed">اختار كورس أو باقة من الكتالوج واضغط «أضف للسلة»</p>' +
         '<button type="button" class="btn-main" data-shop-nav="courses">تصفح الكورسات</button>' +
       '</div>';
 
@@ -285,10 +318,9 @@
       '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">' + itemsHTML + '</div>' +
       '<div class="ck-box">' +
         '<div class="ck-line"><span>عدد العناصر</span><span>' + cart.length + '</span></div>' +
-        '<div class="ck-line"><span>الخصم</span><span>—</span></div>' +
         '<div class="ck-line total"><span>الإجمالي (دفع كاش)</span><b>' + fmt(total) + '</b></div>' +
         '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">' +
-          '<button type="button" class="btn-main" id="goCheckout" style="flex:1"><i class="bi bi-arrow-left-circle"></i>Proceed to Checkout</button>' +
+          '<button type="button" class="btn-main" id="goCheckout" style="flex:1"><i class="bi bi-arrow-left-circle"></i>إتمام الحجز</button>' +
           '<button type="button" class="btn-sc add" id="keepShopping" style="flex:1"><i class="bi bi-arrow-right-circle"></i>كمّل تصفح</button>' +
         '</div>' +
         '<p class="sc-note" style="margin-top:12px">التقسيط متاح — هننسّقه معاك بعد تأكيد الحجز • ' + PHONE + '</p>' +
@@ -297,37 +329,34 @@
     inner.innerHTML =
       '<div style="padding:4px 0 16px">' +
         '<h2 style="font-size:21px;font-weight:800">سلة المشتريات 🛒 (' + cart.length + ')</h2>' +
-        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">راجع اختياراتك قبل تأكيد الحجز — كل كورس يُحجز مرة واحدة</p>' +
+        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">راجع اختياراتك قبل تأكيد الحجز — كل كورس بيُحجز مرة واحدة</p>' +
       '</div>' +
       (cart.length ? filledHTML : emptyHTML);
 
-    const goBtn = qs('#goCheckout');
-    if (goBtn) goBtn.addEventListener('click', () => {
-      if (!auth.currentUser) {
-        notify('سجّل دخول الأول عشان الحجز يتربط بحسابك', 'warn');
-        setTimeout(() => { location.href = 'auth.html'; }, 1000);
-        return;
-      }
-      showView('checkout'); renderCheckout();
-    });
-    const keepBtn = qs('#keepShopping');
-    if (keepBtn) keepBtn.addEventListener('click', () => {
-      const b = qs('[data-nav="view:catalog"]'); if (b) b.click();
-    });
-    qsa('#shopInner-cart [data-cart-remove]').forEach((b) =>
-      b.addEventListener('click', () => {
-        cart = cart.filter((x) => x !== b.dataset.cartRemove);
-        saveCart(); renderCart();
-      }));
+    bindShopEvents(inner);
   }
 
-  /* ---------- Checkout Page ---------- */
+  /* ---------- إتمام الحجز ---------- */
   function renderCheckout() {
     const inner = qs('#shopInner-checkout');
     if (!inner) return;
+
+    /* ✅ v20: السلة فاضية والنجاح مش معروض → رجّع للسلة */
+    if (!cart.length && !orderDoneId) {
+      showView('cart'); renderCart();
+      return;
+    }
+    if (orderDoneId) { renderOrderOK(orderDoneId); return; }
+
     const total = calcTotal();
     const user = auth.currentUser;
-    const phone0 = ((user?.email || '').split('@')[0]);
+
+    /* ✅ v20: تعبئة الرقم من الإيميل الاصطناعي بشكل نظيف */
+    let phone0 = '';
+    const email = (user && user.email) || '';
+    if (email.endsWith('@students.nexora.local')) {
+      phone0 = email.slice(0, -('@students.nexora.local'.length));
+    }
 
     const itemsRows = cart.map(function (id) {
       const info = getItemInfo(id) || { title: id, price: 0, type: 'course' };
@@ -342,8 +371,8 @@
       '<div class="ck-grid">' +
         '<div class="ck-box">' +
           '<h3><i class="bi bi-person"></i>بياناتك</h3>' +
-          '<div class="ck-fld"><label>الاسم</label><input id="ckName" value="' + esc(user?.displayName || '') + '" placeholder="اسمك الكامل"></div>' +
-          '<div class="ck-fld"><label>رقم الموبايل</label><input id="ckPhone" dir="ltr" value="' + esc(phone0) + '" placeholder="01xxxxxxxxx"></div>' +
+          '<div class="ck-fld"><label>الاسم</label><input id="ckName" value="' + esc((user && user.displayName) || '') + '" placeholder="اسمك الكامل"></div>' +
+          '<div class="ck-fld"><label>رقم الموبايل</label><input id="ckPhone" dir="ltr" inputmode="numeric" value="' + esc(phone0) + '" placeholder="01xxxxxxxxx"></div>' +
           '<div class="ck-fld"><label>ملاحظات (اختياري)</label><textarea id="ckNotes" placeholder="أي تفاصيل إضافية…"></textarea></div>' +
           '<h3 style="margin-top:18px"><i class="bi bi-wallet2"></i>طريقة الدفع</h3>' +
           '<label class="pay-opt"><input type="radio" name="payMethod" value="vodafone-cash" checked>' +
@@ -368,37 +397,53 @@
 
     const ckBtn = qs('#ckConfirm');
     if (ckBtn) ckBtn.addEventListener('click', async () => {
-      const name = qs('#ckName').value.trim();
-      const phone = qs('#ckPhone').value.trim().replace(/\s+/g, '');
+      if (!auth.currentUser) {
+        notify('سجّل دخول الأول عشان الحجز يتربط بحسابك', 'warn');
+        setTimeout(() => { location.href = 'auth.html'; }, 1000);
+        return;
+      }
+      const name = (qs('#ckName')?.value || '').trim();
+      const phone = (qs('#ckPhone')?.value || '').replace(/[\s\-]/g, '');
       const method = qs('input[name="payMethod"]:checked')?.value || 'manual';
       if (name.length < 2) { notify('اكتب اسمك', 'error'); return; }
       if (!/^(\+?20)?01\d{9}$/.test(phone)) { notify('رقم موبايل غير صحيح', 'error'); return; }
 
       const btn = qs('#ckConfirm');
-      btn.disabled = true; btn.textContent = 'لحظة…';
+      btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.textContent = 'لحظة…';
       try {
         const orderId = 'NX-' + Date.now().toString(36).toUpperCase().slice(-6);
         const items = cart.map((id) => {
-          const info = getItemInfo(id) || { title: id, price: 0, type: 'course' };
+          const info = getItemInfo(id) || { title: id, price: 0, type: 'course', ids: [] };
           return {
             type: info.type, id,
             title: info.title,
             price: info.price,
-            ...(info.type === 'pack' ? { courseIds: info.ids } : {})
+            ...(info.type === 'pack' ? { courseIds: info.ids || [] } : {})
           };
         });
+
+        /* ✅ v20: الكتابة الأول — وبعد نجاحها بس بنفضّي السلة
+           (قبل كده السلة كانت بتضيع لو الـwrite فشل) */
         await db.collection('orders').add({
           orderId, userId: auth.currentUser.uid, name, phone,
           items, totalCash: total,
-          payMethod: method, notes: qs('#ckNotes').value.trim(),
+          payMethod: method, notes: (qs('#ckNotes')?.value || '').trim(),
           status: 'pending', createdAt: new Date().toISOString()
         });
-        cart = []; saveCart();
+
+        cart = [];
+        save(CART_KEY, cart);
+        updateBadges();
+        try { window.dispatchEvent(new CustomEvent('nexora:cart-changed')); } catch { /* تجاهل */ }
+
+        orderDoneId = orderId;   /* علم النجاح — يحمي من تحديث الكتالوج */
         renderOrderOK(orderId);
       } catch (e) {
         console.error('[SHOP]', e.code);
-        notify('فشل إرسال الطلب: ' + (e.code || ''), 'error');
-        btn.disabled = false; btn.textContent = 'تأكيد الطلب';
+        notify(e.code === 'permission-denied'
+          ? 'السحابة رفضت الحجز — راجع Firestore Rules على orders'
+          : 'فشل إرسال الطلب: ' + (e.code || ''), 'error', 8000);
+        btn.disabled = false; btn.removeAttribute('aria-busy'); btn.textContent = 'تأكيد الطلب';
       }
     });
   }
@@ -412,46 +457,49 @@
         '<p class="ot">تم إرسال حجزك بنجاح!</p>' +
         '<p class="on">' + esc(orderId) + '</p>' +
         '<p class="od"><b>الخطوة الجاية:</b> حوّل المبلغ (فودافون كاش على ' + PHONE + ') وابعت سكرين شوت التحويل على واتساب —' +
-        ' أول ما نأكد الدفع هنفعّل كل كورساتك على حسابك فورًا، وهتتابع حالتها من <b>"حجوزاتي"</b>.</p>' +
+        ' أول ما نأكد الدفع هنفعّل كل كورساتك على حسابك فورًا، وهتتابع حالتها من <b>«حجوزاتي»</b>.</p>' +
         '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
-          '<a class="btn-main" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 بعتت حجز رقم ' + orderId + ' — هبعت سكرين شوت التحويل') + '">📱 كلّمنا واتساب</a>' +
+          '<a class="btn-main" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 بعتت حجز رقم ' + orderId + ' — هبعت سكرين شوت التحويل') + '" target="_blank" rel="noopener noreferrer">📱 كلّمنا واتساب</a>' +
           '<button type="button" class="btn-sc add" id="okOrders">حجوزاتي</button>' +
         '</div>' +
       '</div>';
     const okBtn = qs('#okOrders');
     if (okBtn) okBtn.addEventListener('click', () => {
+      orderDoneId = null;
       const b = qs('[data-nav="view:orders-mine"]');
       if (b) b.click();
-      else notify('افتح "حجوزاتي" من القايمة الجانبية', 'info');
+      else notify('افتح «حجوزاتي» من القايمة الجانبية', 'info');
     });
   }
 
-  /* ---------- Wishlist ---------- */
+  /* ---------- المفضلة ---------- */
   function renderWishlist() {
     const inner = qs('#shopInner-wishlist');
     if (!inner) return;
     if (!wishlist.length) {
       inner.innerHTML =
         '<div class="shop-empty"><div class="ei">❤️</div><p class="et">المفضلة فاضية</p>' +
-        '<p class="ed">دوس ❤️ جنب أي كورس تحب تشتريه بعدين</p>' +
+        '<p class="ed">دوس ❤️ جنب أي كورس في الكتالوج تحب تشتريه بعدين</p>' +
         '<button type="button" class="btn-main" data-shop-nav="courses">تصفح الكورسات</button></div>';
-      bindNavBtns();
+      bindShopEvents(inner);
       return;
     }
     const cardsHTML = wishlist.map(function (id) {
-      const c = CATALOG[id];
-      if (!c) return '';
+      const info = getItemInfo(id);   /* ✅ كورس أو باقة */
+      if (!info) return '';
+      const isPack = info.type === 'pack';
       const addBtn = inCart(id)
         ? '<button type="button" class="btn-sc add added" disabled>في السلة ✓</button>'
-        : '<button type="button" class="btn-sc add" data-add-cart-course="' + esc(id) + '">أضف للسلة</button>';
+        : '<button type="button" class="btn-sc add" data-add-wish="' + esc(id) + '">أضف للسلة</button>';
+      const waMsg = 'أهلاً 👋 عايز أشترك في ' + info.title;
       return '<article class="shop-card">' +
-        '<div class="sc-top"><span class="sc-cat">' + esc(c.cat) + '</span>' +
-          '<button type="button" class="sc-wish on" data-wish="' + esc(id) + '"><i class="bi bi-heart-fill"></i></button></div>' +
-        '<h3 class="sc-title" data-detail="' + esc(id) + '">' + esc(c.t) + '</h3>' +
-        '<p class="sc-desc">' + esc(c.d) + '</p>' +
-        '<div class="sc-price">' + fmt(c.p) + ' <span class="sc-inst">/ كاش</span></div>' +
+        '<div class="sc-top"><span class="sc-cat">' + esc(info.cat || '') + '</span>' +
+          '<button type="button" class="sc-wish on" data-wish-remove="' + esc(id) + '" aria-label="إزالة من المفضلة"><i class="bi bi-heart-fill"></i></button></div>' +
+        '<h3 class="sc-title" data-open-detail="' + esc(id) + '">' + esc(info.title) + '</h3>' +
+        (isPack ? '<p class="sc-desc">' + (info.ids || []).length + ' كورسات في الباقة</p>' : '<p class="sc-desc">' + esc(info.desc || '') + '</p>') +
+        '<div class="sc-price">' + fmt(info.price) + (isPack ? ' <span class="sc-inst">/ باقة</span>' : ' <span class="sc-inst">/ كاش</span>') + '</div>' +
         '<div class="sc-btns">' + addBtn +
-          '<a class="btn-sc buy" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 عايز أشترك في ' + c.t) + '" target="_blank" rel="noopener noreferrer">اشترك</a>' +
+          '<a class="btn-sc buy" href="' + WA + '?text=' + encodeURIComponent(waMsg) + '" target="_blank" rel="noopener noreferrer">اشترك</a>' +
         '</div>' +
       '</article>';
     }).join('');
@@ -462,40 +510,54 @@
     bindShopEvents(inner);
   }
 
-  /* ---------- تفاصيل كورس ---------- */
+  /* ---------- تفاصيل (كورس أو باقة) ---------- */
   function renderDetail(id) {
     const inner = qs('#shopInner-detail');
     if (!inner) return;
-    const c = CATALOG[id];
-    if (!c) {
-      notify('الكورس ده مش في الكتالوج المدفوع', 'warn');
+    const info = getItemInfo(id);
+    if (!info) {
+      notify('العنصر ده مش في الكتالوج', 'warn');
       const b = qs('[data-nav="view:catalog"]'); if (b) b.click();
       return;
     }
+    const isPack = info.type === 'pack';
+
+    /* ✅ v20: تفاصيل الباقة بتعرض كورساتها */
+    let packListHTML = '';
+    if (isPack) {
+      const src = getCatalogSource();
+      const titles = (info.ids || []).map((cid) => {
+        const c = src.courses.find((x) => x.id === cid);
+        return c ? c.title : cid;
+      });
+      packListHTML = '<div class="detail-pack-list">' +
+        titles.map((t) => '✓ ' + esc(t)).join('<br>') + '</div>';
+    }
+
     const addBtn = inCart(id)
       ? '<button type="button" class="btn-sc add added" style="height:48px" disabled>في السلة ✓</button>'
-      : '<button type="button" class="btn-sc add" style="height:48px" data-add-cart-course="' + esc(id) + '"><i class="bi bi-cart3"></i>أضف للسلة</button>';
+      : '<button type="button" class="btn-sc add" style="height:48px" data-detail-add="' + esc(id) + '"><i class="bi bi-cart3"></i>أضف للسلة</button>';
 
     inner.innerHTML =
       '<div class="detail-hero">' +
-        '<span class="sc-cat">' + esc(c.cat) + '</span>' +
-        '<h2 class="detail-title">' + esc(c.t) + '</h2>' +
-        '<p class="detail-desc">' + esc(c.d) + '</p>' +
+        '<span class="sc-cat">' + esc(info.cat || '') + '</span>' +
+        '<h2 class="detail-title">' + (isPack ? '📦 ' : '') + esc(info.title) + '</h2>' +
+        (isPack ? '' : '<p class="detail-desc">' + esc(info.desc || '') + '</p>') +
+        packListHTML +
         '<div class="detail-meta">' +
-          '<span class="dmeta">🎓 كورس مسجل</span>' +
+          (isPack ? '<span class="dmeta">📦 ' + (info.ids || []).length + ' كورسات</span>' : '<span class="dmeta">🎓 كورس مسجل</span>') +
           '<span class="dmeta">♾️ وصول مدى الحياة</span>' +
           '<span class="dmeta">🏅 شهادة إتمام</span>' +
-          '<span class="dmeta">🛠️ مشاريع عملية</span>' +
         '</div>' +
         '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">' +
           '<span style="font-size:11px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);padding:3px 10px;border-radius:6px">دفع كاش</span>' +
-          '<span class="sc-price" style="font-size:24px">' + fmt(c.p) + '</span>' +
+          '<span class="sc-price" style="font-size:24px">' + fmt(info.price) + '</span>' +
         '</div>' +
-        '<p class="sc-inst" style="margin-bottom:18px">أو بالتقسيط: ' + fmt(c.inst) + ' × ' + c.instN + ' دفعات = ' + fmt(c.instT) + '</p>' +
+        (info.instN ? '<p class="sc-inst" style="margin-bottom:18px">أو بالتقسيط: ' + fmt(info.inst) + ' × ' + esc(info.instN) + ' دفعات = ' + fmt(info.instT) + '</p>' : '') +
         '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
           addBtn +
-          '<a class="btn-sc buy" style="height:48px" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 عايز أشترك في ' + c.t) + '" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i>اشترك دلوقتي</a>' +
-          '<button type="button" class="sc-wish ' + (inWish(id) ? 'on' : '') + '" data-wish="' + esc(id) + '" style="height:48px;width:48px;border:1px solid var(--edge,#212129);border-radius:11px;font-size:20px">' +
+          '<a class="btn-sc buy" style="height:48px" href="' + WA + '?text=' + encodeURIComponent('أهلاً 👋 عايز أشترك في ' + info.title) + '" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i>اشترك دلوقتي</a>' +
+          '<button type="button" class="sc-wish ' + (inWish(id) ? 'on' : '') + '" data-detail-wish="' + esc(id) + '" style="height:48px;width:48px;border:1px solid var(--edge,#212129);border-radius:11px;font-size:20px" aria-label="المفضلة">' +
             '<i class="bi ' + (inWish(id) ? 'bi-heart-fill' : 'bi-heart') + '"></i></button>' +
         '</div>' +
       '</div>' +
@@ -503,36 +565,76 @@
     bindShopEvents(inner);
   }
 
-  /* ---------- ربط الأحداث ---------- */
-  function bindShopEvents(scope) {
-    qsa(scope + ' [data-add-cart-course]').forEach((b) => b.addEventListener('click', () => {
-      toggleCart(b.dataset.addCartCourse);
-      notify(inCart(b.dataset.addCartCourse) ? 'اتضاف للسلة 🛒' : 'اتشال من السلة');
-      if (currentView === 'wishlist') renderWishlist();
-      if (currentView === 'detail') renderDetail(currentDetailId);
-    }));
-    qsa(scope + ' [data-wish]').forEach((b) => b.addEventListener('click', () => {
-      toggleWish(b.dataset.wish);
-      if (currentView === 'wishlist') renderWishlist();
-      if (currentView === 'detail') renderDetail(currentDetailId);
-    }));
-    qsa(scope + ' [data-detail]').forEach((t) => t.addEventListener('click', () => {
-      currentDetailId = t.dataset.detail;
-      showView('detail'); renderDetail(currentDetailId);
-    }));
-    bindNavBtns(scope);
-  }
+  /* ==========================================================
+     ✅ v20: ربط الأحداث — element-based (كان selector string مكسور)
+     ========================================================== */
+  function bindShopEvents(root) {
+    if (!root || !(root instanceof Element)) return;
 
-  function bindNavBtns(scope) {
-    qsa((scope || document) + ' [data-shop-nav]').forEach((b) => {
-      if (b.__bound) return;
-      b.__bound = true;
-      b.addEventListener('click', () => {
-        const v = b.dataset.shopNav;
+    root.addEventListener('click', (e) => {
+      const remove = e.target.closest('[data-cart-remove]');
+      if (remove) { toggleCart(remove.dataset.cartRemove); return; }
+
+      const wishRemove = e.target.closest('[data-wish-remove]');
+      if (wishRemove) { toggleWish(wishRemove.dataset.wishRemove); renderWishlist(); return; }
+
+      const wishAdd = e.target.closest('[data-add-wish]');
+      if (wishAdd) { addToCart(wishAdd.dataset.addWish); notify('اتضاف للسلة 🛒', 'success'); renderWishlist(); return; }
+
+      const detailAdd = e.target.closest('[data-detail-add]');
+      if (detailAdd) { addToCart(detailAdd.dataset.detailAdd); notify('اتضاف للسلة 🛒', 'success'); renderDetail(currentDetailId); return; }
+
+      const detailWish = e.target.closest('[data-detail-wish]');
+      if (detailWish) { toggleWish(detailWish.dataset.detailWish); renderDetail(currentDetailId); return; }
+
+      const openDetail = e.target.closest('[data-open-detail]');
+      if (openDetail) { currentDetailId = openDetail.dataset.openDetail; showView('detail'); renderDetail(currentDetailId); return; }
+
+      if (e.target.closest('#goCheckout')) {
+        if (!auth.currentUser) {
+          notify('سجّل دخول الأول عشان الحجز يتربط بحسابك', 'warn');
+          setTimeout(() => { location.href = 'auth.html'; }, 1000);
+          return;
+        }
+        showView('checkout'); renderCheckout();
+        return;
+      }
+      if (e.target.closest('#keepShopping')) {
+        const b = qs('[data-nav="view:catalog"]'); if (b) b.click();
+        return;
+      }
+      const nav = e.target.closest('[data-shop-nav]');
+      if (nav) {
+        const v = nav.dataset.shopNav;
         if (v === 'courses') { const x = qs('[data-nav="view:catalog"]'); if (x) x.click(); }
         else if (v === 'cart') { showView('cart'); renderCart(); }
         else if (v === 'wishlist') { showView('wishlist'); renderWishlist(); }
-      });
+      }
+    });
+  }
+
+  /* ==========================================================
+     عنوان كارت الكتالوج → التفاصيل
+     ✅ v20: قراءة الـID من أزرار الكارت نفسها (data-add-cart-*)
+     — مفيش مطابقة نصية للعناوين، ومفيش capture يسرق كليكات
+     catalog.js (اللي هو صاحب القلوب)
+     ========================================================== */
+  function bindCatalogTitleWatch() {
+    if (document.__shopTitleWatch) return;
+    document.__shopTitleWatch = true;
+    document.addEventListener('click', (e) => {
+      const title = e.target.closest('#view-catalog .nex-title');
+      if (!title) return;
+      const card = title.closest('.nex-card');
+      if (!card) return;
+      const btn = card.querySelector('[data-add-cart-course], [data-add-cart-pack]');
+      if (!btn) return;
+      const id = btn.dataset.addCartCourse || btn.dataset.addCartPack;
+      if (!id) return;
+      e.preventDefault();
+      currentDetailId = id;
+      showView('detail');
+      renderDetail(id);
     });
   }
 
@@ -543,10 +645,10 @@
     if (!qs('#cartNavBtn')) {
       const btn = document.createElement('button');
       btn.id = 'cartNavBtn';
-      btn.type = 'button';
+      btn.type = button;
       btn.className = 'lock-chip';
       btn.setAttribute('aria-label', 'السلة والمفضلة');
-      btn.innerHTML = '<i class="bi bi-cart3 text-[12px]"></i><span id="cartBadge" style="display:none" class="text-[11px] font-bold"></span><i class="bi bi-heart text-[11px]" style="color:#f4636e"></i><span id="wishBadge" style="display:none" class="text-[11px] font-bold"></span>';
+      btn.innerHTML = '<i class="bi bi-cart3 text-[12px]" aria-hidden="true"></i><span id="cartBadge" style="display:none" class="text-[11px] font-bold"></span><i class="bi bi-heart text-[11px]" style="color:#f4636e" aria-hidden="true"></i><span id="wishBadge" style="display:none" class="text-[11px] font-bold"></span>';
       btn.addEventListener('click', () => { showView('cart'); renderCart(); });
       host.insertBefore(btn, host.firstChild);
     }
@@ -554,95 +656,72 @@
   }
   function updateBadges() {
     const cb = qs('#cartBadge'), wb = qs('#wishBadge');
-    if (cb) { cb.textContent = cart.length; cb.style.display = cart.length ? 'inline' : 'none'; }
-    if (wb) { wb.textContent = wishlist.length; wb.style.display = wishlist.length ? 'inline' : 'none'; }
+    if (cb) { cb.textContent = String(cart.length); cb.style.display = cart.length ? 'inline' : 'none'; }
+    if (wb) { wb.textContent = String(wishlist.length); wb.style.display = wishlist.length ? 'inline' : 'none'; }
   }
 
-  /* ---------- بند المفضلة في القايمة ---------- */
+  /* ---------- بند المفضلة ---------- */
   function ensureNavEntries() {
     const nav = qs('#sideNav');
-    if (!nav || qs('[data-nav="view:wishlist"]')) return;
-    const files = qs('[data-nav="view:files"]');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.nav = 'view:wishlist';
-    btn.className = 'nav-item';
-    btn.innerHTML = '<i class="bi bi-heart text-[13.5px] w-4 text-center shrink-0" style="color:#f4636e"></i>' +
-                    '<span class="grow text-start truncate">المفضلة</span>';
-    if (files) files.after(btn);
-    else nav.appendChild(btn);
+    if (!nav) return;
+    let btn = qs('[data-nav="view:wishlist"]');
+    if (!btn) {
+      const files = qs('[data-nav="view:files"]');
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.nav = 'view:wishlist';
+      btn.className = 'nav-item';
+      btn.innerHTML = '<i class="bi bi-heart text-[13.5px] w-4 text-center shrink-0" style="color:#f4636e" aria-hidden="true"></i>' +
+                      '<span class="grow text-start truncate">المفضلة</span>';
+      if (files) files.after(btn);
+      else nav.appendChild(btn);
+    }
   }
 
-  /* ---------- أحداث الكتالوج ---------- */
-  document.addEventListener('click', (e) => {
-    const navWish = e.target.closest('[data-nav="view:wishlist"]');
-    if (navWish) {
-      e.stopPropagation(); e.preventDefault();
-      showView('wishlist'); renderWishlist();
-      return;
-    }
-    const wishBtn = e.target.closest('.nex-card [data-wish]');
-    if (wishBtn) {
-      e.stopPropagation(); e.preventDefault();
-      toggleWish(wishBtn.dataset.wish);
-      wishBtn.classList.toggle('on', inWish(wishBtn.dataset.wish));
-      const ic = wishBtn.querySelector('i');
-      if (ic) ic.className = inWish(wishBtn.dataset.wish) ? 'bi bi-heart-fill' : 'bi bi-heart';
-      return;
-    }
-    const title = e.target.closest('.nex-title');
-    if (title) {
-      const card = title.closest('.nex-card');
-      const id = card ? matchCourseIdFromCard(card) : null;
-      if (id) {
-        e.stopPropagation(); e.preventDefault();
-        currentDetailId = id;
-        showView('detail'); renderDetail(id);
-      }
-    }
-  }, true);
-
-  function matchCourseIdFromCard(cardEl) {
-    const t = cardEl.querySelector('.nex-title')?.textContent?.trim();
-    if (!t) return null;
-    const src = getCatalogSource();
-    const found = (src.courses || []).find((c) => c.title === t);
-    return found ? found.id : null;
+  /* ناف المفضلة — delegation على document (بدون capture) */
+  function bindWishNav() {
+    if (document.__shopWishNav) return;
+    document.__shopWishNav = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav="view:wishlist"]');
+      if (!b) return;
+      e.preventDefault();
+      if (!ensureShopDOM()) return;
+      showView('wishlist');
+      renderWishlist();
+      qs('#sidebar')?.classList.remove('open');
+      qs('#overlay')?.classList.add('hidden');
+    });
   }
 
-  /* هوك السايدبار */
+  /* ---------- Boot ---------- */
+  function boot() {
+    ensureShopDOM();
+    ensureBadges();
+    ensureNavEntries();
+    bindShopEvents(qs('#shopInner-cart'));   /* الحاوية ثابتة — delegation تكفي */
+    bindWishNav();
+    bindGlobalNavWatch();
+    bindCatalogTitleWatch();
+    installHook();
+  }
+
   function installHook() {
     if (window.__shopSidebarHooked) return;
     const orig = window.renderSidebar;
     if (typeof orig !== 'function') return;
     window.__shopSidebarHooked = true;
     window.renderSidebar = function () {
-      orig();
+      try { orig(); } catch (e) { console.error('[SHOP] renderSidebar:', e); }
       ensureNavEntries();
     };
   }
 
-  function boot() {
-    ensureShopDOM();
-    ensureBadges();
-    ensureNavEntries();
-    installHook();
-  }
-
-  /* ⏳ انتظر main#content و #sideNav */
   function waitForDOM(retries = 50) {
     const main = qs('main#content') || qs('main');
     const nav = qs('#sideNav');
-    if (main && nav) {
-      console.info('[SHOP] DOM جاهز — boot');
-      boot();
-      return;
-    }
-    if (retries <= 0) {
-      console.warn('[SHOP] ⚠️ DOM مش جاهز بعد 5 ثواني — boot');
-      boot();
-      return;
-    }
+    if (main && nav) { boot(); return; }
+    if (retries <= 0) { console.warn('[SHOP] ⚠️ DOM مش جاهز — boot'); boot(); return; }
     setTimeout(() => waitForDOM(retries - 1), 100);
   }
 
@@ -652,12 +731,9 @@
     waitForDOM();
   }
 
-  /* ==========================================================
-     ✅ API عام لـ catalog.js
-     ========================================================== */
+  /* ---------- API عام (لـcatalog.js وأي ملف تاني) ---------- */
   window.NexoraShop = {
-    /* السلة */
-    addToCart: (id) => { if (!inCart(id)) { cart.push(id); saveCart(); } },
+    addToCart,          /* ✅ v20: من غير تكرار */
     removeFromCart: (id) => { cart = cart.filter((x) => x !== id); saveCart(); },
     toggleCart,
     inCart,
@@ -667,28 +743,20 @@
     getCartItems: () => cart.map(getItemInfo).filter(Boolean),
     clearCart: () => { cart = []; saveCart(); },
 
-    /* المفضلة */
     toggleWish,
     inWish,
     getWishlist: () => wishlist.slice(),
 
-    /* التنقل */
-    openCart: () => { showView('cart'); renderCart(); },
-    openWishlist: () => { showView('wishlist'); renderWishlist(); },
+    openCart: () => { if (ensureShopDOM()) { showView('cart'); renderCart(); } },
+    openWishlist: () => { if (ensureShopDOM()) { showView('wishlist'); renderWishlist(); } },
+    openDetail: (id) => { if (ensureShopDOM() && id) { currentDetailId = id; showView('detail'); renderDetail(id); } },
 
-    /* معلومات عنصر */
     getItemInfo,
-
-    /* معلومات الكتالوج */
-    getCatalog: () => ({
-      CATALOG: _maps.CATALOG,
-      PACKS: _maps.PACKS
-    })
+    getCatalog: () => ({ CATALOG: _maps.CATALOG, PACKS: _maps.PACKS })
   };
 
-  /* ✅ نبه باقي الملفات إن NexoraShop جاهز */
   try {
     window.dispatchEvent(new CustomEvent('nexora:shop-ready'));
     console.info('[SHOP] ✅ NexoraShop API جاهز');
-  } catch (e) { /* تجاهل */ }
+  } catch { /* تجاهل */ }
 })();

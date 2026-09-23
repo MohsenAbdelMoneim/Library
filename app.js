@@ -1,7 +1,12 @@
 /* ==========================================================
-   My Course Library — app.js (v18)
+   My Course Library — app.js (v19)
    نواة المكتبة — الحماية في gate.js — المزامنة في cloud.js
-   ✅ v18: انتظار DOM + تحسينات + إصلاحات
+   ✅ v19: إكمال النصف الناقص (فورم + dup + masking + keyboard + boot)
+   ✅ v19: إيقاف خطاف التنقل الأجنبي — app.js مايشوفش view:catalog/roadmap/student
+   ✅ v19: الرجوع للمكتبة بيخفي أقسام الكتالوج/المسارات/حسابي (مفيش محتوى مزدوج)
+   ✅ v19: __applyCloudResources (المزامنة اللحظية للموارد اشتغلت)
+   ✅ v19: عقود السكريبتات: __nexoraState + __COURSE_LIBRARY_MAP__ + MCL.getCourses
+   ✅ v19: normalize للموارد المحمّلة + تواريخ آمنة + nav parsing محمي
    ========================================================== */
 
 'use strict';
@@ -43,18 +48,28 @@ function rebuildCatalogFromFirestore() {
     installmentTotal: p.installmentTotal,
     featured: !!p.featured
   }));
+
+  /* ✅ v19: خريطة courseId → عنوان مورد المكتبة
+     (gate.js وstudent.js بيقرأوها لفتح كورسات Drive بالاشتراك) */
+  window.__COURSE_LIBRARY_MAP__ = {};
+  PAID_CATALOG.forEach((c) => {
+    if (c.id && c.title) window.__COURSE_LIBRARY_MAP__[c.id] = c.title;
+  });
 }
 
 rebuildCatalogFromFirestore();
 
+let __booted = false;
+
 window.addEventListener('nexora:catalog-ready', () => {
   rebuildCatalogFromFirestore();
   console.info('[APP] تم تحديث الكتالوج من Firestore:', PAID_CATALOG.length, 'كورس،', PACKAGES.length, 'باقة');
-  if (typeof renderAll === 'function') renderAll();
+  if (__booted && typeof renderAll === 'function') renderAll();
 });
 
 window.addEventListener('nexora:catalog-update', () => {
   rebuildCatalogFromFirestore();
+  if (__booted && typeof renderAll === 'function') renderAll();
 });
 
 const fmtEGP = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
@@ -136,7 +151,7 @@ const INITIAL_RESOURCES = (() => {
     ['Photoshop 2',                      'Graphic Design',   'YouTube',      'https://youtu.be/va-MZOPrJ0s?si=91f15UigdzCr_iB8'],
     ['Illustrator',                      'Graphic Design',   'YouTube',      'https://youtu.be/Fe_oEDD8Kus?si=Yy5gTWPG2NyVGrdV'],
     ['CS50 - Computer Science Fundamentals', 'Computer Science', 'YouTube', 'https://youtube.com/playlist?list=PLknwEmKsW8OvMsFbU9zo8oJCprAsgc4LO&si=EIeS-4HGd_CX778k'],
-    ['إنجليزية للمبتدئين',               'Other',            'YouTube',      'https://youtu.be/9ayf1XuXrVg'],
+    ['إنجليزية للمبتدئين',               'Other',            'YouTube',      'https://youtu.be/9ayf1XuXrVg']
   ];
   return rows.map(([title, category, source, url], i) => ({
     id: 'res-' + String(i + 1).padStart(3, '0'),
@@ -183,10 +198,17 @@ function cloneInitial() {
 }
 
 const dateFmt = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtDate = (iso) => dateFmt.format(new Date(iso));
+
+/* ✅ v19: تواريخ آمنة — قبل كده تاريخ تالف كان يضرب RangeError ويكسر رسم الكارت */
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : dateFmt.format(d);
+}
 
 function timeAgo(iso) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '—';
+  const diff = (Date.now() - t) / 1000;
   if (diff < 45) return 'الآن';
   const rtf = new Intl.RelativeTimeFormat('ar-EG-u-nu-latn', { numeric: 'auto' });
   if (diff < 3600)     return rtf.format(-Math.round(diff / 60), 'minute');
@@ -223,6 +245,7 @@ function sourceTile(source) {
 
 function statusBadge(status) {
   const m = STATUS_META[status];
+  if (!m) return '';
   return `<span class="inline-flex items-center gap-1.5 text-[11px] font-medium" style="color:${m.color}">
     <span class="w-1.5 h-1.5 rounded-full ${m.pulse ? 'pulse-dot' : ''}" style="background:${m.color}"></span>${m.label}</span>`;
 }
@@ -238,14 +261,20 @@ function countLockedVisible() {
   return protectedResources().filter((r) => MCL.isResourceLocked(r)).length;
 }
 
+/* ✅ v19: normalize أثناء التحميل — الحقول الناقصة بتتظبط */
 function loadResources() {
   let stored = null;
   try { stored = localStorage.getItem(STORAGE_KEY); } catch (err) { /* التخزين غير متاح */ }
   if (stored !== null) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) { state.resources = parsed; return; }
-    } catch { /* بيانات تالفة */ }
+    let parsed = null;
+    try { parsed = JSON.parse(stored); } catch { /* بيانات تالفة */ }
+    if (Array.isArray(parsed)) {
+      state.resources = parsed
+        .filter((r) => r && typeof r === 'object')
+        .map((r, i) => normalizeResource(r,
+          (typeof r.id === 'string' && r.id.trim()) ? r.id : 'res-local-' + (i + 1)));
+      return;
+    }
     state.resources = cloneInitial();
     saveResources();
     showToast('كانت البيانات المحفوظة تالفة — تمت استعادة القايمة الأصلية.', 'warn');
@@ -440,16 +469,17 @@ function validateResource(r) {
   return null;
 }
 
+/* ✅ v19: normalize دفاعي — String(undefined) كانت بتطلع "undefined" */
 function normalizeResource(raw, id) {
   return {
     id,
-    title: String(raw.title).trim(),
-    category: raw.category,
-    source: raw.source,
+    title: String(raw.title ?? 'بدون عنوان').trim() || 'بدون عنوان',
+    category: CATEGORIES.includes(raw.category) ? raw.category : 'Other',
+    source: SOURCES.includes(raw.source) ? raw.source : 'Google Drive',
     description: typeof raw.description === 'string' ? raw.description : '',
-    url: String(raw.url).trim(),
+    url: String(raw.url ?? '').trim(),
     cover: typeof raw.cover === 'string' ? raw.cover : '',
-    status: raw.status,
+    status: STATUSES.includes(raw.status) ? raw.status : 'Not Started',
     notes: typeof raw.notes === 'string' ? raw.notes : '',
     createdAt: raw.createdAt ?? new Date().toISOString(),
     lastOpenedAt: typeof raw.lastOpenedAt === 'string' ? raw.lastOpenedAt : null,
@@ -730,12 +760,22 @@ function syncControls() {
   const vl = qs('#viewList'); if (vl) vl.setAttribute('aria-pressed', String(state.layout === 'list'));
 }
 
+/* ✅ v19: الرجوع لأي فيو من فيوهات app بيخفي أقسام السكريبتات الأجنبية —
+   قبل كده الكتالوج كان يفضل ظاهر جنب المكتبة */
+const APP_VIEW_IDS  = { library: 'view-library', files: 'view-files', data: 'view-data', subs: 'view-subs' };
+const FOREIGN_SECTIONS = ['#view-catalog', '#view-roadmap', '#view-student'];
+
 function applyViewVisibility() {
-  const lib = qs('#view-library'); if (lib) lib.classList.toggle('hidden', state.view !== 'library');
-  const files = qs('#view-files'); if (files) files.classList.toggle('hidden', state.view !== 'files');
-  const data = qs('#view-data'); if (data) data.classList.toggle('hidden', state.view !== 'data');
-  const subs = qs('#view-subs');
-  if (subs) subs.classList.toggle('hidden', state.view !== 'subs');
+  Object.entries(APP_VIEW_IDS).forEach(([view, id]) => {
+    const el = qs('#' + id);
+    if (el) el.classList.toggle('hidden', state.view !== view);
+  });
+  if (APP_VIEW_IDS[state.view]) {
+    FOREIGN_SECTIONS.forEach((sel) => {
+      const el = qs(sel);
+      if (el) el.classList.add('hidden');
+    });
+  }
 }
 
 function renderDataView() {
@@ -891,6 +931,53 @@ function openResourceModal(id = null) {
   openModal(qs('#resourceModal'), qs('#f-title'));
 }
 
+/* ==========================================================
+   ✅ v19: معالج الفورم (كان ناقص في الملف المقطوع)
+   ========================================================== */
+function handleResourceSubmit(confirmed) {
+  const get = (id) => (qs('#f-' + id)?.value || '').trim();
+  const editing = state.editingId ? getResourceById(state.editingId) : null;
+
+  /* الرابط المقنّع: لو المالك مغيرش النقاط → نحتفظ بالرابط الأصلي */
+  const urlRaw = get('url');
+  const url = (state.urlMasked && urlRaw.startsWith('•')) ? state.editingOriginalUrl : urlRaw;
+
+  const data = {
+    title: get('title'),
+    category: get('category'),
+    source: get('source'),
+    status: get('status') || 'Not Started',
+    url,
+    cover: get('cover'),
+    description: get('description'),
+    notes: get('notes')
+  };
+
+  let bad = false;
+  ['title', 'category', 'source', 'url', 'status'].forEach((f) => {
+    const msg = fieldError(f, data[f]);
+    setFieldError(f, msg);
+    if (msg) bad = true;
+  });
+  if (bad) return;
+
+  const dup = findDuplicateUrl(data.url, editing ? editing.id : null);
+  if (dup && !state.confirmedDup && !confirmed) {
+    const box = qs('#dupBox'), msg = qs('#dupMsg');
+    if (box && msg) {
+      msg.textContent = `«${dup.title}» يستخدم نفس الرابط بالفعل — متأكد إنك عايز تضيفه تاني؟`;
+      box.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (editing) updateResource(editing.id, data);
+  else createResource(data);
+
+  state.editingId = null;
+  closeModal(qs('#resourceModal'));
+}
+
 function exportData() {
   MCL.requireAdmin(() => {
     const payload = {
@@ -1009,6 +1096,29 @@ function closeDrawer() {
   const mb = qs('#menuBtn'); if (mb) mb.setAttribute('aria-expanded', 'false');
 }
 
+/* ==========================================================
+   ✅ v19: جسر المزامنة اللحظية — cloud.js بينادي عليها في كل snapshot
+   (كانت ناقصة فتحديثات الموارد من الأجهزة التانية مكانتش بتوصل)
+   ========================================================== */
+function applyCloudResources(arr) {
+  if (!Array.isArray(arr)) return;
+  const out = [];
+  const seen = new Set();
+  let skipped = 0;
+  arr.forEach((raw, i) => {
+    const err = validateResource(raw);
+    if (err) { skipped++; console.warn('[APP] مورد تجاهلناه من السحابة (#' + (i + 1) + '):', err); return; }
+    const id = (typeof raw.id === 'string' && raw.id.trim()) ? raw.id.trim() : uid();
+    if (seen.has(id)) { skipped++; return; }
+    seen.add(id);
+    out.push(normalizeResource(raw, id));
+  });
+  state.resources = out;
+  saveResources();
+  if (__booted) renderAll({ animate: false });
+  if (skipped) console.warn('[APP]', skipped, 'عنصر اتخطى من تحديث السحابة');
+}
+
 function wireEvents() {
   const mb = qs('#menuBtn'); if (mb) mb.addEventListener('click', openDrawer);
   const csb = qs('#closeSidebarBtn'); if (csb) csb.addEventListener('click', closeDrawer);
@@ -1023,21 +1133,29 @@ function wireEvents() {
     const btn = e.target.closest('[data-nav]');
     if (!btn) return;
     const raw = btn.dataset.nav;
+    /* ✅ v19: parsing محمي — قيمة ناقصة ما تكسرش */
     const i = raw.indexOf(':');
+    if (i <= 0) return;
     const kind = raw.slice(0, i), val = raw.slice(i + 1);
     if (kind === 'view') {
-      switchView(val);
-    } else {
-      state.view = 'library';
-      if (kind === 'library') {
-        state.category = 'all';
-        state.favoritesOnly = val === 'favorites';
-      } else {
-        state.category = val;
-        state.favoritesOnly = false;
+      /* ✅ v19: app.js بيملك files/data/subs بس —
+         catalog/roadmap/student ليهم سكريبتاتهم اللي بتتعامل بنفسها،
+         ومداخلتنا كانت بتمسح أزرارها من السايدبار */
+      if (val === 'files' || val === 'data' || val === 'subs') {
+        switchView(val);
       }
-      switchView('library');
+      closeDrawer();
+      return;
     }
+    state.view = 'library';
+    if (kind === 'library') {
+      state.category = 'all';
+      state.favoritesOnly = val === 'favorites';
+    } else {
+      state.category = val;
+      state.favoritesOnly = false;
+    }
+    switchView('library');
     closeDrawer();
   });
 
@@ -1051,6 +1169,7 @@ function wireEvents() {
       state.favoritesOnly = !state.favoritesOnly;
     } else {
       const i = k.indexOf(':');
+      if (i <= 0) return;
       const field = k.slice(0, i), value = k.slice(i + 1);
       state[field] = state[field] === value ? 'all' : value;
     }
@@ -1116,172 +1235,111 @@ function wireEvents() {
     }
   });
 
+  /* ---------- ✅ v19: الفورم (إعادة بناء) ---------- */
   const form = qs('#resourceForm');
-  if (form) form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const masked = !!state.editingId && state.urlMasked;
-    const data = {
-      title:       qs('#f-title').value.trim(),
-      category:    qs('#f-category').value,
-      source:      qs('#f-source').value,
-      url:         masked ? state.editingOriginalUrl : qs('#f-url').value.trim(),
-      cover:       qs('#f-cover').value.trim(),
-      status:      qs('#f-status').value,
-      description: qs('#f-description').value.trim(),
-      notes:       qs('#f-notes').value.trim()
-    };
-    const checks = [['title', data.title], ['category', data.category], ['source', data.source]];
-    if (!masked) checks.push(['url', data.url]);
-    checks.push(['status', data.status]);
-    let firstBad = null;
-    checks.forEach(([f, v]) => {
-      const msg = fieldError(f, v);
-      setFieldError(f, msg);
-      if (msg && !firstBad) firstBad = f;
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleResourceSubmit(false);
     });
-    if (firstBad) { qs('#f-' + firstBad).focus(); return; }
-
-    const dup = masked ? null : findDuplicateUrl(data.url, state.editingId);
-    if (dup && !state.confirmedDup) {
-      qs('#dupMsg').innerHTML =
-        `هذا الرابط مُسجَّل بالفعل باسم «${escapeHtml(dup.title)}».` +
-        ` هل ما زلت تريد ${state.editingId ? 'حفظ' : 'إضافة'} المورد بهذا الرابط؟`;
-      qs('#dupBox').classList.remove('hidden');
-      showToast('تنبيه: هذا الرابط موجود مسبقًا.', 'warn');
-      return;
-    }
-
-    if (state.editingId) updateResource(state.editingId, data);
-    else createResource(data);
-    closeModal(qs('#resourceModal'));
-  });
-
-  const fu = qs('#f-url');
-  if (fu) {
-    fu.addEventListener('focus', () => {
-      if (state.urlMasked) fu.select();
-    });
-    fu.addEventListener('input', () => {
-      if (state.urlMasked && fu.value !== '••••••••••••••••') state.urlMasked = false;
-      qs('#dupBox').classList.add('hidden');
-      state.confirmedDup = false;
+    form.addEventListener('click', (e) => {
+      if (e.target.closest('#dupConfirmBtn')) {
+        state.confirmedDup = true;
+        handleResourceSubmit(true);
+      }
     });
   }
-  const dcb = qs('#dupConfirmBtn');
-  if (dcb) dcb.addEventListener('click', () => {
-    state.confirmedDup = true;
-    form.requestSubmit();
-  });
-  qsa('#resourceModal [data-close-resource]').forEach((el) =>
-    el.addEventListener('click', () => closeModal(qs('#resourceModal'))));
-
+  qsa('#resourceModal [data-close-resource]').forEach((b) =>
+    b.addEventListener('click', () => closeModal(qs('#resourceModal'))));
+  qsa('#confirmModal [data-close-confirm]').forEach((b) =>
+    b.addEventListener('click', () => closeModal(qs('#confirmModal'))));
+  const ccancel = qs('#confirmCancel');
+  if (ccancel) ccancel.addEventListener('click', () => closeModal(qs('#confirmModal')));
   const cok = qs('#confirmOk');
   if (cok) cok.addEventListener('click', () => {
-    const cb = confirmCb; confirmCb = null;
+    const cb = confirmCb;
+    confirmCb = null;
     closeModal(qs('#confirmModal'));
-    if (cb) cb();
+    if (cb) { try { cb(); } catch (err) { console.error('[APP] confirm callback:', err); } }
   });
-  const ccl = qs('#confirmCancel');
-  if (ccl) ccl.addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
-  const ccm = qs('#confirmModal [data-close-confirm]');
-  if (ccm) ccm.addEventListener('click', () => { confirmCb = null; closeModal(qs('#confirmModal')); });
 
+  /* ---------- ✅ v19: إدارة البيانات ---------- */
   const eb = qs('#exportBtn'); if (eb) eb.addEventListener('click', exportData);
   const rb = qs('#restoreBtn'); if (rb) rb.addEventListener('click', restoreInitialResources);
-
-  const dz = qs('#dropZone'), fi = qs('#importFile');
-  if (dz && fi) {
-    dz.addEventListener('click', () => fi.click());
+  const dz = qs('#dropZone');
+  const ifl = qs('#importFile');
+  if (dz && ifl) {
+    dz.addEventListener('click', () => ifl.click());
     dz.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ifl.click(); }
     });
-    ['dragenter', 'dragover'].forEach((ev) =>
-      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
-    ['dragleave', 'drop'].forEach((ev) =>
-      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = 'rgba(240,181,62,.6)'; });
+    dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; });
     dz.addEventListener('drop', (e) => {
-      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      e.preventDefault();
+      dz.style.borderColor = '';
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if (f) importData(f);
     });
-    fi.addEventListener('change', () => {
-      const f = fi.files[0];
+    ifl.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
       if (f) importData(f);
-      fi.value = '';
+      e.target.value = '';
     });
   }
 
+  /* ---------- ✅ v19: كيبورد عام ---------- */
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const openModalEl = [qs('#confirmModal'), qs('#resourceModal'), qs('#lockModal')]
-        .find((m) => m && !m.classList.contains('hidden'));
-      if (openModalEl) {
-        if (openModalEl.id === 'lockModal') {
-          if (typeof MCL.closeLockModal === 'function') MCL.closeLockModal();
-          else { openModalEl.classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
-        } else closeModal(openModalEl);
-        return;
-      }
-      const sb = qs('#sidebar');
-      if (sb && sb.classList.contains('open')) { closeDrawer(); return; }
-      return;
-    }
-    const rm = qs('#resourceModal'), cm = qs('#confirmModal'), lm = qs('#lockModal');
-    if (e.key === '/' && !isTypingTarget(e.target)
-        && rm && rm.classList.contains('hidden')
-        && cm && cm.classList.contains('hidden')
-        && lm && lm.classList.contains('hidden')) {
+    if (e.key === '/' && !isTypingTarget(e.target)) {
       e.preventDefault();
       const s = qs('#searchInput');
-      if (s) { s.focus(); s.select(); }
+      if (s) s.focus();
+      return;
+    }
+    if (e.key === 'Escape') {
+      const cm = qs('#confirmModal');
+      if (cm && !cm.classList.contains('hidden')) { closeModal(cm); return; }
+      const rm = qs('#resourceModal');
+      if (rm && !rm.classList.contains('hidden')) { closeModal(rm); return; }
+      const lm = qs('#lockModal');
+      if (lm && !lm.classList.contains('hidden') && window.MCL && typeof MCL.closeLockModal === 'function') {
+        MCL.closeLockModal();
+      }
     }
   });
 }
 
-function init() {
-  console.log('%c My Course Library — v18 ', 'background:#f0b53e;color:#161204;font-weight:bold');
-
-  const required = ['isAdminActive', 'isProtected', 'isResourceLocked',
-                    'requireAdmin', 'requireUnlock', 'loadSubscriptions',
-                    'openLockModal', 'closeLockModal'];
-  const missing = !window.MCL
-    ? required
-    : required.filter((k) => typeof MCL[k] !== 'function');
-  if (missing.length) {
-    console.error('%c[GATE] gate.js ناقص أو نسخة قديمة! الغائب: ' + missing.join(', '),
-      'background:#e5484d;color:#fff;font-weight:bold;padding:4px 8px');
-    showToast('خطأ: gate.js ناقص أو قديم — حدّث الملفات على نفس الرقم.', 'error', { duration: 10000 });
+/* ---------- ✅ v19: Boot مع انتظار DOM ---------- */
+function boot() {
+  /* العقود مع السكريبتات التانية — أول حاجة */
+  if (window.MCL) {
+    MCL.renderAll = renderAll;
+    MCL.getView = () => state.view;
+    /* gate.js بيطلبها لقايمة كورسات Drive في شاشة المشتركين */
+    MCL.getCourses = () => protectedResources().map((r) => r.title);
   }
-
-  MCL.getCourses = () => [...new Set(state.resources.filter((r) => r.source === 'Google Drive').map((r) => r.title))];
-  MCL.getView = () => state.view;
-  MCL.renderAll = renderAll;
-  MCL.onRender = (view) => {
-    if (view === 'subs' && typeof window.renderSubsViewGate === 'function') window.renderSubsViewGate();
-  };
-
-  window.__applyCloudResources = (arr) => { state.resources = arr; renderAll(); };
+  /* student.js بيقرأها لفتح الكورسات */
   window.__nexoraState = state;
-
-  const fp = qs('footer p');
-  if (fp && !qs('#mclVersionBadge')) {
-    const b = document.createElement('span');
-    b.id = 'mclVersionBadge';
-    b.className = 'text-accent font-mono';
-    b.textContent = ' — v18';
-    fp.appendChild(b);
-  }
-
-  const fc = qs('#f-category');
-  if (fc) fc.insertAdjacentHTML('beforeend',
-    CATEGORIES.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(''));
+  /* cloud.js بينادي عليها لكل snapshot */
+  window.__applyCloudResources = applyCloudResources;
 
   loadSettings();
   loadResources();
   wireEvents();
-  switchView('library');
-  if (!missing.length) {
-    MCL.loadSubscriptions();
-  }
+  renderAll();
+  __booted = true;
+  console.info('[APP] ✅ جاهزة —', state.resources.length, 'مورد في المكتبة');
 }
 
-init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot, { once: true });
+} else {
+  boot();
+}
+
+/* إتاحة للتشخيص من الـConsole */
+window.NexoraApp = {
+  get state() { return state; },
+  render: renderAll,
+  export: exportData
+};

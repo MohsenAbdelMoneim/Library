@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0d">
   <meta name="description" content="Nexora Academy — منصة تعليمية احترافية: كورسات، مسارات تعلم، واشتراكات بالتقسيط">
+  <!-- ✅ v19: صفحة تطبيق خاصة — مالهاش داعي في الفهرسة -->
+  <meta name="robots" content="noindex">
   <title>Nexora Academy — منصة التعلم</title>
   <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
 
@@ -40,14 +42,18 @@
     }
   </script>
 
-  <link rel="stylesheet" href="style.css?v=17">
+  <!-- ✅ v19: نسخة محدّثة -->
+  <link rel="stylesheet" href="style.css?v=18">
 
   <style>
+    /* ==========================================================
+       Hero — v19: تدرّج على العنوان + حلقة نابضة حول الإيموجي
+       ========================================================== */
     .lib-hero {
       background: linear-gradient(135deg, rgba(79,124,255,.15), rgba(124,92,255,.12), rgba(240,181,62,.08));
       border: 1px solid rgba(79,124,255,.25);
-      border-radius: 20px;
-      padding: 22px 24px;
+      border-radius: 22px;
+      padding: 24px 26px;
       margin-bottom: 20px;
       display: flex;
       align-items: center;
@@ -61,9 +67,23 @@
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(circle at 20% 50%, rgba(79,124,255,.15), transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(240,181,62,.1), transparent 50%);
+        radial-gradient(circle at 15% 40%, rgba(79,124,255,.18), transparent 50%),
+        radial-gradient(circle at 85% 60%, rgba(240,181,62,.12), transparent 50%);
       pointer-events: none;
+    }
+    /* ✅ لمسة جديدة: خط ضوئي علوي */
+    .lib-hero::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(124,92,255,.7), rgba(240,181,62,.7), transparent);
+      background-size: 200% 100%;
+      animation: heroSweep 6s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes heroSweep {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
     .lib-hero-content {
       position: relative;
@@ -75,76 +95,134 @@
       width: 100%;
     }
     .lib-hero-emoji {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
       background: linear-gradient(135deg, #4f7cff, #7c5cff);
       display: grid;
       place-items: center;
-      font-size: 26px;
+      font-size: 28px;
       flex-shrink: 0;
       box-shadow: 0 8px 24px rgba(79,124,255,.35);
+      position: relative;
     }
-    .lib-hero-text {
-      flex-grow: 1;
-      min-width: 200px;
+    /* ✅ حلقة نابضة */
+    .lib-hero-emoji::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 22px;
+      border: 2px solid rgba(124,92,255,.4);
+      animation: heroRing 3s ease-in-out infinite;
+      pointer-events: none;
     }
+    @keyframes heroRing {
+      0%, 100% { opacity: .5; transform: scale(1); }
+      50%      { opacity: .15; transform: scale(1.08); }
+    }
+    .lib-hero-text { flex-grow: 1; min-width: 200px; }
     .lib-hero-text h2 {
-      font-size: 17px;
-      font-weight: 800;
+      font-size: 18px;
+      font-weight: 900;
       margin-bottom: 4px;
+      /* ✅ تدرّج على الترحيب */
+      background: linear-gradient(135deg, #fff 45%, #f0b53e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      width: fit-content;
     }
     .lib-hero-text p {
       font-size: 12.5px;
-      color: var(--mut);
+      color: var(--mut, #9c9cab);
       line-height: 1.6;
     }
 
-    .quick-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .quick-action {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 14px;
-      border-radius: 10px;
-      background: rgba(16,16,21,.6);
-      border: 1px solid var(--edge);
-      color: var(--ink);
+      gap: 7px;
+      height: 40px;
+      padding: 0 15px;
+      border-radius: 12px;
+      background: rgba(10,10,13,.55);
+      border: 1px solid var(--edge, #212129);
+      color: var(--ink, #ececf1);
       font-size: 12px;
       font-weight: 600;
       transition: all .15s ease;
       text-decoration: none;
       cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
+    .quick-action i { font-size: 14px; color: var(--mut, #9c9cab); transition: color .15s; }
     .quick-action:hover {
       border-color: rgba(240,181,62,.5);
-      color: var(--accent);
+      color: var(--accent, #f0b53e);
       transform: translateY(-1px);
     }
-    .quick-action i { font-size: 13px; }
+    .quick-action:hover i { color: var(--accent, #f0b53e); }
+    /* ✅ لون مميز لكل زر */
+    #qaCourses i   { color: #7ea2ff; }
+    #qaRoadmaps i  { color: #b79cff; }
+    .quick-action[href="profile.html"] i { color: #4ade80; }
+    .quick-action:focus-visible {
+      outline: 2px solid var(--accent, #f0b53e);
+      outline-offset: 2px;
+    }
 
-    /* ============================================
-       Bottom Nav (موبايل)
-       ============================================ */
+    /* ==========================================================
+       ✅ Skeleton — v19: بدل منطقة كروت فاضية أول التحميل
+       (app.js بيمسحها أول render — لو الـJS فشل تفضل ظاهرة،
+        والـnoscript بيغطي حالة الجافاسكريبت المقفول)
+       ========================================================== */
+    .cards-skel {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .skel-card {
+      background: var(--panel, #101015);
+      border: 1px solid var(--edge, #212129);
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .skel-line {
+      height: 12px;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #212129, #16161d, #212129);
+      background-size: 200% 100%;
+      animation: skShimmer 1.4s infinite;
+    }
+    .skel-line + .skel-line { margin-top: 10px; }
+    .skel-line.w-30 { width: 30%; }
+    .skel-line.w-60 { width: 60%; }
+    .skel-line.w-85 { width: 85%; }
+    .skel-foot { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--edge, #212129); display: flex; justify-content: space-between; }
+    .skel-dot { width: 70px; height: 10px; border-radius: 6px; }
+    @keyframes skShimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ==========================================================
+       Bottom Nav — v19: pill خلفية للزر النشط بدل الشريط العلوي
+       ========================================================== */
     .bottom-nav {
       display: none;
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      z-index: 9999;
+      z-index: 35; /* حسب المقياس الموحد — تحت الأوفرلاي */
       background: rgba(16,16,21,.98);
       -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
-      border-top: 1px solid var(--edge);
+      border-top: 1px solid var(--edge, #212129);
       padding-bottom: env(safe-area-inset-bottom, 0px);
       box-shadow: 0 -8px 24px rgba(0,0,0,.5);
-      pointer-events: auto;
     }
     .bottom-nav-inner {
       display: flex;
@@ -161,41 +239,32 @@
       justify-content: center;
       gap: 3px;
       flex: 1;
-      height: 100%;
+      height: calc(100% - 16px);
+      margin: 8px 5px;
       background: none;
       border: none;
-      color: var(--dim);
+      border-radius: 14px;
+      color: var(--dim, #66666f);
       font-size: 10.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: color .15s;
+      transition: color .15s, background .15s;
       font-family: inherit;
       position: relative;
       padding: 0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
-    .bottom-nav-btn i {
-      font-size: 20px;
-      line-height: 1;
-    }
-    .bottom-nav-btn span {
-      line-height: 1;
-    }
-    .bottom-nav-btn:active {
-      transform: scale(.95);
+    .bottom-nav-btn i { font-size: 20px; line-height: 1; }
+    .bottom-nav-btn span { line-height: 1; }
+    .bottom-nav-btn:active { transform: scale(.95); }
+    .bottom-nav-btn:focus-visible {
+      outline: 2px solid var(--accent, #f0b53e);
+      outline-offset: -4px;
     }
     .bottom-nav-btn.active {
-      color: var(--accent);
-    }
-    .bottom-nav-btn.active::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 32px;
-      height: 3px;
-      border-radius: 0 0 3px 3px;
-      background: var(--accent);
+      color: var(--accent, #f0b53e);
+      background: rgba(240,181,62,.09);
     }
 
     @media (max-width: 1024px) {
@@ -203,24 +272,81 @@
       body { padding-bottom: 72px !important; }
       main#content { padding-bottom: 8px !important; }
     }
-
     @media (max-width: 640px) {
       .bottom-nav-inner { height: 60px; }
       .bottom-nav-btn i { font-size: 19px; }
       .bottom-nav-btn span { font-size: 10px; }
     }
 
-    .stat { transition: all .2s ease; }
-    .stat:hover { background: var(--raise); }
+    /* ==========================================================
+       ✅ الإحصائيات — v19: شريط لون جانبي لكل stat بنلونه
+       ========================================================== */
+    .stat { position: relative; transition: background .2s ease; overflow: hidden; }
+    .stat:hover { background: var(--raise, #16161d); }
+    .stat::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 0;
+      top: 0; bottom: 0;
+      width: 3px;
+      background: transparent;
+      transition: background .15s;
+    }
+    .stat[data-stat="total"]:hover::before,
+    .stat[data-stat="total"].stat-active::before               { background: #f0b53e; }
+    .stat[data-stat="status:Not Started"]:hover::before,
+    .stat[data-stat="status:Not Started"].stat-active::before  { background: #8b8b98; }
+    .stat[data-stat="status:In Progress"]:hover::before,
+    .stat[data-stat="status:In Progress"].stat-active::before  { background: #f0b53e; }
+    .stat[data-stat="status:Completed"]:hover::before,
+    .stat[data-stat="status:Completed"].stat-active::before    { background: #4ade80; }
+    .stat[data-stat="source:Google Drive"]:hover::before,
+    .stat[data-stat="source:Google Drive"].stat-active::before { background: #2684fc; }
+    .stat[data-stat="source:YouTube"]:hover::before,
+    .stat[data-stat="source:YouTube"].stat-active::before      { background: #ff5b52; }
+    .stat[data-stat="favorites"]:hover::before,
+    .stat[data-stat="favorites"].stat-active::before           { background: #f0b53e; }
 
+    /* ==========================================================
+       ✅ v19: إصلاح تكدس شريط الفلاتر على الموبايل بكلاسات ثابتة
+       (قواعد style.css بنظام nth-child كانت ما بتطابقش حاجة —
+        العنصر الثاني في view-library قسم statsBar مش div)
+       ========================================================== */
+    @media (max-width: 640px) {
+      .lib-toolbar { flex-direction: column; align-items: stretch; }
+      .lib-toolbar .lib-search-wrap { max-width: 100% !important; min-width: 0 !important; }
+      .lib-toolbar select.field { width: 100% !important; }
+      .lib-toolbar .seg-group { margin-inline-start: 0 !important; align-self: flex-end; }
+    }
+
+    /* صفحة الملفات — hover خفيف */
+    #view-files li { transition: background .15s; }
+    #view-files li:hover { background: var(--raise, #16161d); }
+
+    main#content { scroll-margin-top: 80px; }
+
+    /* شريط السلة — تحت المودالز وفوق الناف + safe-area */
+    #nexCartBar { z-index: 55 !important; }
     .nex-cartbar { bottom: 0 !important; }
     @media (max-width: 1024px) {
-      .nex-cartbar { bottom: 64px !important; }
+      .nex-cartbar {
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lib-hero::after, .lib-hero-emoji::after, .skel-line { animation: none !important; }
     }
   </style>
 </head>
 
 <body class="bg-canvas text-ink font-sans antialiased min-h-screen">
+
+  <noscript>
+    <div style="background:#e5484d;color:#fff;padding:14px;text-align:center;font-family:sans-serif">
+      المنصة محتاجة تشغيل JavaScript — فعّله من إعدادات المتصفح عشان تقدر تستخدم المنصة.
+    </div>
+  </noscript>
 
   <a href="#content" class="skip-link">تخطَّ إلى المحتوى</a>
 
@@ -236,7 +362,7 @@
           <p class="text-[10px] text-dim">Learn · Build · Grow</p>
         </div>
       </div>
-      <button id="closeSidebarBtn" class="icon-btn lg:hidden" aria-label="إغلاق القائمة">
+      <button id="closeSidebarBtn" type="button" class="icon-btn lg:hidden" aria-label="إغلاق القائمة">
         <i class="bi bi-x-lg text-[13px]"></i>
       </button>
     </div>
@@ -259,7 +385,7 @@
 
     <header class="sticky top-0 z-30 border-b border-edge bg-canvas/85 backdrop-blur">
       <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
-        <button id="menuBtn" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition lg:hidden"
+        <button id="menuBtn" type="button" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition lg:hidden"
                 aria-label="فتح القائمة" aria-expanded="false">
           <i class="bi bi-list text-[18px]"></i>
         </button>
@@ -272,11 +398,12 @@
             <i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>
             <span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>
           </button>
-          <button id="quickExportBtn" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition"
+          <!-- hidden افتراضيًا — gate.js بيرجّعهم لوضع المالك (مفيش وميض قدام الطلاب) -->
+          <button id="quickExportBtn" hidden type="button" class="w-9 h-9 grid place-items-center rounded-[10px] border border-edge text-mut hover:text-ink hover:border-edge2 transition"
                   aria-label="تصدير نسخة احتياطية JSON" title="تصدير نسخة احتياطية JSON">
             <i class="bi bi-download text-[14px]"></i>
           </button>
-          <button id="addResourceBtn" class="btn-accent">
+          <button id="addResourceBtn" hidden type="button" class="btn-accent">
             <i class="bi bi-plus-lg text-[13px]" aria-hidden="true"></i>
             <span class="hidden sm:inline">إضافة مورد</span>
           </button>
@@ -290,22 +417,22 @@
 
         <div class="lib-hero">
           <div class="lib-hero-content">
-            <div class="lib-hero-emoji" id="libHeroEmoji">👋</div>
+            <div class="lib-hero-emoji" id="libHeroEmoji" aria-hidden="true">👋</div>
             <div class="lib-hero-text">
               <h2 id="libHeroTitle">أهلاً بيك في مكتبتك</h2>
               <p id="libHeroSub">اتعلّم من أي مكان — كل كورساتك في مكان واحد</p>
             </div>
             <div class="quick-actions">
               <a href="#" class="quick-action" id="qaCourses">
-                <i class="bi bi-mortarboard"></i>
+                <i class="bi bi-mortarboard" aria-hidden="true"></i>
                 الكورسات
               </a>
               <a href="#" class="quick-action" id="qaRoadmaps">
-                <i class="bi bi-signpost-split"></i>
+                <i class="bi bi-signpost-split" aria-hidden="true"></i>
                 المسارات
               </a>
               <a href="profile.html" class="quick-action">
-                <i class="bi bi-person-circle"></i>
+                <i class="bi bi-person-circle" aria-hidden="true"></i>
                 حسابي
               </a>
             </div>
@@ -348,8 +475,10 @@
           </div>
         </section>
 
-        <div class="mt-6 flex flex-wrap items-center gap-2.5">
-          <div class="relative grow min-w-[220px] max-w-md">
+        <!-- ✅ v19: كلاسات ثابتة (lib-toolbar / lib-search-wrap / seg-group)
+             بدل الاعتماد على nth-child الهش في style.css -->
+        <div class="lib-toolbar mt-6 flex flex-wrap items-center gap-2.5">
+          <div class="lib-search-wrap relative grow min-w-[220px] max-w-md">
             <i class="bi bi-search absolute start-3 top-1/2 -translate-y-1/2 text-dim text-[13px]" aria-hidden="true"></i>
             <input id="searchInput" type="search" placeholder="ابحث في العنوان والتصنيف والوصف والملاحظات…"
                    class="field !h-10 ps-9 pe-12" aria-label="بحث في الموارد">
@@ -377,12 +506,12 @@
             <option value="opened">الأحدث فتحًا</option>
           </select>
 
-          <div class="flex items-center rounded-[10px] border border-edge bg-panel p-0.5 ms-auto"
+          <div class="seg-group flex items-center rounded-[10px] border border-edge bg-panel p-0.5 ms-auto"
                role="group" aria-label="طريقة العرض">
-            <button id="viewGrid" class="seg-btn" aria-label="عرض شبكي" aria-pressed="true">
+            <button id="viewGrid" type="button" class="seg-btn" aria-label="عرض شبكي" aria-pressed="true">
               <i class="bi bi-grid-3x3-gap"></i>
             </button>
-            <button id="viewList" class="seg-btn" aria-label="عرض قائمة" aria-pressed="false">
+            <button id="viewList" type="button" class="seg-btn" aria-label="عرض قائمة" aria-pressed="false">
               <i class="bi bi-list-ul"></i>
             </button>
           </div>
@@ -390,12 +519,24 @@
 
         <div class="mt-4 mb-3 flex items-center justify-between gap-3">
           <p id="resultsMeta" class="text-[11.5px] text-dim" aria-live="polite"></p>
-          <button id="clearFiltersBtn" class="hidden items-center gap-1.5 text-[11.5px] text-accent hover:text-accent2 transition">
+          <button id="clearFiltersBtn" type="button" class="hidden items-center gap-1.5 text-[11.5px] text-accent hover:text-accent2 transition">
             <i class="bi bi-x-circle text-[12px]" aria-hidden="true"></i>مسح الفلاتر
           </button>
         </div>
 
-        <div id="cardsContainer"></div>
+        <!-- ✅ v19: Skeleton — app.js بيمسحه أول render -->
+        <div id="cardsContainer">
+          <div class="cards-skel" aria-hidden="true">
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+            <div class="skel-card"><div class="skel-line w-30"></div><div class="skel-line w-85"></div><div class="skel-line w-60"></div><div class="skel-foot"><span class="skel-line skel-dot"></span><span class="skel-line skel-dot"></span></div></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-files" class="hidden" aria-labelledby="filesHeading">
@@ -450,7 +591,7 @@
               مع المزامنة السحابية دي نسخة أمان إضافية.
             </p>
           </div>
-          <button id="exportBtn" class="btn-accent shrink-0">
+          <button id="exportBtn" type="button" class="btn-accent shrink-0">
             <i class="bi bi-download text-[13px]" aria-hidden="true"></i>تصدير JSON
           </button>
         </div>
@@ -481,7 +622,7 @@
               واستبدالها بالقايمة الأصلية، والتغيير هينشر على السحابة.
             </p>
           </div>
-          <button id="restoreBtn" class="btn-danger-o shrink-0">
+          <button id="restoreBtn" type="button" class="btn-danger-o shrink-0">
             <i class="bi bi-arrow-counterclockwise text-[13px]" aria-hidden="true"></i>استرجاع
           </button>
         </div>
@@ -498,20 +639,20 @@
 
   <nav class="bottom-nav" aria-label="التنقل السريع">
     <div class="bottom-nav-inner">
-      <button class="bottom-nav-btn active" data-bottom-nav="library">
-        <i class="bi bi-house-door"></i>
+      <button type="button" class="bottom-nav-btn active" data-bottom-nav="library" aria-current="page">
+        <i class="bi bi-house-door" aria-hidden="true"></i>
         <span>المكتبة</span>
       </button>
-      <button class="bottom-nav-btn" data-bottom-nav="catalog">
-        <i class="bi bi-mortarboard"></i>
+      <button type="button" class="bottom-nav-btn" data-bottom-nav="catalog">
+        <i class="bi bi-mortarboard" aria-hidden="true"></i>
         <span>الكورسات</span>
       </button>
-      <button class="bottom-nav-btn" data-bottom-nav="roadmap">
-        <i class="bi bi-signpost-split"></i>
+      <button type="button" class="bottom-nav-btn" data-bottom-nav="roadmap">
+        <i class="bi bi-signpost-split" aria-hidden="true"></i>
         <span>المسارات</span>
       </button>
-      <button class="bottom-nav-btn" data-bottom-nav="profile">
-        <i class="bi bi-person"></i>
+      <button type="button" class="bottom-nav-btn" data-bottom-nav="profile">
+        <i class="bi bi-person" aria-hidden="true"></i>
         <span>حسابي</span>
       </button>
     </div>
@@ -524,7 +665,7 @@
         <div class="modal-panel relative w-full max-w-xl rounded-2xl border border-edge2 bg-panel shadow-2xl">
           <div class="flex items-center justify-between px-5 h-14 border-b border-edge">
             <h2 id="resourceModalTitle" class="text-[14px] font-semibold">إضافة مورد جديد</h2>
-            <button class="icon-btn" data-close-resource aria-label="إغلاق النافذة">
+            <button type="button" class="icon-btn" data-close-resource aria-label="إغلاق النافذة">
               <i class="bi bi-x-lg text-[13px]"></i>
             </button>
           </div>
@@ -624,8 +765,8 @@
             </div>
           </div>
           <div class="mt-5 flex items-center justify-end gap-2">
-            <button id="confirmCancel" class="btn-ghost">إلغاء</button>
-            <button id="confirmOk" class="btn-danger">تأكيد</button>
+            <button id="confirmCancel" type="button" class="btn-ghost">إلغاء</button>
+            <button id="confirmOk" type="button" class="btn-danger">تأكيد</button>
           </div>
         </div>
       </div>
@@ -633,7 +774,7 @@
   </div>
 
   <!-- 1) config.js -->
-  <script src="config.js?v=17"></script>
+  <script src="config.js?v=18"></script>
 
   <!-- 2) Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -641,47 +782,51 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <!-- 3) ملفات التطبيق — ⚠️ shop.js قبل catalog.js -->
-  <script src="catalog-loader.js?v=1"></script>
-  <script src="gate.js?v=16.2"></script>
-  <script src="cloud.js?v=18"></script>
-  <script src="shop.js?v=19"></script>
-  <script src="catalog.js?v=21"></script>
-  <script src="orders.js?v=17"></script>
-  <script src="student.js?v=16"></script>
-  <script src="roadmap.js?v=20.3"></script>
-  <script src="admin.js?v=17"></script>
-  <script src="app.js?v=18"></script>
+  <!-- ✅ v19: كل النسخ موحّدة مع آخر إصدارات الملفات المصلّحة -->
+  <script src="catalog-loader.js?v=2"></script>
+  <script src="gate.js?v=17"></script>
+  <script src="cloud.js?v=19"></script>
+  <script src="shop.js?v=20"></script>
+  <script src="catalog.js?v=22"></script>
+  <script src="orders.js?v=18"></script>
+  <script src="student.js?v=17"></script>
+  <script src="roadmap.js?v=19"></script>
+  <script src="admin.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 
   <script>
     (function () {
+      /* ---------- الترحيب ---------- */
       function updateHero() {
         if (!window.firebase || !firebase.auth) return;
-        firebase.auth().onAuthStateChanged((user) => {
-          const emoji = document.getElementById('libHeroEmoji');
-          const title = document.getElementById('libHeroTitle');
-          const sub = document.getElementById('libHeroSub');
-          if (!emoji || !title || !sub) return;
+        try {
+          firebase.auth().onAuthStateChanged((user) => {
+            const emoji = document.getElementById('libHeroEmoji');
+            const title = document.getElementById('libHeroTitle');
+            const sub = document.getElementById('libHeroSub');
+            if (!emoji || !title || !sub) return;
 
-          if (user) {
-            const firstName = (user.displayName || 'صديقنا').split(' ')[0];
-            const hour = new Date().getHours();
-            let greet = 'أهلاً';
-            if (hour < 12) greet = 'صباح الخير';
-            else if (hour < 18) greet = 'مساء الخير';
-            else greet = 'مساء الخير';
-            emoji.textContent = hour < 12 ? '☀️' : (hour < 18 ? '🌤️' : '🌙');
-            title.textContent = greet + ' يا ' + firstName + ' 👋';
-            sub.textContent = 'كمّل رحلتك التعليمية من مكان ما وقفت';
-          } else {
-            emoji.textContent = '👋';
-            title.textContent = 'أهلاً بيك في مكتبتك';
-            sub.textContent = 'اتعلّم من أي مكان — كل كورساتك في مكان واحد';
-          }
-        });
+            const h = new Date().getHours();
+            const greet = h < 12 ? 'صباح الخير' : 'مساء الخير';
+            const emojiByHour = h < 5 ? '🌙' : h < 12 ? '☀️' : h < 18 ? '🌤️' : '🌙';
+
+            if (user) {
+              const firstName = (user.displayName || 'صديقنا').split(' ')[0];
+              emoji.textContent = emojiByHour;
+              title.textContent = greet + ' يا ' + firstName + ' 👋';
+              sub.textContent = 'كمّل رحلتك التعليمية من مكان ما وقفت';
+            } else {
+              emoji.textContent = '👋';
+              title.textContent = 'أهلاً بيك في مكتبتك';
+              sub.textContent = 'اتعلّم من أي مكان — كل كورساتك في مكان واحد';
+            }
+          });
+        } catch (e) { console.warn('[HERO]', e); }
       }
       updateHero();
 
-      function tryClickNav(selector, retries = 20) {
+      /* ---------- ضغط عناصر التنقل مع retry ---------- */
+      function tryClickNav(selector, retries = 25) {
         const btn = document.querySelector(selector);
         if (btn) { btn.click(); return; }
         if (retries <= 0) { console.warn('[HERO] مش لاقي:', selector); return; }
@@ -699,15 +844,25 @@
         tryClickNav('[data-nav="view:roadmap"]');
       });
 
-      document.querySelectorAll('[data-bottom-nav]').forEach((btn) => {
+      /* ---------- الناف السفلي ---------- */
+      const bottomBtns = [...document.querySelectorAll('[data-bottom-nav]')];
+
+      function setBottomActive(name) {
+        bottomBtns.forEach((b) => {
+          const on = b.dataset.bottomNav === name;
+          b.classList.toggle('active', on);
+          if (on) b.setAttribute('aria-current', 'page');
+          else b.removeAttribute('aria-current');
+        });
+      }
+
+      bottomBtns.forEach((btn) => {
         btn.addEventListener('click', () => {
           const target = btn.dataset.bottomNav;
-          document.querySelectorAll('.bottom-nav-btn').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
+          setBottomActive(target);
 
           if (target === 'library') {
-            const nav = document.querySelector('[data-nav="library:all"]');
-            if (nav) nav.click();
+            tryClickNav('[data-nav="library:all"]');
           } else if (target === 'catalog') {
             tryClickNav('[data-nav="view:catalog"]');
           } else if (target === 'roadmap') {
@@ -718,17 +873,15 @@
         });
       });
 
-      function checkBottomNav() {
-        const bn = document.querySelector('.bottom-nav');
-        if (!bn) return;
-        if (window.innerWidth <= 1024) {
-          bn.style.display = 'block';
-        } else {
-          bn.style.display = 'none';
-        }
-      }
-      checkBottomNav();
-      window.addEventListener('resize', checkBottomNav);
+      /* مزامنة مؤشر الناف السفلي مع أي تنقل من أي مكان في الصفحة */
+      document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-nav]');
+        if (!b) return;
+        const v = b.dataset.nav || '';
+        if (v === 'view:catalog') setBottomActive('catalog');
+        else if (v === 'view:roadmap') setBottomActive('roadmap');
+        else if (v.indexOf('library:') === 0) setBottomActive('library');
+      }, true);
     })();
   </script>
 </body>

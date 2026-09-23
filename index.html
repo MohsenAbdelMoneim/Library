@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0d">
+  <!-- ✅ السبلاش صفحة عبور — ماينفعش يتفرس بدل المحتوى الحقيقي -->
+  <meta name="robots" content="noindex, follow">
   <title>Nexora Academy</title>
+
+  <!-- ✅ Fallback شامل: لو JS مش هيشتغل لأي سبب، التحويل يحصل برضه
+       (الـJS بيوصل الأول عادةً فمش هتحس بيه) -->
+  <meta http-equiv="refresh" content="5;url=landing.html">
+
   <link rel="shortcut icon" href="Gemini_Generated_Image_tsfpgwtsfpgwtsfp.jpg" type="image/x-icon">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,10 +21,7 @@
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    html, body {
-      height: 100%;
-      overflow: hidden;
-    }
+    html, body { height: 100%; overflow: hidden; }
 
     body {
       font-family: 'IBM Plex Sans Arabic', sans-serif;
@@ -35,7 +39,6 @@
       position: relative;
     }
 
-    /* خطوط متحركة في الخلفية */
     .bg-lines {
       position: fixed;
       inset: 0;
@@ -61,7 +64,6 @@
       padding: 24px;
     }
 
-    /* اللوجو */
     .logo-badge {
       width: 96px;
       height: 96px;
@@ -95,7 +97,6 @@
       50%      { opacity: .8; transform: scale(1.05); }
     }
 
-    /* الاسم */
     .brand {
       font-size: clamp(28px, 6vw, 44px);
       font-weight: 900;
@@ -122,7 +123,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* شريط التحميل */
     .progress-wrap {
       width: min(280px, 80vw);
       height: 4px;
@@ -147,7 +147,6 @@
       font-weight: 500;
       animation: fadeUp .6s ease .9s backwards;
     }
-
     .loading-text .dots::after {
       content: '';
       animation: dots 1.5s steps(4, end) infinite;
@@ -160,7 +159,33 @@
       100% { content: ''; }
     }
 
-    /* Reduced motion */
+    /* ✅ زرار التخطي — ظاهر بس خفيف */
+    .skip-splash {
+      position: fixed;
+      top: 16px;
+      inset-inline-end: 16px;
+      z-index: 10;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      color: #9c9cab;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .15s;
+      animation: fadeUp .6s ease 1.1s backwards;
+    }
+    .skip-splash:hover {
+      color: #ececf1;
+      border-color: rgba(240,181,62,.5);
+    }
+    .skip-splash:focus-visible {
+      outline: 2px solid #f0b53e;
+      outline-offset: 2px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -172,49 +197,97 @@
 </head>
 <body>
 
+  <!-- ✅ ولو بدون JS: لينك مباشر (مع الـmeta refresh في الهيد كشبكة أمان) -->
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#0a0a0d;color:#ececf1;font-family:sans-serif;text-align:center;padding:24px">
+      <div>
+        <p style="margin-bottom:16px">لو مش هتتحوّل تلقائيًا:</p>
+        <a href="landing.html" style="color:#f0b53e;font-weight:700">ادخل هنا ←</a>
+      </div>
+    </div>
+  </noscript>
+
   <div class="bg-lines" aria-hidden="true"></div>
 
+  <!-- ✅ تخطي الشاشة -->
+  <button type="button" class="skip-splash" id="skipBtn">تخطي ←</button>
+
   <div class="splash-wrap">
-    <div class="logo-badge">🎓</div>
+    <div class="logo-badge" aria-hidden="true">🎓</div>
     <h1 class="brand">Nexora Academy</h1>
     <p class="tagline">LEARN · BUILD · GROW</p>
 
     <div class="progress-wrap">
-      <div class="progress-bar" id="progressBar"></div>
+      <div class="progress-bar" id="progressBar"
+           role="progressbar" aria-label="جاري تحميل المنصة"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
     </div>
-    <p class="loading-text">جاري التحميل<span class="dots"></span></p>
+    <p class="loading-text" aria-live="polite">جاري التحميل<span class="dots"></span></p>
   </div>
 
   <script>
     (function () {
-      const bar = document.getElementById('progressBar');
-      let progress = 0;
+      'use strict';
 
-      /* تقدّم تدريجي: من 0 لـ 100 خلال ~2.2 ثانية */
-      const step = () => {
-        progress += Math.random() * 18 + 8;
-        if (progress > 100) progress = 100;
-        bar.style.width = progress + '%';
+      var bar = document.getElementById('progressBar');
+      var started = false;   /* ✅ يمنع الـstep المزدوج (كان race condition حقيقي) */
+      var done = false;      /* ✅ يمنع التحويل المزدوج */
 
-        if (progress < 100) {
-          setTimeout(step, 180 + Math.random() * 150);
-        } else {
-          /* لما يوصل 100 → تحويل */
-          setTimeout(() => {
-            window.location.replace('landing.html');
-          }, 400);
-        }
-      };
+      function go() {
+        if (done) return;
+        done = true;
+        try { window.location.replace('landing.html'); }
+        catch (e) { window.location.href = 'landing.html'; }
+      }
 
-      /* ابدأ بعد ما الصفحة تحمّل */
-      window.addEventListener('load', () => {
-        setTimeout(step, 200);
+      /* ✅ تخطي: من الزرار أو أي ضغطة على الصفحة */
+      document.getElementById('skipBtn').addEventListener('click', go);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') go();
       });
 
-      /* fallback: لو load اتأخر */
-      setTimeout(() => {
-        if (progress === 0) step();
-      }, 1500);
+      function setProgress(p) {
+        bar.style.width = p + '%';
+        bar.setAttribute('aria-valuenow', String(Math.round(p)));
+      }
+
+      function step() {
+        if (started) return;   /* 🔑 الإصلاح: مرة واحدة بس */
+        started = true;
+
+        var progress = 0;
+        (function tick() {
+          progress += Math.random() * 18 + 10;
+          if (progress > 100) progress = 100;
+          setProgress(progress);
+
+          if (progress < 100) {
+            setTimeout(tick, 140 + Math.random() * 120);
+          } else {
+            setTimeout(go, 350);
+          }
+        })();
+      }
+
+      /* ✅ الزيارة التانية في نفس الجلسة = سبلاش أسرع بكثير
+         (قبل كده كل زيارة بتدفع ~2.2 ثانية كاملة) */
+      var seen = false;
+      try {
+        seen = sessionStorage.getItem('nexora_splash') === '1';
+        sessionStorage.setItem('nexora_splash', '1');
+      } catch (e) { /* التخزين مقفول — نتعامل كأول زيارة */ }
+      var startDelay = seen ? 0 : 200;
+
+      if (document.readyState === 'complete') {
+        setTimeout(step, startDelay);
+      } else {
+        window.addEventListener('load', function () { setTimeout(step, startDelay); });
+        /* fallback لو load اتأخر */
+        setTimeout(step, startDelay + 1300);
+      }
+
+      /* ✅ أقصى مهلة قصوى — مهما حصل، التحويل بيحصل (شبكة أمان فوق الشبكة) */
+      setTimeout(go, 4500);
     })();
   </script>
 </body>

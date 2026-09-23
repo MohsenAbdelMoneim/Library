@@ -7,21 +7,29 @@
   <meta name="description" content="Nexora Academy — منصة تعليمية احترافية: كورسات في البرمجة والتصميم وتحليل البيانات. دفع كاش أو تقسيط.">
   <title>Nexora Academy — استثمر في نفسك</title>
 
+  <!-- ✅ Canonical — عشان جوجل مايعتبرش index وlanding محتوى مكرر -->
+  <link rel="canonical" href="https://nexora-academy.com/">
+
   <!-- ✅ Favicon محسّن -->
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="favicon.png">
 
-  <!-- ✅ Open Graph + Twitter Card -->
+  <!-- ✅ Open Graph + Twitter Card
+       🚨 إصلاح: الصور لازم URLs مطلقة — الكراولرز مش بتفهم النسبي -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Nexora Academy">
+  <meta property="og:locale" content="ar_EG">
   <meta property="og:title" content="Nexora Academy — استثمر في نفسك">
   <meta property="og:description" content="كورسات احترافية في البرمجة والتصميم وتحليل البيانات. دفع كاش أو تقسيط.">
-  <meta property="og:image" content="og-cover.png">
+  <meta property="og:image" content="https://nexora-academy.com/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Nexora Academy — منصة تعليمية احترافية">
   <meta property="og:url" content="https://nexora-academy.com/">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Nexora Academy — استثمر في نفسك">
   <meta name="twitter:description" content="كورسات احترافية في البرمجة والتصميم وتحليل البيانات.">
-  <meta name="twitter:image" content="og-cover.png">
+  <meta name="twitter:image" content="https://nexora-academy.com/og-cover.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,7 +105,6 @@
       background: var(--green); animation: pulse 1.5s infinite;
     }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
-    /* ✅ h1 بدل h2 */
     .hero h1 {
       font-size: clamp(28px, 5vw, 52px); font-weight: 900;
       line-height: 1.3; margin-bottom: 20px;
@@ -217,6 +224,7 @@
     .btn-wa { flex: 0 0 52px; background: #25D366; color: #04310f; }
     .btn-wa:hover { opacity: .9; }
     .courses-more { text-align: center; margin-top: 32px; }
+    .courses-more .btn-secondary { display: inline-flex; }
 
     /* ✅ Loading / Empty / Error states */
     .courses-state {
@@ -300,7 +308,6 @@
       background: linear-gradient(135deg, var(--blue), var(--purple));
       display: grid; place-items: center; font-size: 18px;
     }
-    /* ✅ div بدل h1 في الـfooter */
     .footer .logo-text .brand {
       font-size: 14.5px; font-weight: 800;
       background: linear-gradient(135deg, #fff, var(--accent));
@@ -314,7 +321,6 @@
       .hero { padding: 90px 0 60px; }
       .cta-box { padding: 32px 20px; }
       .feature, .course-card, .testimonial, .stat-box { padding: 18px; }
-      /* ✅ الأزرار بعرض كامل بس في الـhero والـCTA */
       .hero-cta .btn-primary,
       .hero-cta .btn-secondary,
       .cta-box .btn-primary,
@@ -329,16 +335,12 @@
     }
 
     /* ✅ Reveal Animation آمن */
-    .reveal {
-      opacity: 1; transform: none;
-    }
+    .reveal { opacity: 1; transform: none; }
     .reveal.will-reveal {
       opacity: 0; transform: translateY(20px);
       transition: opacity .6s ease, transform .6s ease;
     }
-    .reveal.will-reveal.visible {
-      opacity: 1; transform: translateY(0);
-    }
+    .reveal.will-reveal.visible { opacity: 1; transform: translateY(0); }
 
     /* ✅ prefers-reduced-motion */
     @media (prefers-reduced-motion: reduce) {
@@ -429,7 +431,7 @@
       </div>
 
       <div class="courses-more">
-        <a href="library.html" class="btn-secondary" style="display:inline-flex;">
+        <a href="library.html" class="btn-secondary">
           <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
           شوف كل الكورسات
         </a>
@@ -562,7 +564,7 @@
         <nav aria-label="تواصل معنا">
           <h4>تواصل معنا</h4>
           <ul>
-            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone" aria-hidden="true"></i> 01096295395</a></li>
+            <li><a href="tel:+201096295395" dir="ltr"><i class="bi bi-telephone" aria-hidden="true"></i> 01096295395</a></li>
             <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i> واتساب</a></li>
           </ul>
         </nav>
@@ -574,7 +576,11 @@
     </div>
   </footer>
 
-  <!-- ====== Scripts (✅ defer على كل حاجة) ====== -->
+  <!-- ====== Scripts ======
+       ⚠️ v18: شيلنا defer من السكريبت inline — الـspec بي تجاهله
+       للسكريبتات من غير src، وکان مضلل. السكريبت هنا في آخر الـbody
+       فالـDOM جاهز، والـlisteners بتتسجل قبل ما catalog-loader
+       (المؤجل) يطلق أي event — فالترتيب مظبوط. -->
   <script src="config.js?v=17" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
@@ -582,7 +588,7 @@
   <script src="catalog-loader.js?v=17" defer></script>
   <script src="nav.js?v=17" defer></script>
 
-  <script defer>
+  <script>
   (function () {
     'use strict';
 
@@ -590,7 +596,7 @@
     const $  = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
 
-    /* ✅ رقم آمن */
+    /* رقم آمن */
     function fmtPrice(n) {
       const v = Number(n);
       if (!Number.isFinite(v) || v <= 0) return null;
@@ -598,11 +604,9 @@
       catch { return String(v) + ' جنيه'; }
     }
 
-    /* ✅ escape شامل */
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
       (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-    /* ✅ واتساب من MCL لو متاح */
     function waHref(text) {
       const phone = (window.MCL && MCL.CONTACT_PHONE) || '01096295395';
       const intl = String(phone).replace(/^0/, '20');
@@ -613,7 +617,7 @@
     const yearEl = $('#year');
     if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-    /* ====== Reveal on scroll (✅ آمن لو JS فشل) ====== */
+    /* ====== Reveal on scroll (آمن لو JS فشل) ====== */
     if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
@@ -632,6 +636,11 @@
 
     /* ====== Render Courses ====== */
     const grid = $('#coursesGrid');
+
+    /* ✅ v18: بنفرّق بين «الكتالوج لسه منزلش» (خطأ/شبكة)
+       و«الكتالوج نزل وفاضي فعلًا» — قبل كده retry بعد timeout
+       كان يعرض «مفيش كورسات» وهي غلط */
+    let catalogReady = false;
 
     function courseCardHTML(c) {
       const price = fmtPrice(c.cashPrice);
@@ -659,7 +668,7 @@
         </article>`;
     }
 
-    function setState(state, extra) {
+    function setState(state) {
       if (!grid) return;
       if (state === 'loading') {
         grid.innerHTML = '<div class="courses-state" data-state="loading">' +
@@ -676,58 +685,64 @@
         const retry = $('#retryCourses');
         if (retry) retry.addEventListener('click', (e) => {
           e.preventDefault();
+          setState('loading');
           renderCourses();
         });
       }
     }
 
+    function updateStats(courses) {
+      const statCourses = $('#statCourses');
+      if (statCourses) statCourses.textContent = courses.length + '+';
+
+      /* ✅ v18 إصلاح: الرقم الحقيقي لعدد التصنيفات —
+         قبل كده كان Math.max(3, Math.min(size, 12)) رقم مفبرك */
+      const statPaths = $('#statPaths');
+      if (statPaths) {
+        const cats = new Set(courses.map((c) => c.category).filter(Boolean));
+        if (cats.size > 0) statPaths.textContent = String(cats.size);
+        /* لو مفيش تصنيفات، نسيب الرقم الافتراضي زي ما هو */
+      }
+    }
+
     function renderCourses() {
       const catalog = window.__NEXORA_CATALOG__;
-      if (!catalog || !Array.isArray(catalog.courses) || !catalog.courses.length) {
+      const courses = (catalog && Array.isArray(catalog.courses)) ? catalog.courses : null;
+
+      /* الكتالوج لسه منزلش */
+      if (!courses) {
+        setState(catalogReady ? 'empty' : 'error');
+        return;
+      }
+
+      /* نزل وفاضي فعلًا */
+      if (!courses.length) {
+        catalogReady = true;
         setState('empty');
         return;
       }
-      /* ✅ featured: أول 6 من الأحدث */
-      const featured = catalog.courses
+
+      catalogReady = true;
+      const featured = courses
         .slice()
         .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
         .slice(0, 6);
       if (!grid) return;
       grid.innerHTML = featured.map(courseCardHTML).join('');
-
-      /* ✅ تحديث الإحصائيات */
-      const statCourses = $('#statCourses');
-      if (statCourses) statCourses.textContent = catalog.courses.length + '+';
-
-      /* ✅ عدد المسارات من roadmap لو موجود */
-      const statPaths = $('#statPaths');
-      if (statPaths && window.NexoraRoadmap) {
-        /* نستنى event بدل ما نخمّن */
-      }
+      updateStats(courses);
     }
 
-    /* ✅ Event-driven + fallback polling */
-    window.addEventListener('nexora:catalog-ready', renderCourses);
+    /* ✅ v18: listener واحد بس بدل اتنين متسجلين على نفس الـevent */
+    window.addEventListener('nexora:catalog-ready', () => {
+      catalogReady = true;
+      renderCourses();
+    });
     window.addEventListener('nexora:catalog-update', renderCourses);
 
-    /* ✅ عدد المسارات — لو roadmap.js موجود */
-    window.addEventListener('nexora:catalog-ready', () => {
-      const statPaths = $('#statPaths');
-      if (statPaths && window.NexoraRoadmap) {
-        try {
-          /* نعمل reload سريع لبناء المسارات */
-          const catalog = window.__NEXORA_CATALOG__;
-          if (catalog && catalog.courses) {
-            const cats = new Set(catalog.courses.map((c) => c.category).filter(Boolean));
-            statPaths.textContent = Math.max(3, Math.min(cats.size, 12));
-          }
-        } catch { /* تجاهل */ }
-      }
-    });
-
-    /* ✅ Initial check + polling آمن */
+    /* Initial check + polling آمن */
     (function initCourses() {
-      if (window.__NEXORA_CATALOG__ && window.__NEXORA_CATALOG__.courses && window.__NEXORA_CATALOG__.courses.length) {
+      const cat = window.__NEXORA_CATALOG__;
+      if (cat && Array.isArray(cat.courses) && cat.courses.length) {
         renderCourses();
         return;
       }
@@ -735,20 +750,19 @@
       const maxTries = 20; /* ~6 ثواني */
       const check = setInterval(() => {
         tries++;
-        const cat = window.__NEXORA_CATALOG__;
-        if (cat && Array.isArray(cat.courses) && cat.courses.length) {
+        const c = window.__NEXORA_CATALOG__;
+        if (c && Array.isArray(c.courses)) {
           clearInterval(check);
           renderCourses();
         } else if (tries >= maxTries) {
           clearInterval(check);
-          /* ✅ نتحقق بـdata-state بدل النص */
-          const stateEl = grid && grid.querySelector('[data-state="loading"]');
-          if (stateEl) setState('error');
+          /* ✅ error مش empty — الكتالوج لسه منزلش */
+          renderCourses();
         }
       }, 300);
     })();
 
-    /* ✅ إخفاء الأنيميشن عند الخروج */
+    /* ✅ إخفاء الأنيميشن عند الخروج (bfcache) */
     window.addEventListener('pagehide', () => {
       $$('.reveal').forEach((el) => el.classList.remove('will-reveal'));
     });

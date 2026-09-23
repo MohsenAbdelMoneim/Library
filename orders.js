@@ -1,15 +1,19 @@
 /* ==========================================================
-   orders.js — v17
+   orders.js — v18
    حجوزات الطالب + تأكيد المالك (تفعيل تلقائي للكورسات)
-   ✅ v17: انتظار DOM + إصلاح كل المشاكل
+   ✅ v18: خصوصية — الطالب بينزّل حجوزاته هو بس (query مفلتر على السيرفر)
+   ✅ v18: ترتيب في JS بدل orderBy — مفيش حجوزات بتختفي بصمت
+   ✅ v18: onSnapshot — الطالب بيشوف التأكيد لحظيًا والمالك بيشوف الطلبات الجديدة لحظيًا
+   ✅ v18: الباقات بتتحل من الكتالوج لو courseIds ناقصة + courseTitle في الenrollment
+   ✅ v18: إخفاء #view-orders عند التنقل لأي فيو تاني (مفيش محتوى مزدوج)
+   ✅ v18: حارس مالك على فيو الأدمن + إزالة أزرار الناف عند الخروج
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Orders — v17 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Orders — v18 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
-  /* ✅ فحص Firebase */
   if (typeof firebase === 'undefined') {
     console.error('[ORDERS] Firebase SDK مش محمّل');
     return;
@@ -24,20 +28,25 @@
     appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
   };
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
   const OWNER_EMAIL = (window.__OWNER_EMAIL__) || 'owner@gymzone.com';
 
-  /* ---------- أدوات مساعدة ---------- */
+  /* ---------- أدوات ---------- */
   const qs  = (s) => document.querySelector(s);
   const qsa = (s) => [...document.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const fmt = (n) => Number(n).toLocaleString('ar-EG-u-nu-latn') + ' جنيه';
-  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('ar-EG-u-nu-latn') : '—';
+
+  /* ✅ v18: تاريخ آمن */
+  function fmtDate(iso) {
+    const t = iso && Date.parse(iso);
+    if (!Number.isFinite(t)) return '—';
+    try { return new Date(t).toLocaleDateString('ar-EG-u-nu-latn'); }
+    catch { return '—'; }
+  }
 
   function notify(msg, type = 'info', duration = 4500) {
     if (typeof window.showToast === 'function') {
@@ -48,15 +57,42 @@
   }
 
   function askConfirm(opts) {
-    if (typeof window.openConfirm === 'function') {
-      window.openConfirm(opts);
-      return;
-    }
+    if (typeof window.openConfirm === 'function') { window.openConfirm(opts); return; }
     if (window.confirm(opts.message)) opts.onConfirm();
   }
 
   let orders = [];
   let currentUser = null;
+  let ordersUnsub = null;   /* ✅ v18: إدارة الاشتراك اللحظي */
+  let activeView = null;    /* 'admin' | 'student' | null */
+
+  const isOwnerUser = (user) =>
+    !!user && (user.email === OWNER_EMAIL || (window.MCL && MCL.isAdminActive()));
+
+  /* ✅ v18: عنوان كورس من الكتالوج (للـcourseTitle في الenrollment) */
+  function courseTitleOf(courseId) {
+    const src = window.__NEXORA_CATALOG__ || {};
+    const c = (src.byId && src.byId[courseId]) ||
+              (src.courses || []).find((x) => x.id === courseId);
+    return c ? c.title : courseId;
+  }
+
+  /* ✅ v18: حل courseIds للباقة من الكتالوج لو العنصر ناقصها */
+  function resolvePackCourseIds(packId) {
+    const src = window.__NEXORA_CATALOG__ || {};
+    const p = (src.packById && src.packById[packId]) ||
+              (src.packages || []).find((x) => x.id === packId);
+    return (p && Array.isArray(p.courseIds)) ? p.courseIds : [];
+  }
+
+  /* ✅ v18: ترتيب في JS — بدل orderBy اللي كان بيسقط وثائق بأنواع تواريخ مختلطة */
+  function sortOrdersDesc(list) {
+    return list.slice().sort((a, b) => {
+      const ta = Date.parse(a.createdAt) || 0;
+      const tb = Date.parse(b.createdAt) || 0;
+      return tb - ta;
+    });
+  }
 
   const STYLES = `
 .od-wrap{max-width:900px;margin:0 auto}
@@ -74,6 +110,7 @@
 .od-btn{height:40px;padding:0 18px;border-radius:10px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .od-btn.ok{background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff}
 .od-btn.no{background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.4);color:#f4636e}
+.od-btn[aria-busy="true"]{opacity:.6;pointer-events:none}
 .od-empty{text-align:center;padding:44px;color:var(--dim,#66666f);font-size:13px}
 @media (max-width:640px){
   .od-actions{flex-direction:column}
@@ -105,17 +142,6 @@
     return true;
   }
 
-  async function loadOrders() {
-    try {
-      const snap = await db.collection('orders').orderBy('createdAt', 'desc').get();
-      orders = snap.docs.map((d) => ({ docId: d.id, ...d.data() }));
-      console.info('[ORDERS] حمّل', orders.length, 'حجز');
-    } catch (e) {
-      console.warn('[ORDERS]', e.code);
-      orders = [];
-    }
-  }
-
   function statusChip(s) {
     const map = {
       pending:   ['بانتظار المراجعة ⏳', 'pending'],
@@ -133,6 +159,45 @@
     ).join('<br>');
   }
 
+  /* ==========================================================
+     ✅ v18: التحميل — كل واحد بينزّل اللي يخصه بس:
+     الطالب: query مفلتر على السيرفر where userId==uid
+     المالك: كل الحجوزات
+     ========================================================== */
+  function unsubscribeOrders() {
+    if (ordersUnsub) { try { ordersUnsub(); } catch { /* تجاهل */ } ordersUnsub = null; }
+  }
+
+  function subscribeOrders(user) {
+    unsubscribeOrders();
+
+    if (!user) { orders = []; return; }
+
+    if (isOwnerUser(user)) {
+      /* المالك: كل الحجوزات — لحظيًا (بيشوف الطلبات الجديدة وهي نازلة) */
+      ordersUnsub = db.collection('orders').onSnapshot((snap) => {
+        orders = sortOrdersDesc(snap.docs.map((d) => ({ docId: d.id, ...d.data() })));
+        if (activeView === 'admin') renderOwner();
+      }, (err) => {
+        console.warn('[ORDERS] استماع المالك:', err.code);
+        notify('مش قادرين نتابع الحجوزات لحظيًا — راجع Firestore Rules', 'error');
+      });
+    } else {
+      /* ✅ الطالب: حجوزاته هو بس — الفلترة على السيرفر مش في المتصفح */
+      ordersUnsub = db.collection('orders')
+        .where('userId', '==', user.uid)
+        .onSnapshot((snap) => {
+          orders = sortOrdersDesc(snap.docs.map((d) => ({ docId: d.id, ...d.data() })));
+          if (activeView === 'student') renderStudent();
+        }, (err) => {
+          console.warn('[ORDERS] استماع الطالب:', err.code);
+          if (err.code === 'permission-denied') {
+            notify('مش قادرين نحمّل حجوزاتك — راجع Firestore Rules (orders: read own)', 'error', 8000);
+          }
+        });
+    }
+  }
+
   /* ---------- عرض المالك ---------- */
   function renderOwner() {
     const inner = qs('#ordersInner');
@@ -143,15 +208,11 @@
       '<div style="padding:4px 0 16px">' +
         '<h2 style="font-size:20px;font-weight:800">الحجوزات 🧾</h2>' +
         '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">' +
-          '"تأكيد وتفعيل" = إضافة كل كورسات الطلب لحساب الطالب فورًا</p>' +
+          '«تأكيد وتفعيل» = إضافة كل كورسات الطلب لحساب الطالب فورًا — القايمة بتتحدث لحظيًا</p>' +
       '</div>' +
       (pending.length ? pending.map(orderAdminHTML).join('') : '<p class="od-empty">مفيش حجوزات جديدة.</p>') +
       (done.length ? '<h3 style="font-size:14px;font-weight:800;margin:22px 0 10px">سجل الحجوزات السابقة</h3>' + done.map(orderAdminHTML).join('') : '');
-
-    qsa('#ordersInner [data-confirm]').forEach((b) =>
-      b.addEventListener('click', () => confirmOrder(b.dataset.confirm)));
-    qsa('#ordersInner [data-reject]').forEach((b) =>
-      b.addEventListener('click', () => rejectOrder(b.dataset.reject)));
+    /* ✅ مفيش bind فردي — الـdelegation مربوطة مرة واحدة */
   }
 
   function orderAdminHTML(o) {
@@ -177,11 +238,11 @@
   function renderStudent() {
     const inner = qs('#ordersInner');
     if (!inner || !currentUser) return;
-    const mine = orders.filter((o) => o.userId === currentUser.uid);
+    const mine = orders; /* ✅ السيرفر فلترها أصلًا — مفيش فلترة متصفح */
     inner.innerHTML =
       '<div style="padding:4px 0 16px">' +
         '<h2 style="font-size:20px;font-weight:800">حجوزاتي 🧾</h2>' +
-        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">تابع حالة حجوزاتك هنا — بعد تأكيد الدفع الكورسات تظهر في "حسابي"</p>' +
+        '<p style="font-size:12.5px;color:var(--mut,#9c9cab);margin-top:4px">تابع حالة حجوزاتك هنا — أول ما الدفع يتأكد الكورسات تظهر في «حسابي» فورًا</p>' +
       '</div>' +
       (mine.length ? mine.map((o) =>
         '<div class="od-card">' +
@@ -192,7 +253,7 @@
           '</div>' +
           '<div class="od-total">الإجمالي: ' + fmt(o.totalCash || 0) + '</div>' +
         '</div>').join('')
-      : '<p class="od-empty">مفيش حجوزات لسه — اختار كورس من "الكورسات والباقات" واضغط "أضف للسلة" 🛒</p>');
+      : '<p class="od-empty">مفيش حجوزات لسه — اختار كورس من «الكورسات والباقات» واضغط «أضف للسلة» 🛒</p>');
   }
 
   function itemsOneLine(o) {
@@ -200,14 +261,31 @@
     return o.items.map((i) => esc(i.title)).join(' + ');
   }
 
+  /* ---------- Event Delegation (مرة واحدة) ---------- */
+  function bindInnerEvents() {
+    const inner = qs('#ordersInner');
+    if (!inner || inner.__odBound) return;
+    inner.__odBound = true;
+
+    inner.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-confirm]');
+      if (c) { confirmOrder(c.dataset.confirm); return; }
+      const r = e.target.closest('[data-reject]');
+      if (r) { rejectOrder(r.dataset.reject); return; }
+    });
+  }
+
   /* ---------- تأكيد الطلب ---------- */
   function confirmOrder(docId) {
+    /* ✅ v18: حارس — التأكيد للمالك بس */
+    if (!isOwnerUser(currentUser)) { notify('العملية دي لوضع المالك فقط.', 'error'); return; }
+
     const o = orders.find((x) => x.docId === docId);
     if (!o || o.status !== 'pending') return;
 
     askConfirm({
       title: 'تأكيد الحجز',
-      message: 'تأكيد حجز «' + o.name + '»؟ هيتم تفعيل كل كورسات الطلب على حسابه فورًا.',
+      message: 'تأكيد حجز «' + (o.name || 'طالب') + '»؟ هيتم تفعيل كل كورسات الطلب على حسابه فورًا.',
       confirmLabel: 'تأكيد وتفعيل',
       danger: false,
       onConfirm: () => performConfirmOrder(o)
@@ -222,19 +300,45 @@
         .where('userId', '==', o.userId).where('status', '==', 'active').get();
       const active = new Set(existing.docs.map((d) => d.data().courseId));
 
+      /* ✅ v18: حل courseIds مع fallback للكتالوج —
+         قبل كده باقة من غير courseIds كانت بتتأكد من غير تفعيل أي كورس بصمت! */
       const courseIds = [];
+      let unresolvable = 0;
       (o.items || []).forEach((i) => {
-        if (i.type === 'course') courseIds.push(i.id);
-        else if (i.type === 'pack' && Array.isArray(i.courseIds)) courseIds.push(...i.courseIds);
+        if (i.type === 'course') {
+          if (i.id) courseIds.push(i.id);
+        } else if (i.type === 'pack') {
+          const ids = (Array.isArray(i.courseIds) && i.courseIds.length)
+            ? i.courseIds
+            : resolvePackCourseIds(i.id);
+          if (ids.length) courseIds.push(...ids);
+          else unresolvable++;
+        }
       });
 
+      if (!courseIds.length) {
+        notify('⚠️ معرفناش نحدد كورسات من الطلب — راجع عناصره قبل التأكيد. الحجز لسه معلّق.', 'error', 9000);
+        return;
+      }
+      if (unresolvable) {
+        console.warn('[ORDERS]', unresolvable, 'باقة مفيش ليها courseIds في الكتالوج');
+      }
+
       const batch = db.batch();
+      const seen = new Set();
+      let added = 0;
       courseIds.forEach((cid) => {
-        if (active.has(cid)) return;
+        if (active.has(cid) || seen.has(cid)) return;
+        seen.add(cid);
+        added++;
         const ref = db.collection('enrollments').doc();
         batch.set(ref, {
-          userId: o.userId, courseId: cid, status: 'active',
-          enrolledAt: new Date().toISOString(), expiresAt: null,
+          userId: o.userId,
+          courseId: cid,
+          courseTitle: courseTitleOf(cid),   /* ✅ v18: عشان profile.html يعرض الاسم مش الـID */
+          status: 'active',
+          enrolledAt: new Date().toISOString(),
+          expiresAt: null,
           paymentType: 'cash', paymentStatus: 'paid',
           paidInstallments: 0, notes: 'حجز #' + docId.slice(0, 6)
         });
@@ -244,21 +348,24 @@
       });
       await batch.commit();
 
-      console.info('[ORDERS] ✅ الحجز اتأكد والكورسات اتفعّلت');
-      await loadOrders();
-      renderOwner();
-      notify('تم التأكيد — الكورسات ظهرت لحساب الطالب ✅', 'success');
+      console.info('[ORDERS] ✅ اتأكد —', added, 'كورس جديد اتفعّل (',
+        courseIds.length - added, 'كانوا مفعّلين بالفعل )');
+      notify('تم التأكيد — ' + added + ' كورس ظهروا لحساب الطالب ✅', 'success');
+      /* الـsnapshot هيحدّث القايمة لوحده */
     } catch (e) {
       console.error('[ORDERS]', e.code);
-      notify('فشل التأكيد: ' + e.code, 'error');
+      notify(e.code === 'permission-denied'
+        ? 'السحابة رفضت التفعيل — راجع Firestore Rules على enrollments'
+        : 'فشل التأكيد: ' + e.code, 'error', 8000);
     }
   }
 
   /* ---------- رفض الطلب ---------- */
   function rejectOrder(docId) {
+    if (!isOwnerUser(currentUser)) { notify('العملية دي لوضع المالك فقط.', 'error'); return; }
     askConfirm({
       title: 'رفض الحجز',
-      message: 'رفض الحجز ده؟ الطالب هيتشاور معاه بشكل منفصل.',
+      message: 'رفض الحجز ده؟ يُفضّل تكلّم الطالب على واتساب لتوضيح السبب.',
       confirmLabel: 'رفض الحجز',
       danger: true,
       onConfirm: async () => {
@@ -266,8 +373,6 @@
           await db.collection('orders').doc(docId).update({
             status: 'rejected', rejectedAt: new Date().toISOString()
           });
-          await loadOrders();
-          renderOwner();
           notify('تم رفض الحجز', 'warn');
         } catch (e) {
           notify('فشل الرفض: ' + e.code, 'error');
@@ -281,10 +386,12 @@
     const nav = qs('#sideNav');
     if (!nav) return;
 
-    const isOwner = window.MCL && MCL.isAdminActive();
-    const isStudent = currentUser && currentUser.email !== OWNER_EMAIL;
+    const ownerNow = isOwnerUser(currentUser);
+    const studentNow = currentUser && currentUser.email !== OWNER_EMAIL;
 
-    if (isOwner && !qs('[data-nav="view:orders-admin"]')) {
+    /* ✅ v18: البند بيتشال لو الحالة اتغيرت (خروج/تغيير صلاحيات) */
+    const adminBtn = qs('[data-nav="view:orders-admin"]');
+    if (ownerNow && !adminBtn) {
       const anchor = qs('[data-nav="view:admin"]') || qs('[data-nav="view:data"]');
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -294,9 +401,12 @@
                       '<span class="grow text-start truncate">الحجوزات</span>';
       if (anchor) anchor.after(btn);
       else nav.appendChild(btn);
+    } else if (!ownerNow && adminBtn) {
+      adminBtn.remove();
     }
 
-    if (isStudent && !qs('[data-nav="view:orders-mine"]')) {
+    const mineBtn = qs('[data-nav="view:orders-mine"]');
+    if (studentNow && !mineBtn) {
       const me = qs('[data-nav="view:student"]');
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -306,21 +416,30 @@
                       '<span class="grow text-start truncate">حجوزاتي</span>';
       if (me) me.after(btn);
       else nav.appendChild(btn);
+    } else if (!studentNow && mineBtn) {
+      mineBtn.remove();
     }
   }
 
   function showOrders(mode) {
+    /* ✅ v18: حارس — فيو الأدمن للمالك بس */
+    if (mode === 'admin' && !isOwnerUser(currentUser)) mode = 'student';
+
     if (!qs('#view-orders')) ensureDOM();
     qsa('main#content > section:not(#view-orders)').forEach((s) => s.classList.add('hidden'));
     const view = qs('#view-orders');
     if (view) view.classList.remove('hidden');
     const isOwnerView = mode === 'admin';
+    activeView = mode;
     const pt = qs('#pageTitle'); if (pt) pt.textContent = isOwnerView ? 'الحجوزات' : 'حجوزاتي';
     const ps = qs('#pageSub');   if (ps) ps.textContent = isOwnerView ? 'مراجعة وتفعيل طلبات الاشتراك' : 'حالة حجوزاتك';
     window.scrollTo(0, 0);
     const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
     const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
-    loadOrders().then(() => { isOwnerView ? renderOwner() : renderStudent(); });
+
+    if (isOwnerView) renderOwner();
+    else renderStudent();
+    /* البيانات نفسها بتيجي من الـsnapshot اللحظي */
   }
 
   function bindOrdersNav() {
@@ -334,6 +453,22 @@
       e.preventDefault();
       showOrders(a ? 'admin' : 'student');
     });
+  }
+
+  /* ✅ v18: الخروج من فيو الحجوزات لأي فيو تاني → نخبيه
+     (app.js v19 مش بيعرف #view-orders فكان بيفضل ظاهر جنب المكتبة) */
+  function bindGlobalNavWatch() {
+    if (document.__ordersNavWatch) return;
+    document.__ordersNavWatch = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav]');
+      if (!b) return;
+      const v = b.dataset.nav || '';
+      if (v.indexOf('view:orders') === 0) return; /* فيو تبعنا */
+      const sec = qs('#view-orders');
+      if (sec) sec.classList.add('hidden');
+      if (activeView) activeView = null;
+    }, true);
   }
 
   function installHook() {
@@ -378,6 +513,8 @@
 
   function boot() {
     ensureDOM();
+    bindInnerEvents();     /* ✅ v18 */
+    bindGlobalNavWatch();  /* ✅ v18 */
     installHook();
     ensureNav();
     bindOrdersNav();
@@ -385,7 +522,6 @@
     observeSideNav();
   }
 
-  /* ⏳ انتظر main#content و #sideNav */
   function waitForDOM(retries = 50) {
     const main = qs('main#content') || qs('main');
     const nav = qs('#sideNav');
@@ -408,15 +544,22 @@
     waitForDOM();
   }
 
-  auth.onAuthStateChanged(async (user) => {
+  auth.onAuthStateChanged((user) => {
     currentUser = user;
     ensureNav();
     bindOrdersNav();
-    if (user && user.email !== OWNER_EMAIL) await loadOrders();
+    /* ✅ v18: اشتراك لحظي حسب الدور — الطالب حجوزاته بس، المالك الكل */
+    subscribeOrders(user);
+    if (!user && activeView) {
+      const sec = qs('#view-orders');
+      if (sec) sec.classList.add('hidden');
+      activeView = null;
+    }
   });
 
   window.NexoraOrders = {
     show: showOrders,
-    reload: loadOrders
+    get count() { return orders.length; },
+    get pendingCount() { return orders.filter((o) => o.status === 'pending').length; }
   };
 })();

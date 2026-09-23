@@ -1,19 +1,21 @@
 /* ==========================================================
-   roadmap.js — v20.3
-   ✅ v20:   Smart stage matching بـ scoring/priority
-   ✅ v20.1: Advanced Frontend + Backend Sub-Paths
-   ✅ v20.2: إصلاح dead code + منع التكرار + ARIA
-   ✅ v20.3: Threshold منفصل لـ timeline (60) vs sub-paths (25)
-   ✅ v20.3: عرض stageLabel بدل category الخام
-   ✅ v20.3: Keyword specificity أقوى لمنع الـ match الضعيف
-   ✅ v20.3: Leftovers fallback أذكى (بترتيب order)
-   ✅ v20.3: عرض clean + بدون تزويق أرقام
+   roadmap.js — v19 (Comprehensive Edition)
+   ✅ v19: مسارات موسّعة (DevOps / قواعد بيانات / ألعاب / تسويق / ICDL)
+   ✅ v19: حفظ تقدّم الزوار في localStorage + دمج تلقائي عند تسجيل الدخول
+   ✅ v19: بحث فوري في كل المسارات + فلاتر (الكل / المتبقي / المكتمل)
+   ✅ v19: Gamification — XP + مستويات + شارات
+   ✅ v19: توصية "الخطوة الجاية" + تنقّل مباشر ليها
+   ✅ v19: ملاحظات شخصية لكل خطوة (تتزامن مع Firestore)
+   ✅ v19: شهادة إتمام المسار قابلة للطباعة/PDF
+   ✅ v19: تصدير/استيراد التقدّم (JSON) + تصفير
+   ✅ v19: Toasts بدل alert
+   ✅ v19: إصلاحات v18: role مكرر على <ol>، gradient مكسور، ترقيم الأقساط
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Roadmap — v20.3 ', 'background:#2684fc;color:#fff;font-weight:bold');
+  console.log('%c Nexora Roadmap — v19 Comprehensive ', 'background:#2684fc;color:#fff;font-weight:bold');
 
   /* ---------- Firebase ---------- */
   const firebaseConfig = window.__FIREBASE_CONFIG__ || {
@@ -38,6 +40,9 @@
   const qsa = (s, el) => [...(el || document).querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n - 1) + '…' : String(s || '');
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function fmtNum(n) {
     const v = Number(n);
@@ -53,448 +58,66 @@
     return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`;
   }
 
-  function normalizeText(s) {
-    return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  /* ---------- Toast ---------- */
+  function toast(msg, type) {
+    let holder = qs('#rmToasts');
+    if (!holder) {
+      holder = document.createElement('div');
+      holder.id = 'rmToasts';
+      document.body.appendChild(holder);
+    }
+    const t = document.createElement('div');
+    t.className = 'rm-toast' + (type ? ' ' + type : '');
+    t.setAttribute('role', 'status');
+    t.textContent = msg;
+    holder.appendChild(t);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, 3200);
   }
 
-  /* ---------- Level Detection ---------- */
-  const LEVEL_PATTERNS = {
-    advanced: [
-      'advanced', 'متقدم', 'احتراف', 'pro ', 'expert', 'master', 'عميق',
-      'deep dive', 'متقدمة', 'النطاق المتقدم', 'من الصفر للاحتراف المتقدم', 'diploma'
-    ],
-    intermediate: [
-      'intermediate', 'متوسط', 'وسط', 'متوسطة', 'practical', 'تطبيقي'
-    ],
-    beginnerHint: [
-      'complete course', 'from zero', 'from scratch', 'من الصفر',
-      'دورة شاملة', 'كورس شامل', 'complete guide', 'basics', 'مقدمة',
-      'intro', 'fundamentals', 'أساسيات'
-    ]
-  };
-
-  function detectLevel(course) {
-    if (course.level) {
-      const l = normalizeText(course.level);
-      if (['beginner', 'مبتدئ', 'مبتدئة', 'مبتدئين'].includes(l)) return 'beginner';
-      if (['intermediate', 'متوسط', 'متوسطة'].includes(l)) return 'intermediate';
-      if (['advanced', 'متقدم', 'متقدمة', 'احترافي'].includes(l)) return 'advanced';
-    }
-    const haystack = normalizeText((course.title || '') + ' ' + (course.description || ''));
-
-    for (const k of LEVEL_PATTERNS.advanced) {
-      if (haystack.includes(k)) return 'advanced';
-    }
-    for (const k of LEVEL_PATTERNS.intermediate) {
-      if (haystack.includes(k)) return 'intermediate';
-    }
-    for (const k of LEVEL_PATTERNS.beginnerHint) {
-      if (haystack.includes(k)) return 'beginner';
-    }
-    return 'beginner';
-  }
-
-  function getStageLevel(stageIndex, totalSteps, explicitLevel) {
-    if (explicitLevel && explicitLevel !== 'beginner') return explicitLevel;
-    if (!totalSteps || totalSteps < 3) return explicitLevel || 'beginner';
-    const ratio = stageIndex / totalSteps;
-    if (ratio >= 0.7) return 'advanced';
-    if (ratio >= 0.35) return 'intermediate';
-    return 'beginner';
-  }
-
-  const LEVEL_LABEL = {
-    beginner: 'مبتدئ',
-    intermediate: 'متوسط',
-    advanced: 'متقدم'
-  };
-  const LEVEL_COLOR = {
-    beginner: 'var(--rm-lv-beginner, #22c55e)',
-    intermediate: 'var(--rm-lv-intermediate, #f0b53e)',
-    advanced: 'var(--rm-lv-advanced, #ef4444)'
-  };
-
-  /* ---------- Roadmap Definitions ---------- */
-  const ROADMAP_DEFINITIONS = [
-    /* ===================== 1. Frontend ===================== */
-    {
-      id: 'frontend',
-      icon: '🎨',
-      title: 'Frontend Development',
-      desc: 'من أساسيات الويب إلى بناء تطبيقات React احترافية',
-      color: 'var(--rm-c-frontend, #4f7cff)',
-      stages: [
-        { id: 'html',         label: 'HTML',                    level: 'beginner',     keywords: ['html'],                                       categories: ['HTML'] },
-        { id: 'css',          label: 'CSS',                     level: 'beginner',     keywords: ['css'],                                        categories: ['CSS'] },
-        { id: 'responsive',   label: 'Responsive Web Design',   level: 'beginner',     keywords: ['responsive', 'متجاوب', 'web design'],         categories: [] },
-        { id: 'js',           label: 'JavaScript',              level: 'beginner',     keywords: ['javascript', 'js basics', 'أساسيات جافاسكريبت', 'js fundamentals'], categories: ['JavaScript'] },
-        { id: 'dom',          label: 'DOM & Browser APIs',      level: 'intermediate', keywords: ['dom', 'browser api', 'browser apis'],         categories: [] },
-        { id: 'git',          label: 'Git & GitHub',            level: 'beginner',     keywords: ['git', 'github'],                              categories: [] },
-        { id: 'css-fw',       label: 'Bootstrap / Tailwind',    level: 'intermediate', keywords: ['bootstrap', 'tailwind'],                      categories: ['Tailwind CSS', 'Bootstrap'] },
-        { id: 'js-adv',       label: 'Advanced JavaScript',     level: 'advanced',     keywords: ['advanced javascript', 'javascript متقدم', 'js advanced', 'es6', 'modern javascript'], categories: [] },
-        { id: 'react',        label: 'React',                   level: 'intermediate', keywords: ['react'],                                      categories: ['React'] },
-        { id: 'react-router', label: 'React Router',            level: 'intermediate', keywords: ['react router'],                               categories: [] },
-        { id: 'apis',         label: 'APIs & Async JavaScript', level: 'intermediate', keywords: ['api', 'async', 'fetch', 'ajax'],              categories: [] },
-        { id: 'state',        label: 'State Management',        level: 'advanced',     keywords: ['state management', 'redux', 'zustand', 'context'], categories: [] },
-        { id: 'nextjs',       label: 'Next.js',                 level: 'advanced',     keywords: ['next.js', 'nextjs'],                          categories: ['Next.js'] },
-        { id: 'projects',     label: 'Frontend Projects',       level: 'advanced',     keywords: ['projects', 'مشاريع', 'portfolio', 'frontend project'], categories: [] },
-        { id: 'adv-frontend', label: 'Advanced Frontend',       level: 'advanced',     keywords: ['advanced frontend', 'frontend متقدم', 'performance', 'optimization', 'web performance', 'pwa', 'testing frontend'], categories: [] }
-      ]
-    },
-
-    /* ===================== 2. Backend ===================== */
-    {
-      id: 'backend',
-      icon: '⚙️',
-      title: 'Backend Development',
-      desc: 'ابنِ الخدمات الخلفية وقواعد البيانات بشكل احترافي',
-      color: 'var(--rm-c-backend, #22c55e)',
-      subPaths: [
-        {
-          id: 'nodejs-track',
-          label: 'Node.js Track',
-          icon: '🟢',
-          stages: [
-            { id: 'nodejs',  label: 'Node.js',    level: 'intermediate', keywords: ['node.js', 'nodejs'],    categories: ['Node.js'] },
-            { id: 'express', label: 'Express.js', level: 'intermediate', keywords: ['express'],               categories: [] },
-            { id: 'nestjs',  label: 'NestJS',     level: 'advanced',     keywords: ['nestjs', 'nest.js'],     categories: [] }
-          ]
-        },
-        {
-          id: 'python-track',
-          label: 'Python Track',
-          icon: '🐍',
-          stages: [
-            { id: 'python',  label: 'Python',  level: 'beginner',     keywords: ['python', 'بايثون'],  categories: [] },
-            { id: 'django',  label: 'Django',  level: 'intermediate', keywords: ['django'],            categories: [] },
-            { id: 'fastapi', label: 'FastAPI', level: 'advanced',     keywords: ['fastapi', 'flask'],  categories: [] }
-          ]
-        },
-        {
-          id: 'php-track',
-          label: 'PHP Track',
-          icon: '🐘',
-          stages: [
-            { id: 'php',     label: 'PHP',     level: 'beginner',     keywords: ['php'],      categories: [] },
-            { id: 'laravel', label: 'Laravel', level: 'intermediate', keywords: ['laravel'],  categories: [] }
-          ]
-        },
-        {
-          id: 'java-track',
-          label: 'Java Track',
-          icon: '☕',
-          stages: [
-            { id: 'java',   label: 'Java',        level: 'beginner',     keywords: ['java'],                  categories: [] },
-            { id: 'spring', label: 'Spring Boot', level: 'intermediate', keywords: ['spring', 'spring boot'], categories: [] }
-          ]
-        },
-        {
-          id: 'dotnet-track',
-          label: '.NET Track',
-          icon: '🟣',
-          stages: [
-            { id: 'csharp', label: 'C#',      level: 'beginner',     keywords: ['c#', 'csharp'],      categories: [] },
-            { id: 'aspnet', label: 'ASP.NET', level: 'intermediate', keywords: ['asp.net', 'aspnet'], categories: [] }
-          ]
-        }
-      ],
-      stages: [
-        { id: 'prog-basics', label: 'Programming Basics',    level: 'beginner',     keywords: ['programming basics', 'أساسيات البرمجة', 'programming fundamentals'], categories: [] },
-        { id: 'git',         label: 'Git & GitHub',          level: 'beginner',     keywords: ['git', 'github'],                              categories: [] },
-        { id: 'http',        label: 'HTTP & REST APIs',      level: 'beginner',     keywords: ['http', 'rest', 'restful'],                    categories: [] },
-        { id: 'backend-fund',label: 'Backend Fundamentals',  level: 'beginner',     keywords: ['backend', 'back end', 'back-end', 'سيرفر'],   categories: ['Backend'] },
-        { id: 'nodejs',      label: 'Node.js',               level: 'intermediate', keywords: ['node.js', 'nodejs', 'node js'],               categories: ['Node.js'] },
-        { id: 'express',     label: 'Express.js',            level: 'intermediate', keywords: ['express'],                                    categories: [] },
-        { id: 'databases',   label: 'Databases',             level: 'intermediate', keywords: ['database', 'databases', 'قواعد بيانات'],      categories: [] },
-        { id: 'sql',         label: 'SQL',                   level: 'intermediate', keywords: ['sql', 'mysql', 'postgres'],                   categories: [] },
-        { id: 'mongodb',     label: 'MongoDB',               level: 'intermediate', keywords: ['mongo', 'mongodb'],                           categories: [] },
-        { id: 'auth',        label: 'Auth & Authorization',  level: 'intermediate', keywords: ['auth', 'authentication', 'jwt', 'oauth'],     categories: [] },
-        { id: 'rest-dev',    label: 'REST API Development',  level: 'intermediate', keywords: ['rest api', 'api development'],                categories: [] },
-        { id: 'security',    label: 'Security',              level: 'advanced',     keywords: ['security', 'أمان'],                           categories: [] },
-        { id: 'testing',     label: 'Testing',               level: 'advanced',     keywords: ['testing', 'jest', 'unit test'],               categories: [] },
-        { id: 'deploy',      label: 'Deployment',            level: 'advanced',     keywords: ['deployment', 'deploy', 'نشر'],                categories: [] },
-        { id: 'backend-adv', label: 'Advanced Backend',      level: 'advanced',     keywords: ['advanced backend', 'microservices'],          categories: [] }
-      ]
-    },
-
-    /* ===================== 3. Full Stack ===================== */
-    {
-      id: 'fullstack',
-      icon: '🚀',
-      title: 'Full Stack Development',
-      desc: 'الواجهة والخلفية مع بعض — بناء تطبيقات كاملة',
-      color: 'var(--rm-c-fullstack, #f0b53e)',
-      stages: [
-        { id: 'fe-fund',     label: 'Frontend Fundamentals',  level: 'beginner',     keywords: ['frontend', 'front end', 'front-end'],         categories: ['Frontend'] },
-        { id: 'js',          label: 'JavaScript',             level: 'beginner',     keywords: ['javascript'],                                 categories: ['JavaScript'] },
-        { id: 'react',       label: 'React',                  level: 'intermediate', keywords: ['react'],                                      categories: ['React'] },
-        { id: 'be-fund',     label: 'Backend Fundamentals',   level: 'beginner',     keywords: ['backend', 'back end', 'back-end'],            categories: ['Backend'] },
-        { id: 'nodejs',      label: 'Node.js / Backend Tech', level: 'intermediate', keywords: ['node.js', 'nodejs'],                          categories: ['Node.js'] },
-        { id: 'db',          label: 'Database',               level: 'intermediate', keywords: ['database', 'mongodb', 'sql'],                 categories: [] },
-        { id: 'auth',        label: 'Authentication',         level: 'intermediate', keywords: ['auth', 'jwt'],                                categories: [] },
-        { id: 'apis',        label: 'APIs',                   level: 'intermediate', keywords: ['api', 'rest'],                                categories: [] },
-        { id: 'fs-proj',     label: 'Full Stack Projects',    level: 'advanced',     keywords: ['full stack', 'fullstack', 'full-stack'],      categories: ['Full Stack'] },
-        { id: 'deploy',      label: 'Deployment',             level: 'advanced',     keywords: ['deployment', 'deploy'],                       categories: [] }
-      ]
-    },
-
-    /* ===================== 4. AI & GenAI ===================== */
-    {
-      id: 'ai',
-      icon: '🤖',
-      title: 'AI & Generative AI',
-      desc: 'من أساسيات AI لحد بناء أنظمة ذكية بـGenerative AI',
-      color: 'var(--rm-c-ai, #8b5cf6)',
-      stages: [
-        { id: 'prog-basics',   label: 'Programming Basics',    level: 'beginner',     keywords: ['programming basics', 'أساسيات البرمجة'],      categories: [] },
-        { id: 'python',        label: 'Python',                level: 'beginner',     keywords: ['python', 'بايثون'],                           categories: [] },
-        { id: 'math',          label: 'Mathematics / Logic',   level: 'beginner',     keywords: ['math', 'رياضيات', 'logic', 'إحصاء', 'statistics'], categories: [] },
-        { id: 'data-handling', label: 'Data Handling',         level: 'intermediate', keywords: ['data handling', 'pandas', 'numpy'],           categories: [] },
-        { id: 'ai-fund',       label: 'AI Fundamentals',       level: 'intermediate', keywords: ['ai fundamentals', 'أساسيات ai', 'artificial intelligence', 'machine learning basics'], categories: ['AI'] },
-        { id: 'ml',            label: 'Machine Learning',      level: 'intermediate', keywords: ['machine learning', 'ml'],                     categories: [] },
-        { id: 'dl',            label: 'Deep Learning',         level: 'advanced',     keywords: ['deep learning', 'neural network', 'cnn', 'rnn'], categories: [] },
-        { id: 'genai',         label: 'Generative AI',         level: 'advanced',     keywords: ['generative', 'genai', 'llm', 'gpt', 'transformer'], categories: [] },
-        { id: 'prompt',        label: 'Prompt Engineering',    level: 'advanced',     keywords: ['prompt', 'prompting'],                        categories: [] },
-        { id: 'ai-tools',      label: 'AI Tools',              level: 'intermediate', keywords: ['ai tools', 'midjourney', 'openai'],           categories: [] },
-        { id: 'ai-proj',       label: 'AI Projects',           level: 'advanced',     keywords: ['ai projects', 'مشاريع ai', 'portfolio ai'],   categories: [] }
-      ]
-    },
-
-    /* ===================== 5. UI/UX Design ===================== */
-    {
-      id: 'design',
-      icon: '🎨',
-      title: 'UI/UX Design',
-      desc: 'من مبادئ التصميم لحد إتقان Figma وبناء Portfolio',
-      color: 'var(--rm-c-design, #ec4899)',
-      stages: [
-        { id: 'design-fund',   label: 'Design Fundamentals',      level: 'beginner',     keywords: ['design fundamentals', 'أساسيات التصميم', 'graphic design'], categories: ['Graphic Design'] },
-        { id: 'color-typo',    label: 'Color & Typography',       level: 'beginner',     keywords: ['color', 'typography', 'ألوان', 'خطوط'],      categories: [] },
-        { id: 'user-research', label: 'User Research',            level: 'intermediate', keywords: ['user research', 'research', 'أبحاث'],         categories: [] },
-        { id: 'ux-fund',       label: 'UX Fundamentals',          level: 'intermediate', keywords: ['ux fundamental', 'ux basics', 'user experience'], categories: ['UI/UX'] },
-        { id: 'wireframe',     label: 'Wireframing',              level: 'intermediate', keywords: ['wireframe', 'wireframing'],                   categories: [] },
-        { id: 'user-flow',     label: 'User Flow',                level: 'intermediate', keywords: ['user flow', 'flow'],                          categories: [] },
-        { id: 'ia',            label: 'Information Architecture', level: 'intermediate', keywords: ['information architecture', 'ia '],            categories: [] },
-        { id: 'ui-design',     label: 'UI Design',                level: 'intermediate', keywords: ['ui design', 'واجهات'],                        categories: ['UI/UX'] },
-        { id: 'figma',         label: 'Figma',                    level: 'intermediate', keywords: ['figma', 'فيجما'],                             categories: [] },
-        { id: 'prototyping',   label: 'Prototyping',              level: 'intermediate', keywords: ['prototype', 'prototyping', 'نموذج'],          categories: [] },
-        { id: 'design-sys',    label: 'Design Systems',           level: 'advanced',     keywords: ['design system', 'design systems'],            categories: [] },
-        { id: 'responsive',    label: 'Responsive Design',        level: 'intermediate', keywords: ['responsive', 'متجاوب'],                       categories: [] },
-        { id: 'case-study',    label: 'UX Case Study',            level: 'advanced',     keywords: ['case study', 'دراسة حالة'],                   categories: [] },
-        { id: 'portfolio',     label: 'Portfolio',                level: 'advanced',     keywords: ['portfolio', 'بورتفوليو', 'معرض أعمال'],       categories: [] }
-      ]
-    },
-
-    /* ===================== 6. Data Analysis ===================== */
-    {
-      id: 'data',
-      icon: '📊',
-      title: 'Data Analysis',
-      desc: 'اتخذ قراراتك بالأرقام — من Excel لـPower BI',
-      color: 'var(--rm-c-data, #06b6d4)',
-      stages: [
-        { id: 'excel',         label: 'Excel',                 level: 'beginner',     keywords: ['excel', 'إكسل'],                              categories: ['Excel'] },
-        { id: 'excel-adv',     label: 'Advanced Excel',        level: 'intermediate', keywords: ['advanced excel', 'excel متقدم', 'pivot'],     categories: [] },
-        { id: 'sql',           label: 'SQL',                   level: 'intermediate', keywords: ['sql', 'mysql', 'postgres'],                   categories: [] },
-        { id: 'stats',         label: 'Statistics',            level: 'intermediate', keywords: ['statistics', 'إحصاء'],                        categories: [] },
-        { id: 'data-clean',    label: 'Data Cleaning',         level: 'intermediate', keywords: ['data cleaning', 'تنظيف بيانات'],              categories: [] },
-        { id: 'data-analysis', label: 'Data Analysis',         level: 'intermediate', keywords: ['data analysis', 'تحليل البيانات'],            categories: ['Data Analysis'] },
-        { id: 'powerbi',       label: 'Power BI',              level: 'advanced',     keywords: ['power bi', 'powerbi'],                        categories: [] },
-        { id: 'data-viz',      label: 'Data Visualization',    level: 'advanced',     keywords: ['data visualization', 'visualization', 'charts'], categories: [] },
-        { id: 'dashboards',    label: 'Dashboard Projects',    level: 'advanced',     keywords: ['dashboard', 'لوحات'],                         categories: [] },
-        { id: 'portfolio',     label: 'Portfolio',             level: 'advanced',     keywords: ['portfolio', 'بورتفوليو'],                     categories: [] }
-      ]
-    },
-
-    /* ===================== 7. Programming / CS ===================== */
-    {
-      id: 'programming',
-      icon: '💻',
-      title: 'Programming & CS',
-      desc: 'أساسيات البرمجة وعلوم الحاسب لأي لغة',
-      color: 'var(--rm-c-prog, #a855f7)',
-      stages: [
-        { id: 'prog-basics', label: 'Programming Basics',     level: 'beginner',     keywords: ['programming basics', 'أساسيات البرمجة', 'intro to programming'], categories: [] },
-        { id: 'vars',        label: 'Variables & Data Types', level: 'beginner',     keywords: ['variables', 'data types'],                    categories: [] },
-        { id: 'conditions',  label: 'Conditions & Loops',     level: 'beginner',     keywords: ['conditions', 'loops', 'if', 'for'],          categories: [] },
-        { id: 'functions',   label: 'Functions',              level: 'beginner',     keywords: ['functions', 'دوال'],                          categories: [] },
-        { id: 'oop',         label: 'OOP',                    level: 'intermediate', keywords: ['oop', 'object oriented', 'كائنية'],           categories: [] },
-        { id: 'ds',          label: 'Data Structures',        level: 'intermediate', keywords: ['data structures', 'هياكل بيانات'],            categories: [] },
-        { id: 'algo',        label: 'Algorithms',             level: 'advanced',     keywords: ['algorithms', 'خوارزميات'],                    categories: [] },
-        { id: 'problem',     label: 'Problem Solving',        level: 'advanced',     keywords: ['problem solving', 'حل مشكلات'],               categories: [] },
-        { id: 'git',         label: 'Git & GitHub',           level: 'beginner',     keywords: ['git', 'github'],                              categories: [] },
-        { id: 'projects',    label: 'Projects',               level: 'advanced',     keywords: ['projects', 'مشاريع'],                         categories: [] }
-      ]
-    },
-
-    /* ===================== 8. DevOps & Cloud ===================== */
-    {
-      id: 'devops',
-      icon: '☁️',
-      title: 'DevOps & Cloud',
-      desc: 'من Linux للـKubernetes والنشر السحابي',
-      color: 'var(--rm-c-devops, #0ea5e9)',
-      stages: [
-        { id: 'linux',      label: 'Linux',              level: 'beginner',     keywords: ['linux', 'bash', 'shell'],                     categories: [] },
-        { id: 'network',    label: 'Networking Basics',  level: 'beginner',     keywords: ['networking', 'network', 'شبكات'],             categories: [] },
-        { id: 'git',        label: 'Git',                level: 'beginner',     keywords: ['git'],                                        categories: [] },
-        { id: 'docker',     label: 'Docker',             level: 'intermediate', keywords: ['docker', 'container'],                        categories: [] },
-        { id: 'cicd',       label: 'CI/CD',              level: 'intermediate', keywords: ['ci/cd', 'cicd', 'jenkins', 'github actions'], categories: [] },
-        { id: 'cloud-fund', label: 'Cloud Fundamentals', level: 'intermediate', keywords: ['cloud fundamentals', 'cloud computing'],      categories: [] },
-        { id: 'aws',        label: 'AWS / Azure',        level: 'advanced',     keywords: ['aws', 'azure', 'gcp'],                        categories: [] },
-        { id: 'k8s',        label: 'Kubernetes',         level: 'advanced',     keywords: ['kubernetes', 'k8s'],                          categories: [] },
-        { id: 'deploy',     label: 'Deployment',         level: 'advanced',     keywords: ['deployment', 'deploy'],                       categories: [] },
-        { id: 'monitoring', label: 'Monitoring',         level: 'advanced',     keywords: ['monitoring', 'observability', 'prometheus'],  categories: [] }
-      ]
-    },
-
-    /* ===================== 9. Cyber Security ===================== */
-    {
-      id: 'cyber',
-      icon: '🔐',
-      title: 'Cyber Security',
-      desc: 'من أساسيات الشبكات إلى اختبار الاختراق',
-      color: 'var(--rm-c-cyber, #ef4444)',
-      stages: [
-        { id: 'cs-fund',  label: 'Computer Fundamentals', level: 'beginner',     keywords: ['computer fundamentals', 'أساسيات الحاسب'],    categories: [] },
-        { id: 'network',  label: 'Networking',            level: 'beginner',     keywords: ['networking', 'شبكات', 'ccna'],                categories: [] },
-        { id: 'linux',    label: 'Linux',                 level: 'beginner',     keywords: ['linux', 'kali'],                              categories: [] },
-        { id: 'sec-fund', label: 'Security Fundamentals', level: 'intermediate', keywords: ['security fundamental', 'أساسيات الأمن'],       categories: ['Cyber Security'] },
-        { id: 'web-sec',  label: 'Web Security',          level: 'intermediate', keywords: ['web security', 'xss', 'sql injection'],       categories: [] },
-        { id: 'ethical',  label: 'Ethical Hacking',       level: 'advanced',     keywords: ['ethical hacking', 'hacking', 'اختراق أخلاقي'], categories: [] },
-        { id: 'owasp',    label: 'OWASP',                 level: 'advanced',     keywords: ['owasp', 'top 10'],                            categories: [] },
-        { id: 'pentest',  label: 'Penetration Testing',   level: 'advanced',     keywords: ['penetration', 'pentest', 'اختبار اختراق'],     categories: [] },
-        { id: 'sec-proj', label: 'Security Projects',     level: 'advanced',     keywords: ['security projects', 'مشاريع أمن'],            categories: [] }
-      ]
-    },
-
-    /* ===================== 10. Mobile ===================== */
-    {
-      id: 'mobile',
-      icon: '📱',
-      title: 'Mobile Development',
-      desc: 'تطوير تطبيقات الموبايل بـFlutter من الصفر للنشر',
-      color: 'var(--rm-c-mobile, #a855f7)',
-      stages: [
-        { id: 'prog-basics', label: 'Programming Basics', level: 'beginner',     keywords: ['programming basics', 'أساسيات البرمجة'],      categories: [] },
-        { id: 'mobile-fund', label: 'Mobile Fundamentals',level: 'beginner',     keywords: ['mobile fundamental', 'mobile basics'],        categories: ['Mobile App'] },
-        { id: 'dart',        label: 'Dart',               level: 'beginner',     keywords: ['dart'],                                       categories: [] },
-        { id: 'flutter',     label: 'Flutter',            level: 'intermediate', keywords: ['flutter'],                                    categories: [] },
-        { id: 'ui-dev',      label: 'UI Development',     level: 'intermediate', keywords: ['ui development', 'widgets'],                  categories: [] },
-        { id: 'state',       label: 'State Management',   level: 'advanced',     keywords: ['state management', 'provider', 'bloc', 'riverpod'], categories: [] },
-        { id: 'apis',        label: 'APIs',               level: 'intermediate', keywords: ['api', 'rest'],                                categories: [] },
-        { id: 'firebase',    label: 'Firebase',           level: 'intermediate', keywords: ['firebase', 'firestore'],                      categories: [] },
-        { id: 'auth',        label: 'Authentication',     level: 'intermediate', keywords: ['auth', 'authentication'],                     categories: [] },
-        { id: 'local',       label: 'Local Storage',      level: 'intermediate', keywords: ['local storage', 'sqflite', 'hive'],            categories: [] },
-        { id: 'publish',     label: 'Publishing Apps',    level: 'advanced',     keywords: ['publish', 'app store', 'google play'],        categories: [] },
-        { id: 'mobile-proj', label: 'Mobile Projects',    level: 'advanced',     keywords: ['mobile projects', 'مشاريع موبايل'],           categories: [] }
-      ]
-    },
-
-    /* ===================== 11. Other / Misc ===================== */
-    {
-      id: 'misc',
-      icon: '🎓',
-      title: 'كورسات إضافية',
-      desc: 'كورسات متنوعة في مجالات مختلفة',
-      color: 'var(--rm-c-other, #64748b)',
-      stages: []
-    }
-  ];
-
-  /* ---------- Matching Engine (scored) ---------- */
-  /* ✅ v20.3: specificity أقوى */
-  function scoreCourseStage(course, stage) {
-    const title = normalizeText(course.title || '');
-    const desc  = normalizeText(course.description || '');
-    const cat   = String(course.category || '');
-    let score = 0;
-
-    /* Category exact */
-    if (Array.isArray(stage.categories) && stage.categories.length) {
-      if (stage.categories.includes(cat)) score += 100;
-    }
-
-    /* Keywords */
-    if (Array.isArray(stage.keywords)) {
-      for (const k of stage.keywords) {
-        const kw = normalizeText(k);
-        if (!kw) continue;
-        const kwLen = kw.length;
-        /* ✅ v20.3: specificity أوضح */
-        const specificity = Math.min(kwLen * 6, 60);
-
-        if (title === kw) {
-          score += 100 + specificity;
-        } else if (title.includes(kw)) {
-          const wordBoundary = new RegExp(`(^|\\s)${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`);
-          if (wordBoundary.test(title)) score += 80 + specificity;
-          else score += 50 + specificity;
-        } else if (kwLen >= 5 && desc.includes(kw)) {
-          score += 25 + specificity * 0.5;
-        }
-      }
-    }
-
-    /* Level match bonus */
-    if (stage.level) {
-      const courseLevel = detectLevel(course);
-      if (courseLevel === stage.level) score += 15;
-    }
-
-    return score;
-  }
-
-  /* ✅ v20.3: minScore threshold */
-  function findBestCourseForStage(courses, stage, usedIds, minScore) {
-    const threshold = (typeof minScore === 'number') ? minScore : 25;
-    let best = null;
-    let bestScore = 0;
-    for (const c of courses) {
-      if (usedIds.has(c.id)) continue;
-      const s = scoreCourseStage(c, stage);
-      if (s > bestScore) { bestScore = s; best = c; }
-    }
-    if (best && bestScore >= threshold) return { course: best, score: bestScore };
-    return null;
-  }
-
-  /* ---------- Cache ---------- */
+  /* ---------- بناء المسارات ---------- */
   let _catalogCacheKey = '';
   let _catalogCache = null;
-  let _lastDebugInfo = null;
 
   function catalogCacheKey(courses) {
-    return courses.length + '::' + courses.map((c) => c.id + ':' + (c.order ?? '')).join('|');
+    return courses.map((c) => `${c.id}:${c.category}:${c.order ?? ''}`).join('|');
   }
 
-  /* ---------- Sub-Paths ---------- */
-  function buildSubPathsFor(def, courses) {
-    if (!def.subPaths || !def.subPaths.length) return { subPaths: [], courseIds: new Set() };
+  const PATHS = [
+    { id:'frontend-path',  icon:'🎨', title:'مسار Frontend', desc:'من HTML لحد React و Next.js',
+      categories:['Frontend','HTML','CSS','JavaScript','Tailwind CSS','Bootstrap','React','Next.js'],
+      color:'var(--rm-c-frontend,#4f7cff)' },
+    { id:'backend-path',   icon:'⚙️', title:'مسار Backend', desc:'ابنِ الخدمات الخلفية وقواعد البيانات',
+      categories:['Backend','Node.js','PHP','Laravel','Python'],
+      color:'var(--rm-c-backend,#22c55e)' },
+    { id:'fullstack-path', icon:'🚀', title:'مسار Full Stack', desc:'الواجهة والخلفية مع بعض',
+      categories:['Full Stack'], color:'var(--rm-c-fullstack,#f0b53e)' },
+    { id:'mobile-path',    icon:'📱', title:'مسار الموبايل', desc:'تطوير تطبيقات الموبايل',
+      categories:['Mobile App','Flutter','React Native'], color:'var(--rm-c-mobile,#a855f7)' },
+    { id:'design-path',    icon:'🖌️', title:'مسار التصميم', desc:'من مبادئ UI/UX لحد إتقان أدوبي',
+      categories:['UI/UX','Graphic Design','Video Editing','Motion Graphics'],
+      color:'var(--rm-c-design,#ec4899)' },
+    { id:'data-path',      icon:'📊', title:'مسار تحليل البيانات', desc:'اتخذ قراراتك بالأرقام',
+      categories:['Data Analysis','Excel','Power BI'], color:'var(--rm-c-data,#06b6d4)' },
+    { id:'ai-path',        icon:'🤖', title:'مسار الذكاء الاصطناعي', desc:'من أساسيات AI لحد بناء أنظمة ذكية',
+      categories:['AI','Machine Learning','Deep Learning'], color:'var(--rm-c-ai,#8b5cf6)' },
+    { id:'cyber-path',     icon:'🔐', title:'مسار الأمن السيبراني', desc:'أساسيات وعمق الأمن السيبراني',
+      categories:['Cyber Security','Ethical Hacking'], color:'var(--rm-c-cyber,#ef4444)' },
+    { id:'devops-path',    icon:'🐳', title:'مسار DevOps', desc:'Linux و Git و Docker والنشر في السحابة',
+      categories:['DevOps','Linux','Git','Docker','CI/CD','AWS'], color:'var(--rm-c-devops,#0ea5e9)' },
+    { id:'db-path',        icon:'🗄️', title:'مسار قواعد البيانات', desc:'تصميم وإدارة قواعد البيانات SQL و NoSQL',
+      categories:['Database','SQL','MySQL','MongoDB','PostgreSQL'], color:'var(--rm-c-db,#14b8a6)' },
+    { id:'game-path',      icon:'🎮', title:'مسار تطوير الألعاب', desc:'من الفكرة لنسخة قابلة للّعب',
+      categories:['Game Dev','Unity','Unreal','Game Development'], color:'var(--rm-c-game,#f97316)' },
+    { id:'marketing-path', icon:'📈', title:'مسار التسويق الرقمي', desc:'SEO وسوشيال ميديا والإعلانات المدفوعة',
+      categories:['Digital Marketing','Marketing','SEO','Social Media','Ads'],
+      color:'var(--rm-c-marketing,#d946ef)' },
+    { id:'icdl-path',      icon:'💻', title:'مسار ICDL والأوفيس', desc:'مهارات الكمبيوتر الأساسية بثقة',
+      categories:['ICDL','Office','Word','PowerPoint','Computer Basics'],
+      color:'var(--rm-c-icdl,#84cc16)' },
+    { id:'other-path',     icon:'📦', title:'كورسات متنوعة', desc:'كورسات في مجالات مختلفة',
+      categories:['Other'], color:'var(--rm-c-other,#64748b)' }
+  ];
 
-    const subPathCourseIds = new Set();
-
-    const subPaths = def.subPaths.map((sp) => {
-      const usedInSub = new Set();
-      const steps = [];
-
-      for (const stage of sp.stages) {
-        /* sub-paths: threshold 25 (أخف) */
-        const best = findBestCourseForStage(courses, stage, usedInSub, 25);
-        if (best) {
-          usedInSub.add(best.course.id);
-          subPathCourseIds.add(best.course.id);
-          steps.push(mapCourseToStep(best.course, stage, steps.length, sp.stages.length));
-        }
-      }
-
-      return { id: sp.id, label: sp.label, icon: sp.icon, steps };
-    }).filter((sp) => sp.steps.length > 0);
-
-    return { subPaths, courseIds: subPathCourseIds };
-  }
-
-  /* ---------- Build Roadmaps ---------- */
   function buildRoadmapsFromCatalog() {
     const src = window.__NEXORA_CATALOG__ || { courses: [] };
     const courses = src.courses || [];
@@ -503,128 +126,45 @@
     const key = catalogCacheKey(courses);
     if (key === _catalogCacheKey && _catalogCache) return _catalogCache;
 
-    const usedGlobal = new Set();
-    const debug = [];
+    const result = [];
+    const usedCourseIds = new Set();
 
-    const result = ROADMAP_DEFINITIONS.map((def) => {
-      const usedInThisPath = new Set();
-      const steps = [];
+    PATHS.forEach((path) => {
+      const matching = courses.filter((c) =>
+        path.categories.includes(c.category) && !usedCourseIds.has(c.id)
+      );
+      if (matching.length === 0) return;
 
-      /* 1) Timeline الأساسي — ✅ v20.3: threshold 60 (صارم) */
-      for (const stage of def.stages) {
-        const best = findBestCourseForStage(courses, stage, usedInThisPath, 60);
-        if (best) {
-          usedInThisPath.add(best.course.id);
-          usedGlobal.add(best.course.id);
-          steps.push(mapCourseToStep(best.course, stage, steps.length, def.stages.length));
-          debug.push({
-            path: def.id,
-            stage: stage.id,
-            courseId: best.course.id,
-            title: best.course.title,
-            score: best.score
-          });
-        }
-      }
+      matching.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      matching.forEach((c) => usedCourseIds.add(c.id));
 
-      /* 2) Sub-paths */
-      const { subPaths, courseIds: subPathCourseIds } = buildSubPathsFor(def, courses);
-      subPathCourseIds.forEach((id) => usedGlobal.add(id));
+      result.push({
+        id: path.id, icon: path.icon, title: path.title, desc: path.desc,
+        color: path.color, steps: matching.map(mapCourseToStep)
+      });
+    });
 
-      /* 3) Leftovers: كورسات من نفس الـ path category ماتمطّطتش */
-      const leftovers = courses
-        .filter((c) =>
-          !usedInThisPath.has(c.id) &&
-          !subPathCourseIds.has(c.id) &&
-          belongsToPathCategory(c, def)
-        )
-        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-
-      for (const c of leftovers) {
-        usedInThisPath.add(c.id);
-        usedGlobal.add(c.id);
-        steps.push(mapCourseToStep(c, null, steps.length, def.stages.length));
-        debug.push({ path: def.id, stage: '(leftover)', courseId: c.id, title: c.title, score: 0 });
-      }
-
-      return {
-        id: def.id,
-        icon: def.icon,
-        title: def.title,
-        desc: def.desc,
-        color: def.color,
-        steps,
-        subPaths
-      };
-    }).filter((p) => p.steps.length > 0 || (p.subPaths && p.subPaths.length > 0));
-
-    /* 4) Orphans → misc */
-    const orphans = courses.filter((c) => !usedGlobal.has(c.id));
+    const orphans = courses.filter((c) => !usedCourseIds.has(c.id));
     if (orphans.length) {
       orphans.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-      const miscDef = ROADMAP_DEFINITIONS.find((d) => d.id === 'misc');
-      const existing = result.find((r) => r.id === 'misc');
-      const miscSteps = orphans.map((c, i) => mapCourseToStep(c, null, i, orphans.length));
-      if (existing) {
-        existing.steps.push(...miscSteps);
-      } else {
-        result.push({
-          id: 'misc',
-          icon: miscDef.icon,
-          title: miscDef.title,
-          desc: miscDef.desc,
-          color: miscDef.color,
-          steps: miscSteps,
-          subPaths: []
-        });
-      }
+      result.push({
+        id: 'misc-path', icon: '🎓', title: 'كورسات إضافية', desc: 'كورسات متنوعة',
+        color: 'var(--rm-c-other,#64748b)', steps: orphans.map(mapCourseToStep)
+      });
     }
 
     _catalogCacheKey = key;
     _catalogCache = result;
-    _lastDebugInfo = debug;
-    console.info('[RM] ✅ اتبنى', result.length, 'مسار من',
-      result.reduce((s, r) => s + r.steps.length, 0), 'كورس');
     return result;
   }
 
-  function belongsToPathCategory(course, def) {
-    const catMap = {
-      frontend:    ['Frontend', 'HTML', 'CSS', 'JavaScript', 'Tailwind CSS', 'Bootstrap', 'React', 'Next.js'],
-      backend:     ['Backend', 'Node.js'],
-      fullstack:   ['Full Stack'],
-      ai:          ['AI'],
-      design:      ['UI/UX', 'Graphic Design', 'Video Editing'],
-      data:        ['Data Analysis', 'Excel'],
-      programming: ['Programming', 'Computer Science', 'CS'],
-      devops:      ['DevOps', 'Cloud'],
-      cyber:       ['Cyber Security'],
-      mobile:      ['Mobile App'],
-      misc:        []
-    };
-    const allowed = catMap[def.id] || [];
-    return allowed.includes(String(course.category || ''));
-  }
-
-  function mapCourseToStep(c, stage, stageIndex, totalSteps) {
-    const title = c.title || '';
-    const cat = c.category || '';
-    const desc = c.description || '';
-    const explicitLevel = detectLevel(c);
-    const positionLevel = getStageLevel(stageIndex || 0, totalSteps || 0, explicitLevel);
-    const level = stage && stage.level
-      ? (explicitLevel !== 'beginner' ? explicitLevel : stage.level)
-      : positionLevel;
-
+  function mapCourseToStep(c) {
     return {
       courseId: c.id,
-      title,
-      description: desc,
-      category: cat,
-      level,
-      stageId: stage ? stage.id : null,
-      stageLabel: stage ? stage.label : null,
-      order: c.order ?? 999,
+      title: c.title,
+      description: c.description || '',
+      category: c.category || '',
+      duration: c.duration || '',           /* اختياري: لو الكتالوج فيه مدة */
       cashPrice: c.cashPrice || 0,
       installmentAmount: c.installmentAmount || 0,
       installmentCount: c.installmentCount || 0,
@@ -632,23 +172,160 @@
     };
   }
 
-  function getCourseStatus(rm, idx, currentIdx) {
-    const p = progress[rm.id] || {};
-    if (p[idx]) return 'completed';
-    const ci = (typeof currentIdx === 'number') ? currentIdx : getCurrentStepIndex(rm);
-    if (idx === ci) return 'current';
-    if (ci !== -1 && idx > ci) return 'locked';
-    return 'available';
-  }
-
   /* ---------- حالة ---------- */
   let currentUser = null;
-  let progress = {};
+  let progress = {};        /* { roadmapId: { 0: true, 3: true } } */
+  let notes = {};           /* { roadmapId: { 0: 'نص الملاحظة' } } */
   let ROADMAPS = [];
   let activeTabId = null;
-  let loadState = 'idle';
+  let searchQuery = '';
+  let filterMode = 'all';   /* all | todo | done */
+  let loadState = 'idle';   /* idle | loading | ready | error */
   let loadError = '';
   let authUnsub = null;
+
+  /* ---------- التخزين المحلي (زوار + نسخة احتياطية) ---------- */
+  const GUEST_KEY = 'nexora_roadmap_guest_v1';
+
+  function readLocal() {
+    try { return JSON.parse(localStorage.getItem(GUEST_KEY) || '{}') || {}; }
+    catch { return {}; }
+  }
+  function persistLocal() {
+    try {
+      localStorage.setItem(GUEST_KEY, JSON.stringify(
+        { steps: progress, notes, updatedAt: Date.now() }
+      ));
+    } catch { /* التخزين ممتلئ أو ممنوع */ }
+  }
+
+  async function persistAll() {
+    if (!currentUser) { persistLocal(); return { ok: true, local: true }; }
+    try {
+      await db.collection('roadmapProgress').doc(currentUser.uid)
+        .set({ steps: progress, notes }, { merge: true });
+      return { ok: true };
+    } catch (e) {
+      console.warn('[RM] حفظ التقدّم:', e.code);
+      persistLocal(); /* نسخة احتياطية لحد ما الاتصال يرجع */
+      return { ok: false, reason: e.code };
+    }
+  }
+
+  /* ---------- Progress ---------- */
+  async function loadProgress() {
+    if (!currentUser) {
+      const g = readLocal();
+      progress = g.steps || {};
+      notes = g.notes || {};
+      loadState = 'ready';
+      return;
+    }
+    loadState = 'loading';
+    loadError = '';
+    try {
+      const doc = await db.collection('roadmapProgress').doc(currentUser.uid).get();
+      const remote = doc.exists ? doc.data() : {};
+      const remoteSteps = remote.steps || {};
+      const remoteNotes = remote.notes || {};
+
+      /* ⚡ دمج تقدّم الزائر اللي اشتغل بدون تسجيل */
+      const g = readLocal();
+      let hadGuest = false;
+      Object.keys(g.steps || {}).forEach((rid) => {
+        remoteSteps[rid] = Object.assign({}, g.steps[rid], remoteSteps[rid] || {});
+        hadGuest = true;
+      });
+      Object.keys(g.notes || {}).forEach((rid) => {
+        remoteNotes[rid] = Object.assign({}, g.notes[rid], remoteNotes[rid] || {});
+        hadGuest = true;
+      });
+
+      progress = remoteSteps;
+      notes = remoteNotes;
+
+      if (hadGuest) {
+        try {
+          await db.collection('roadmapProgress').doc(currentUser.uid)
+            .set({ steps: progress, notes }, { merge: true });
+          try { localStorage.removeItem(GUEST_KEY); } catch {}
+          toast('✅ اتمزام تقدّمك اللي اشتغلته كزائر مع حسابك', 'ok');
+        } catch (e) { console.warn('[RM] دمج الزائر:', e.code); }
+      }
+      loadState = 'ready';
+    } catch (e) {
+      console.warn('[RM] تحميل التقدّم:', e.code);
+      const g = readLocal();
+      progress = g.steps || {};
+      notes = g.notes || {};
+      loadState = 'error';
+      loadError = e.code || 'unknown';
+    }
+  }
+
+  async function saveStep(rmId, idx, on) {
+    progress[rmId] = progress[rmId] || {};
+    if (on) progress[rmId][idx] = true;
+    else delete progress[rmId][idx];
+    return persistAll();
+  }
+
+  /* ---------- ملاحظات (Debounce) ---------- */
+  const _noteTimers = {};
+  function saveNoteDebounced(rmId, idx, text) {
+    notes[rmId] = notes[rmId] || {};
+    const t = String(text || '').trim();
+    if (t) notes[rmId][idx] = t;
+    else delete notes[rmId][idx];
+    const key = rmId + ':' + idx;
+    clearTimeout(_noteTimers[key]);
+    _noteTimers[key] = setTimeout(() => { persistAll(); }, 700);
+  }
+
+  /* ---------- Gamification ---------- */
+  const STEP_XP = 10, PATH_BONUS = 50;
+
+  function computeStats() {
+    let totalDone = 0, pathsDone = 0;
+    ROADMAPS.forEach((rm) => {
+      const p = progress[rm.id] || {};
+      const d = rm.steps.filter((_, i) => p[i]).length;
+      totalDone += d;
+      if (rm.steps.length && d === rm.steps.length) pathsDone++;
+    });
+    const xp = totalDone * STEP_XP + pathsDone * PATH_BONUS;
+    return {
+      totalDone, pathsDone, xp,
+      level: Math.floor(xp / 100) + 1,
+      inLevel: xp % 100
+    };
+  }
+
+  function computeBadges(st) {
+    const b = [];
+    if (st.totalDone >= 1)  b.push({ icon:'🌱', label:'أول خطوة' });
+    if (st.totalDone >= 5)  b.push({ icon:'🔥', label:'5 خطوات' });
+    if (st.totalDone >= 25) b.push({ icon:'⭐', label:'25 خطوة' });
+    if (st.pathsDone >= 1)  b.push({ icon:'🏆', label:'أول مسار كامل' });
+    if (st.pathsDone >= 3)  b.push({ icon:'👑', label:'3 مسارات كاملة' });
+    if (st.level >= 5)      b.push({ icon:'🚀', label:'مستوى 5' });
+    return b;
+  }
+
+  function getPathProgress(rm) {
+    const p = progress[rm.id] || {};
+    const done = rm.steps.filter((_, i) => p[i]).length;
+    const total = rm.steps.length;
+    return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+  }
+
+  function getNextStep(rm) {
+    const p = progress[rm.id] || {};
+    for (let i = 0; i < rm.steps.length; i++) {
+      if (!p[i]) return { step: rm.steps[i], idx: i };
+    }
+    return null;
+  }
 
   /* ---------- أنماط ---------- */
   const STYLES = `
@@ -656,78 +333,79 @@
   --rm-c-frontend:#4f7cff; --rm-c-backend:#22c55e; --rm-c-fullstack:#f0b53e;
   --rm-c-design:#ec4899;   --rm-c-mobile:#a855f7;  --rm-c-data:#06b6d4;
   --rm-c-ai:#8b5cf6;       --rm-c-cyber:#ef4444;   --rm-c-other:#64748b;
-  --rm-c-prog:#a855f7;     --rm-c-devops:#0ea5e9;
-  --rm-lv-beginner:#22c55e; --rm-lv-intermediate:#f0b53e; --rm-lv-advanced:#ef4444;
+  --rm-c-devops:#0ea5e9;   --rm-c-db:#14b8a6;      --rm-c-game:#f97316;
+  --rm-c-marketing:#d946ef;--rm-c-icdl:#84cc16;
 }
 .rm-wrap{max-width:1000px;margin:0 auto;padding-bottom:40px}
 .rm-header{padding:4px 0 20px}
 .rm-header h2{font-size:24px;font-weight:900;margin-bottom:6px}
 .rm-header p{font-size:13.5px;color:var(--mut,#9c9cab);line-height:1.8}
+
+.rm-search{display:flex;align-items:center;gap:10px;background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:14px;padding:0 14px;margin-bottom:18px;transition:border-color .15s}
+.rm-search:focus-within{border-color:#4f7cff66}
+.rm-search i{color:var(--mut,#9c9cab);font-size:14px}
+.rm-search input{flex:1;background:none;border:none;outline:none;color:var(--ink,#ececf1);font:inherit;font-size:13.5px;height:44px;min-width:0}
+.rm-search button{background:none;border:none;color:var(--mut,#9c9cab);cursor:pointer;font-size:14px;padding:6px}
+.rm-search button:hover{color:var(--ink,#ececf1)}
+
+.rm-statsbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:linear-gradient(135deg,rgba(79,124,255,.08),rgba(124,92,255,.06));border:1px solid rgba(79,124,255,.25);border-radius:16px;padding:14px 18px;margin-bottom:18px}
+.rm-stats-main{display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex:1}
+.rm-level{display:flex;align-items:center;gap:10px}
+.rm-level-num{font-weight:900;font-size:15px;background:linear-gradient(135deg,#4f7cff,#7c5cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rm-xpbar{width:110px;height:6px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);border-radius:999px;overflow:hidden}
+.rm-xpbar>div{height:100%;background:linear-gradient(90deg,#4f7cff,#7c5cff);border-radius:999px;transition:width .4s ease}
+.rm-xp-txt{font-size:10.5px;color:var(--dim,#66666f);font-weight:700}
+.rm-mini{font-size:12px;color:var(--mut,#9c9cab)}
+.rm-mini b{color:var(--ink,#ececf1);font-size:14px}
+.rm-badges{display:flex;gap:6px;flex-wrap:wrap}
+.rm-badge{font-size:16px;width:30px;height:30px;display:grid;place-items:center;background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:10px}
+.rm-tools{display:flex;gap:6px;flex-wrap:wrap}
+.rm-tool{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.rm-tool:hover{color:var(--ink,#ececf1);border-color:#4f7cff66}
+
 .rm-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:24px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .rm-tab{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:14px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .rm-tab:hover{color:var(--ink,#ececf1);border-color:#4f7cff66}
 .rm-tab:focus-visible{outline:2px solid #4f7cff;outline-offset:2px}
 .rm-tab.active{background:linear-gradient(135deg,#4f7cff,#7c5cff);border-color:transparent;color:#fff}
 .rm-tab .rm-tab-count{font-size:10.5px;font-weight:700;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:999px}
-.rm-hero{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:20px;padding:26px;margin-bottom:24px;position:relative;overflow:hidden}
-.rm-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,var(--hero-color,#4f7cff)22,transparent 60%);pointer-events:none;opacity:.15}
+
+.rm-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.rm-fchip{padding:7px 14px;border-radius:10px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.rm-fchip:hover{color:var(--ink,#ececf1)}
+.rm-fchip.active{background:rgba(79,124,255,.15);border-color:rgba(79,124,255,.45);color:#7ea2ff}
+
+.rm-hero{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:20px;padding:26px;margin-bottom:20px;position:relative;overflow:hidden}
+.rm-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,var(--hero-color,#4f7cff),transparent 60%);pointer-events:none;opacity:.12}
 .rm-hero-content{position:relative;z-index:1}
 .rm-hero-icon{font-size:44px;margin-bottom:10px;line-height:1}
 .rm-hero-title{font-size:24px;font-weight:900;margin-bottom:6px}
 .rm-hero-desc{font-size:14px;color:var(--mut,#9c9cab);line-height:1.8;max-width:600px}
 .rm-hero-meta{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.rm-hero-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.rm-next{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid rgba(79,124,255,.35);background:rgba(79,124,255,.1);color:#7ea2ff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s;max-width:100%;text-align:start}
+.rm-next:hover{background:rgba(79,124,255,.18)}
 .rm-chip{font-size:11.5px;font-weight:700;padding:5px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
 .rm-chip.prog{color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
 .rm-chip.count{color:#7ea2ff;background:rgba(79,124,255,.1);border:1px solid rgba(79,124,255,.3)}
+.rm-chip.gold{color:#f0b53e;background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3)}
 .rm-progress-bar{height:6px;background:var(--bg,#0a0a0d);border-radius:999px;overflow:hidden;margin-top:14px;border:1px solid var(--edge,#212129)}
 .rm-progress-fill{height:100%;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:999px;transition:width .4s ease}
 
-.rm-current{
-  background:linear-gradient(135deg,rgba(79,124,255,.15),rgba(240,181,62,.1));
-  border:1px solid rgba(79,124,255,.35);
-  border-radius:18px;padding:18px 20px;margin-bottom:20px;
-  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-  position:relative;overflow:hidden;
-}
-.rm-current::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 0% 0%,rgba(79,124,255,.2),transparent 60%);pointer-events:none}
-.rm-current-content{position:relative;z-index:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;width:100%}
-.rm-current-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#4f7cff,#7c5cff);display:grid;place-items:center;font-size:22px;flex-shrink:0;color:#fff}
-.rm-current-text{flex-grow:1;min-width:200px}
-.rm-current-label{font-size:11px;font-weight:700;color:#7ea2ff;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
-.rm-current-title{font-size:16px;font-weight:800;line-height:1.3}
-.rm-current-actions{display:flex;gap:8px;flex-wrap:wrap}
-
-.rm-complete{
-  background:linear-gradient(135deg,rgba(74,222,128,.15),rgba(240,181,62,.1));
-  border:1px solid rgba(74,222,128,.4);
-  border-radius:20px;padding:28px 24px;margin-bottom:24px;
-  text-align:center;position:relative;overflow:hidden;
-  animation:rmPop .5s cubic-bezier(.34,1.56,.64,1);
-}
-@keyframes rmPop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
-.rm-complete-icon{font-size:56px;line-height:1;margin-bottom:12px}
-.rm-complete-title{font-size:22px;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,#4ade80,#f0b53e);-webkit-background-clip:text;background-clip:text;color:transparent}
-.rm-complete-desc{font-size:13.5px;color:var(--mut,#9c9cab);line-height:1.7;margin-bottom:16px}
-.rm-complete-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-
 .rm-steps{position:relative;padding-inline-start:34px;list-style:none;margin:0}
-.rm-steps::before{content:'';position:absolute;inset-inline-start:11px;top:24px;bottom:24px;width:2px;background:linear-gradient(180deg,var(--hero-color,#4f7cff)44,var(--edge,#212129))}
+.rm-steps::before{content:'';position:absolute;inset-inline-start:11px;top:24px;bottom:24px;width:2px;background:linear-gradient(180deg,var(--hero-color,#4f7cff),var(--edge,#212129))}
 .rm-step{position:relative;margin-bottom:16px}
 .rm-step-dot{position:absolute;inset-inline-start:-34px;top:24px;width:24px;height:24px;border-radius:50%;background:var(--bg,#0a0a0d);border:2px solid var(--edge2,#2e2e39);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--dim,#66666f);z-index:1;transition:.2s}
 .rm-step.done .rm-step-dot{background:#4ade80;border-color:#4ade80;color:#052e12}
-.rm-step.current .rm-step-dot{border-color:#4f7cff;background:rgba(79,124,255,.15);color:#4f7cff;animation:rmPulse 1.8s infinite}
-@keyframes rmPulse{0%,100%{box-shadow:0 0 0 0 rgba(79,124,255,.5)}50%{box-shadow:0 0 0 6px rgba(79,124,255,0)}}
-.rm-step.locked .rm-step-card{opacity:.55;filter:saturate(.6)}
-.rm-step.locked .rm-step-dot{color:var(--dim,#66666f)}
 .rm-step-card{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:16px;padding:18px 20px;transition:.2s;position:relative;overflow:hidden}
 .rm-step-card:hover{border-color:var(--hero-color,#4f7cff)}
 .rm-step.done .rm-step-card{border-color:rgba(74,222,128,.35)}
-.rm-step.current .rm-step-card{border-color:rgba(79,124,255,.55);box-shadow:0 0 0 1px rgba(79,124,255,.2),0 8px 24px rgba(79,124,255,.1)}
 .rm-step-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .rm-step-num{font-size:10.5px;font-weight:800;color:var(--dim,#66666f);text-transform:uppercase;letter-spacing:.5px}
-.rm-step-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.rm-step-cat{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);color:#7ea2ff}
-.rm-step-level{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.rm-step-head-chips{display:flex;gap:6px;flex-wrap:wrap}
+.rm-step-cat{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);color:#7ea2ff;align-self:flex-start}
+.rm-step-dur{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.3);color:#b79cff;align-self:flex-start}
+.rm-step-hint{font-size:11px;color:#f0b53e;background:rgba(240,181,62,.08);border:1px dashed rgba(240,181,62,.3);border-radius:9px;padding:6px 10px;margin-bottom:10px;display:inline-block}
 .rm-step-title{flex:1;font-size:15px;font-weight:800;line-height:1.5;min-width:180px}
 .rm-step-desc{font-size:12.5px;color:var(--mut,#9c9cab);line-height:1.7;margin-bottom:12px}
 .rm-step-prices{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:12.5px;align-items:baseline}
@@ -742,62 +420,84 @@
 .rm-btn.done-btn:hover{background:rgba(74,222,128,.2)}
 .rm-btn.undone-btn{background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e}
 .rm-btn.wa{background:#25D366;color:#04310f}
+.rm-btn.cert{background:linear-gradient(135deg,#f0b53e,#e08e0b);color:#231400}
 .rm-btn[aria-busy="true"]{opacity:.6;pointer-events:none}
+
+.rm-note{margin-top:10px}
+.rm-note-toggle{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--dim,#66666f);font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;padding:4px 0}
+.rm-note-toggle:hover,.rm-note-toggle[aria-expanded="true"]{color:#7ea2ff}
+.rm-note-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block}
+.rm-note-area{width:100%;margin-top:8px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);border-radius:10px;padding:10px 12px;color:var(--ink,#ececf1);font:inherit;font-size:12.5px;line-height:1.6;resize:vertical;min-height:60px}
+.rm-note-area:focus{outline:none;border-color:#4f7cff66}
+.rm-note-area.hidden{display:none}
+
+.rm-sr-group{margin-bottom:26px}
+.rm-sr-title{font-size:15px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.rm-sr-title .rm-tab-count{font-size:10.5px;font-weight:700;background:rgba(79,124,255,.15);color:#7ea2ff;padding:2px 8px;border-radius:999px}
+
 .rm-empty{text-align:center;padding:60px 20px;background:var(--panel,#101015);border:1px dashed var(--edge2,#2e2e39);border-radius:20px}
+.rm-empty-sm{padding:34px 20px}
 .rm-empty .rm-empty-icon{font-size:52px;margin-bottom:14px}
 .rm-empty .rm-empty-title{font-size:18px;font-weight:800;margin-bottom:8px}
 .rm-empty .rm-empty-desc{font-size:13.5px;color:var(--mut,#9c9cab);line-height:1.8;margin-bottom:16px}
-.rm-empty .rm-empty-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dim,#66666f);background:var(--bg,#0a0a0d);padding:6px 10px;border-radius:8px;display:inline-block;margin-bottom:16px;border:1px solid var(--edge,#212129)}
 .rm-state-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
 .rm-guest{background:rgba(79,124,255,.08);border:1px solid rgba(79,124,255,.3);color:#7ea2ff;padding:12px 16px;border-radius:12px;font-size:12.5px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.rm-guest a{color:#7ea2ff;text-decoration:underline;font-weight:700}
+.rm-guest a,.rm-guest button{color:#7ea2ff;text-decoration:underline;font-weight:700;background:none;border:none;cursor:pointer;font:inherit;padding:0}
+
 .rm-skel{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:16px;padding:20px;margin-bottom:16px}
 .rm-skel-line{height:12px;background:linear-gradient(90deg,var(--edge,#212129),var(--raise,#16161d),var(--edge,#212129));background-size:200% 100%;border-radius:6px;animation:rmShimmer 1.4s infinite}
 .rm-skel-line.w-40{width:40%} .rm-skel-line.w-70{width:70%} .rm-skel-line.w-90{width:90%}
 .rm-skel-line+.rm-skel-line{margin-top:10px}
 @keyframes rmShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* Sub-Paths */
-.rm-subpaths{margin-top:32px;padding-top:24px;border-top:1px solid var(--edge,#212129)}
-.rm-subpaths-title{font-size:16px;font-weight:800;margin-bottom:4px}
-.rm-subpaths-desc{font-size:12.5px;color:var(--mut,#9c9cab);margin-bottom:16px}
-.rm-subpath{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:14px;padding:16px 18px;margin-bottom:12px}
-.rm-subpath-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-.rm-subpath-icon{font-size:22px;line-height:1}
-.rm-subpath-label{font-size:14px;font-weight:800;flex:1;min-width:120px}
-.rm-subpath-count{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);color:#7ea2ff}
-.rm-subpath-steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
-.rm-substep{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--bg,#0a0a0d);border:1px solid var(--edge,#212129);flex-wrap:wrap}
-.rm-substep-num{font-size:11px;font-weight:800;color:var(--dim,#66666f);flex-shrink:0}
-.rm-substep-title{flex:1;font-size:13px;font-weight:600;min-width:120px}
-.rm-substep-btn{height:32px;padding:0 12px;font-size:11.5px;flex-shrink:0}
+#rmToasts{position:fixed;bottom:16px;inset-inline-start:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;max-width:min(360px,calc(100vw - 32px))}
+.rm-toast{background:#16161d;color:#ececf1;border:1px solid #2e2e39;border-inline-start:3px solid #4f7cff;border-radius:12px;padding:11px 14px;font-size:12.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:rmToastIn .25s ease}
+.rm-toast.err{border-inline-start-color:#ef4444}
+.rm-toast.ok{border-inline-start-color:#4ade80}
+.rm-toast.out{opacity:0;transform:translateY(6px);transition:.3s}
+@keyframes rmToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.rm-cert-overlay{position:fixed;inset:0;z-index:9999;background:rgba(5,5,10,.82);display:grid;place-items:center;padding:16px;backdrop-filter:blur(4px)}
+.rm-cert-card{background:#fffdf6;color:#191713;border-radius:16px;max-width:560px;width:100%;padding:36px 30px;text-align:center;border:1px solid #d9c58a;outline:4px double #c9a227;outline-offset:-14px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+.rm-cert-close{position:absolute;top:10px;inset-inline-end:10px;background:none;border:none;font-size:17px;cursor:pointer;color:#8a8371;width:32px;height:32px;border-radius:8px}
+.rm-cert-close:hover{background:rgba(0,0,0,.06)}
+.rm-cert-brand{font-weight:900;letter-spacing:3px;font-size:13px;color:#c9a227;margin-bottom:14px}
+.rm-cert-title{font-size:26px;font-weight:900;margin-bottom:6px}
+.rm-cert-sub{font-size:13px;color:#6b6455;margin-bottom:12px}
+.rm-cert-name{width:100%;max-width:320px;margin:0 auto 12px;display:block;text-align:center;border:none;border-bottom:2px dashed #c9a227;background:transparent;font:inherit;font-size:20px;font-weight:800;padding:6px 10px;color:#191713}
+.rm-cert-name:focus{outline:none;border-bottom-style:solid}
+.rm-cert-name::placeholder{color:#b3ab97;font-weight:600;font-size:15px}
+.rm-cert-path{font-size:18px;font-weight:900;margin:8px 0;color:#7a5d00}
+.rm-cert-meta{font-size:11.5px;color:#6b6455;margin-top:10px}
+.rm-cert-actions{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.rm-cert-actions .rm-btn{height:38px}
+.rm-cert-actions .rm-btn.grey{background:#e8e2d0;color:#191713}
 
 @media (max-width:640px){
   .rm-header h2{font-size:20px}
   .rm-hero{padding:20px}
   .rm-hero-title{font-size:19px}
   .rm-hero-icon{font-size:36px}
-  .rm-current{padding:14px 16px}
-  .rm-current-icon{width:42px;height:42px;font-size:20px}
-  .rm-current-title{font-size:14.5px}
-  .rm-current-actions{width:100%}
-  .rm-current-actions .rm-btn{flex:1}
-  .rm-complete{padding:22px 18px}
-  .rm-complete-title{font-size:18px}
-  .rm-complete-icon{font-size:44px}
   .rm-step-card{padding:14px 16px}
   .rm-step-title{font-size:14px}
   .rm-step-actions{flex-direction:column}
   .rm-btn{width:100%;min-height:44px}
   .rm-tab{padding:9px 14px;font-size:12px}
-  .rm-substep-btn{width:100%;min-height:40px}
-  .rm-substep-title{min-width:0;width:100%}
+  .rm-statsbar{padding:12px 14px}
+  .rm-xpbar{width:80px}
+}
+@media print{
+  body.rm-printing *{visibility:hidden!important}
+  body.rm-printing #rmCertOverlay,body.rm-printing #rmCertOverlay *{visibility:visible!important}
+  body.rm-printing #rmCertOverlay{position:static!important;background:#fff!important;backdrop-filter:none!important;padding:0!important}
+  body.rm-printing .rm-cert-card{box-shadow:none!important;max-width:100%!important}
+  body.rm-printing .rm-cert-actions,body.rm-printing .rm-cert-close{display:none!important}
 }
 @media (prefers-reduced-motion:reduce){
-  .rm-progress-fill,.rm-step-dot,.rm-step-card,.rm-tab,.rm-btn{transition:none!important}
+  .rm-progress-fill,.rm-xpbar>div,.rm-step-dot,.rm-step-card,.rm-tab,.rm-btn,.rm-fchip{transition:none!important}
   .rm-skel-line{animation:none}
-  .rm-step.current .rm-step-dot{animation:none}
-  .rm-complete{animation:none}
+  .rm-toast{animation:none}
 }
 `;
 
@@ -806,6 +506,7 @@
     if (qs('#view-roadmap')) return true;
     const main = qs('main#content') || qs('main');
     if (!main) { console.warn('[RM] main مش موجود — هستنى'); return false; }
+
     if (!document.getElementById('nexRoadmapStyles')) {
       const st = document.createElement('style');
       st.id = 'nexRoadmapStyles';
@@ -822,51 +523,83 @@
     return true;
   }
 
-  /* ---------- Progress ---------- */
-  async function loadProgress() {
-    if (!currentUser) { progress = {}; loadState = 'ready'; return; }
-    loadState = 'loading';
-    loadError = '';
-    try {
-      const docSnap = await db.collection('roadmapProgress').doc(currentUser.uid).get();
-      progress = (docSnap.exists && docSnap.data().steps) ? docSnap.data().steps : {};
-      loadState = 'ready';
-    } catch (e) {
-      console.warn('[RM] تحميل التقدم:', e.code);
-      progress = {};
-      loadState = 'error';
-      loadError = e.code || 'unknown';
-    }
+  /* ---------- Render: أجزاء ثابتة ---------- */
+  function headerHTML(loading) {
+    return '<div class="rm-header"><h2>خرائط التعلم 🗺️</h2>' +
+      '<p>' + (loading ? 'بنجهّز مساراتك…' : 'مسارات مرتبة بخطوات واضحة — علّم على اللي خلصته، وخد شهادتك لما تكمل') + '</p></div>';
   }
 
-  async function saveStep(roadmapId, idx, on) {
-    progress[roadmapId] = progress[roadmapId] || {};
-    progress[roadmapId][idx] = on;
-    if (!currentUser) return { ok: false, reason: 'guest' };
-    try {
-      await db.collection('roadmapProgress').doc(currentUser.uid).set(
-        { steps: progress }, { merge: true }
-      );
-      return { ok: true };
-    } catch (e) {
-      console.warn('[RM] حفظ التقدم:', e.code);
-      return { ok: false, reason: e.code };
-    }
+  function skeletonHTML() {
+    return '<div class="rm-skel"><div class="rm-skel-line w-40"></div><div class="rm-skel-line w-90"></div><div class="rm-skel-line w-70"></div></div>'.repeat(3);
   }
 
-  function getPathProgress(rm) {
-    const p = progress[rm.id] || {};
-    const done = rm.steps.filter((_, i) => p[i]).length;
-    const total = rm.steps.length;
-    return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+  function emptyHTML() {
+    return '<div class="rm-empty">' +
+      '<div class="rm-empty-icon" aria-hidden="true">🗺️</div>' +
+      '<p class="rm-empty-title">مفيش مسارات لسه</p>' +
+      '<p class="rm-empty-desc">لما نضيف كورسات، المسارات هتظهر هنا تلقائيًا</p>' +
+    '</div>';
   }
 
-  function getCurrentStepIndex(rm) {
-    const p = progress[rm.id] || {};
-    for (let i = 0; i < rm.steps.length; i++) {
-      if (!p[i]) return i;
-    }
-    return -1;
+  function errorHTML() {
+    return '<div class="rm-empty" role="alert">' +
+      '<div class="rm-empty-icon" aria-hidden="true">⚠️</div>' +
+      '<p class="rm-empty-title">مش قادرين نحمّل تقدّمك</p>' +
+      '<p class="rm-empty-desc">حصلت مشكلة في الاتصال. جرّب تاني — وتقدّمك محفوظ محليًا في نفس الوقت.</p>' +
+      '<div class="rm-state-actions">' +
+        '<button type="button" class="rm-btn open" data-rm-retry><i class="bi bi-arrow-clockwise"></i>حاول تاني</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function guestBannerHTML() {
+    if (currentUser) return '';
+    return '<div class="rm-guest" role="status">' +
+      '<i class="bi bi-info-circle" aria-hidden="true"></i>' +
+      '<span>أنت شغال كزائر — تقدّمك بيتحفظ على جهازك. سجّل دخولك عشان يتزامن على حسابك وترجع له من أي جهاز.</span>' +
+      '<a href="auth.html">تسجيل الدخول</a>' +
+    '</div>';
+  }
+
+  function statsBarHTML(st, badges) {
+    return '<div class="rm-statsbar">' +
+      '<div class="rm-stats-main">' +
+        '<div class="rm-level">' +
+          '<span class="rm-level-num">Lv.' + st.level + '</span>' +
+          '<div class="rm-xpbar" role="progressbar" aria-label="التقدّم للمستوى الجاي"' +
+            ' aria-valuenow="' + st.inLevel + '" aria-valuemin="0" aria-valuemax="100">' +
+            '<div style="width:' + st.inLevel + '%"></div>' +
+          '</div>' +
+          '<span class="rm-xp-txt">' + st.inLevel + '/100 XP</span>' +
+        '</div>' +
+        '<span class="rm-mini"><b>' + fmtNum(st.xp) + '</b> XP</span>' +
+        '<span class="rm-mini"><b>' + fmtNum(st.totalDone) + '</b> خطوة مكتملة</span>' +
+        '<span class="rm-mini"><b>' + fmtNum(st.pathsDone) + '</b> مسار كامل</span>' +
+      '</div>' +
+      (badges.length
+        ? '<div class="rm-badges" aria-label="شاراتك">' +
+            badges.map((b) => '<span class="rm-badge" title="' + esc(b.label) + '" aria-label="' + esc(b.label) + '">' + b.icon + '</span>').join('') +
+          '</div>'
+        : '') +
+      '<div class="rm-tools">' +
+        '<button type="button" class="rm-tool" data-rm-export title="نزّل تقدّمك كملف"><i class="bi bi-download" aria-hidden="true"></i>تصدير</button>' +
+        '<button type="button" class="rm-tool" data-rm-import-btn title="ارفع ملف تقدّم"><i class="bi bi-upload" aria-hidden="true"></i>استيراد</button>' +
+        '<button type="button" class="rm-tool" data-rm-reset title="مسح كل التقدّم"><i class="bi bi-trash3" aria-hidden="true"></i>تصفير</button>' +
+        '<input type="file" id="rmImportFile" accept=".json,application/json" hidden>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function searchHTML() {
+    return '<div class="rm-search">' +
+      '<i class="bi bi-search" aria-hidden="true"></i>' +
+      '<input type="search" data-rm-search value="' + esc(searchQuery) + '"' +
+        ' placeholder="ابحث في كل المسارات: HTML، React، Excel…"' +
+        ' aria-label="ابحث في المسارات والكورسات">' +
+      (searchQuery
+        ? '<button type="button" data-rm-search-clear aria-label="مسح البحث"><i class="bi bi-x-lg" aria-hidden="true"></i></button>'
+        : '') +
+    '</div>';
   }
 
   /* ---------- Render: Tabs ---------- */
@@ -889,8 +622,8 @@
   }
 
   /* ---------- Render: Hero ---------- */
-  function heroHTML(rm) {
-    const pr = getPathProgress(rm);
+  function heroHTML(rm, pr) {
+    const nx = pr.pct < 100 ? getNextStep(rm) : null;
     return '<div class="rm-hero" style="--hero-color:' + rm.color + '">' +
       '<div class="rm-hero-content">' +
         '<div class="rm-hero-icon" aria-hidden="true">' + rm.icon + '</div>' +
@@ -898,115 +631,77 @@
         '<p class="rm-hero-desc">' + esc(rm.desc) + '</p>' +
         '<div class="rm-hero-meta">' +
           '<span class="rm-chip count">📚 ' + rm.steps.length + ' كورس</span>' +
-          '<span class="rm-chip prog" aria-live="polite">✅ تقدّمك: ' + pr.done + '/' + pr.total + ' (' + pr.pct + '%)</span>' +
+          (pr.pct === 100
+            ? '<span class="rm-chip gold">🏆 مكتمل بالكامل!</span>'
+            : '<span class="rm-chip prog" aria-live="polite">✅ تقدّمك: ' + pr.done + '/' + pr.total + ' (' + pr.pct + '%)</span>') +
         '</div>' +
-        '<div class="rm-progress-bar" role="progressbar" aria-valuenow="' + pr.pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="تقدّم المسار">' +
+        '<div class="rm-progress-bar" role="progressbar" aria-valuenow="' + pr.pct + '" aria-valuemin="0" aria-valuemax="100">' +
           '<div class="rm-progress-fill" style="width:' + pr.pct + '%"></div>' +
         '</div>' +
-      '</div>' +
-    '</div>';
-  }
-
-  /* ---------- Render: Current Step ---------- */
-  function currentStepHTML(rm) {
-    const idx = getCurrentStepIndex(rm);
-    if (idx === -1) return '';
-
-    const step = rm.steps[idx];
-    return '<div class="rm-current">' +
-      '<div class="rm-current-content">' +
-        '<div class="rm-current-icon" aria-hidden="true"><i class="bi bi-play-fill"></i></div>' +
-        '<div class="rm-current-text">' +
-          '<div class="rm-current-label">🎯 الكورس التالي</div>' +
-          '<div class="rm-current-title">' + esc(step.title) + '</div>' +
-        '</div>' +
-        '<div class="rm-current-actions">' +
-          '<a class="rm-btn open" href="library.html" data-rm-open="' + esc(step.courseId) + '">' +
-            '<i class="bi bi-play-circle" aria-hidden="true"></i>ابدأ الآن' +
-          '</a>' +
-          '<button type="button" class="rm-btn done-btn" data-rm-done="' + esc(rm.id) + '" data-rm-idx="' + idx + '">' +
-            '<i class="bi bi-check2-circle" aria-hidden="true"></i>حدد كمكتمل' +
-          '</button>' +
+        '<div class="rm-hero-cta">' +
+          (nx
+            ? '<button type="button" class="rm-next" data-rm-jump="' + esc(rm.id) + ':' + nx.idx + '">' +
+                '🎯 الخطوة الجاية: ' + esc(truncate(nx.step.title, 44)) +
+              '</button>'
+            : '') +
+          (pr.pct === 100
+            ? '<button type="button" class="rm-btn cert" data-rm-cert="' + esc(rm.id) + '">' +
+                '<i class="bi bi-award" aria-hidden="true"></i>احصل على شهادتك 🏆</button>'
+            : '') +
         '</div>' +
       '</div>' +
     '</div>';
   }
 
-  /* ---------- Render: Completion ---------- */
-  function completionHTML(rm) {
-    return '<div class="rm-complete" role="status">' +
-      '<div class="rm-complete-icon" aria-hidden="true">🎉</div>' +
-      '<div class="rm-complete-title">مبروك! أكملت مسار ' + esc(rm.title) + '</div>' +
-      '<p class="rm-complete-desc">خلصت كل الكورسات في المسار ده. جاهز للتحدي اللي بعده؟</p>' +
-      '<div class="rm-complete-actions">' +
-        '<a href="library.html" class="rm-btn open">' +
-          '<i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>تصفح كورسات تانية' +
-        '</a>' +
-        '<button type="button" class="rm-btn wa" data-rm-share="' + esc(rm.id) + '">' +
-          '<i class="bi bi-whatsapp" aria-hidden="true"></i>شارك إنجازك' +
-        '</button>' +
-      '</div>' +
+  function filtersHTML(pr) {
+    const mk = (mode, label) =>
+      '<button type="button" class="rm-fchip ' + (filterMode === mode ? 'active' : '') + '"' +
+      ' data-rm-filter="' + mode + '" aria-pressed="' + (filterMode === mode) + '">' + label + '</button>';
+    return '<div class="rm-filters" role="group" aria-label="فلترة الخطوات">' +
+      mk('all',  'الكل (' + pr.total + ')') +
+      mk('todo', 'المتبقي (' + (pr.total - pr.done) + ')') +
+      mk('done', 'المكتمل (' + pr.done + ')') +
     '</div>';
   }
 
   /* ---------- Render: Step ---------- */
-  /* ✅ v20.3: نعرض stageLabel بدل category لو متاح */
-  function stepHTML(rm, step, i, currentIdx) {
-    const status = getCourseStatus(rm, i, currentIdx);
-    const done = status === 'completed';
-    const isCurrent = status === 'current';
-    const isLocked = status === 'locked';
-
-    let cls = '';
-    if (done) cls = 'done';
-    else if (isCurrent) cls = 'current';
-    else if (isLocked) cls = 'locked';
-
+  function stepHTML(rm, step, i, done, withHint) {
+    const cls = done ? 'done' : '';
     const dot = done ? '✓' : (i + 1);
-    const num = String(i + 1).padStart(2, '0');
-
-    const levelColor = LEVEL_COLOR[step.level] || 'var(--mut, #9c9cab)';
-    const levelHTML = step.level
-      ? '<span class="rm-step-level" style="color:' + levelColor + ';border-color:' + levelColor + '40;background:' + levelColor + '15;">'
-        + esc(LEVEL_LABEL[step.level] || step.level) + '</span>'
-      : '';
-
-    /* ✅ v20.3: stageLabel أولوية على category */
-    const displayCat = step.stageLabel || step.category;
-    const catHTML = displayCat
-      ? '<span class="rm-step-cat">' + esc(displayCat) + '</span>'
-      : '';
 
     const actions =
       '<a class="rm-btn open" href="library.html" data-rm-open="' + esc(step.courseId) + '">' +
-        '<i class="bi bi-play-circle" aria-hidden="true"></i>' + (done ? 'افتح تاني' : (isCurrent ? 'ابدأ الآن' : 'افتح الكورس')) +
+        '<i class="bi bi-play-circle" aria-hidden="true"></i>' + (done ? 'افتح تاني' : 'ابدأ الكورس') +
       '</a>' +
       '<a class="rm-btn wa" href="' + waLinkFor(step.title) + '" target="_blank" rel="noopener noreferrer">' +
         '<i class="bi bi-whatsapp" aria-hidden="true"></i>اشترك' +
       '</a>' +
       (done
         ? '<button type="button" class="rm-btn undone-btn" data-rm-undone="' + esc(rm.id) + '" data-rm-idx="' + i + '">' +
-            '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>إلغاء الإكمال' +
+            '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>رجّعها' +
           '</button>'
         : '<button type="button" class="rm-btn done-btn" data-rm-done="' + esc(rm.id) + '" data-rm-idx="' + i + '">' +
-            '<i class="bi bi-check2-circle" aria-hidden="true"></i>حدد كمكتمل' +
+            '<i class="bi bi-check2-circle" aria-hidden="true"></i>خلصت ✓' +
           '</button>'
       );
 
     const instText = step.installmentCount
-      ? fmtNum(step.installmentAmount) + ' × ' + step.installmentCount + ' = ' + fmtNum(step.installmentTotal) + ' جنيه'
+      ? fmtNum(step.installmentAmount) + ' × ' + fmtNum(step.installmentCount) + ' = ' + fmtNum(step.installmentTotal) + ' جنيه'
       : '';
 
-    return '<li class="rm-step ' + cls + '">' +
+    const note = (notes[rm.id] || {})[i] || '';
+
+    return '<li class="rm-step ' + cls + '" id="rmstep-' + esc(rm.id) + '-' + i + '">' +
       '<span class="rm-step-dot" aria-hidden="true">' + dot + '</span>' +
       '<div class="rm-step-card">' +
         '<div class="rm-step-head">' +
-          '<span class="rm-step-num">' + num + ' — المرحلة</span>' +
-          '<div class="rm-step-tags">' +
-            catHTML +
-            levelHTML +
-          '</div>' +
+          '<span class="rm-step-num">خطوة ' + (i + 1) + ' من ' + rm.steps.length + '</span>' +
+          '<span class="rm-step-head-chips">' +
+            (step.category ? '<span class="rm-step-cat">' + esc(step.category) + '</span>' : '') +
+            (step.duration ? '<span class="rm-step-dur">⏱ ' + esc(step.duration) + '</span>' : '') +
+          '</span>' +
         '</div>' +
+        (withHint ? '<div class="rm-step-hint">💡 الأفضل تخلّص الخطوة اللي قبله الأول</div>' : '') +
         '<h3 class="rm-step-title">' + esc(step.title) + '</h3>' +
         (step.description ? '<p class="rm-step-desc">' + esc(step.description) + '</p>' : '') +
         (step.cashPrice
@@ -1016,41 +711,78 @@
             '</div>'
           : '') +
         '<div class="rm-step-actions">' + actions + '</div>' +
+        '<div class="rm-note">' +
+          '<button type="button" class="rm-note-toggle" data-rm-note-toggle' +
+            ' aria-expanded="false" aria-controls="rmnote-' + esc(rm.id) + '-' + i + '">' +
+            '📝 ملاحظة' + (note ? '<span class="rm-note-dot" title="عندك ملاحظة محفوظة"></span>' : '') +
+          '</button>' +
+          '<textarea id="rmnote-' + esc(rm.id) + '-' + i + '" class="rm-note-area hidden"' +
+            ' data-rm-note="' + esc(rm.id) + '" data-rm-idx="' + i + '" rows="2"' +
+            ' placeholder="اكتب ملاحظتك: لينكات، أكواد، خطط…">' + esc(note) + '</textarea>' +
+        '</div>' +
       '</div>' +
     '</li>';
   }
 
-  /* ---------- Render: Sub-Paths ---------- */
-  function subPathsHTML(rm) {
-    if (!rm.subPaths || !rm.subPaths.length) return '';
+  /* ---------- Render: قائمة الخطوات + الفلترة ---------- */
+  function stepsListHTML(rm) {
+    const p = progress[rm.id] || {};
+    const items = [];
+    rm.steps.forEach((s, i) => {
+      const done = !!p[i];
+      if (filterMode === 'todo' && done) return;
+      if (filterMode === 'done' && !done) return;
+      const prevDone = i === 0 || !!p[i - 1];
+      items.push(stepHTML(rm, s, i, done, filterMode === 'all' && !done && !prevDone));
+    });
 
-    return '<div class="rm-subpaths">' +
-      '<h3 class="rm-subpaths-title">🔀 مسارات بديلة</h3>' +
-      '<p class="rm-subpaths-desc">تقنيات Backend تانية — كل واحدة مسار مستقل</p>' +
-      rm.subPaths.map((sp) => {
-        return '<div class="rm-subpath">' +
-          '<div class="rm-subpath-head">' +
-            '<span class="rm-subpath-icon" aria-hidden="true">' + sp.icon + '</span>' +
-            '<h4 class="rm-subpath-label">' + esc(sp.label) + '</h4>' +
-            '<span class="rm-subpath-count">' + sp.steps.length + ' كورس</span>' +
-          '</div>' +
-          '<ol class="rm-subpath-steps" role="list">' +
-            sp.steps.map((s, i) => {
-              return '<li class="rm-substep">' +
-                '<span class="rm-substep-num">' + String(i + 1).padStart(2, '0') + '</span>' +
-                '<span class="rm-substep-title">' + esc(s.title) + '</span>' +
-                '<a class="rm-btn open rm-substep-btn" href="library.html" data-rm-open="' + esc(s.courseId) + '">' +
-                  '<i class="bi bi-play-circle" aria-hidden="true"></i>افتح' +
-                '</a>' +
-              '</li>';
-            }).join('') +
-          '</ol>' +
-        '</div>';
-      }).join('') +
+    if (!items.length) {
+      const allDone = filterMode === 'todo' || getPathProgress(rm).pct === 100;
+      return '<div class="rm-empty rm-empty-sm">' +
+        '<div class="rm-empty-icon" aria-hidden="true">' + (allDone ? '🎉' : '📭') + '</div>' +
+        '<p class="rm-empty-title">' + (allDone ? 'مبروك! خلّصت كل الخطوات هنا' : 'لسه مفيش خطوات مكتملة هنا') + '</p>' +
+      '</div>';
+    }
+
+    return '<div id="rmpanel-' + esc(rm.id) + '" role="tabpanel" aria-labelledby="rmtab-' + esc(rm.id) + '">' +
+      '<ol class="rm-steps" role="list">' + items.join('') + '</ol>' +
     '</div>';
   }
 
-  /* ---------- Render: Roadmap ---------- */
+  /* ---------- Render: نتايج البحث ---------- */
+  function searchResultsHTML() {
+    const q = searchQuery.trim().toLowerCase();
+    const results = [];
+    ROADMAPS.forEach((rm) => {
+      const p = progress[rm.id] || {};
+      const hits = [];
+      rm.steps.forEach((s, i) => {
+        const hay = (s.title + ' ' + s.description + ' ' + s.category).toLowerCase();
+        if (hay.includes(q)) hits.push({ s, i, done: !!p[i] });
+      });
+      if (hits.length) results.push({ rm, hits });
+    });
+
+    if (!results.length) {
+      return '<div class="rm-empty">' +
+        '<div class="rm-empty-icon" aria-hidden="true">🔍</div>' +
+        '<p class="rm-empty-title">مفيش نتايج لـ«' + esc(searchQuery.trim()) + '»</p>' +
+        '<p class="rm-empty-desc">جرّب كلمة تانية أو امسح البحث</p>' +
+      '</div>';
+    }
+
+    return results.map(({ rm, hits }) =>
+      '<section class="rm-sr-group" style="--hero-color:' + rm.color + '">' +
+        '<h3 class="rm-sr-title"><span aria-hidden="true">' + rm.icon + '</span> ' + esc(rm.title) +
+          ' <span class="rm-tab-count">' + hits.length + '</span></h3>' +
+        '<ol class="rm-steps" role="list">' +
+          hits.map(({ s, i, done }) => stepHTML(rm, s, i, done, false)).join('') +
+        '</ol>' +
+      '</section>'
+    ).join('');
+  }
+
+  /* ---------- Render: Detail ---------- */
   function renderRoadmap(rmId) {
     const rm = ROADMAPS.find((r) => r.id === rmId) || ROADMAPS[0];
     if (!rm) return;
@@ -1061,53 +793,10 @@
       if (location.hash !== next) history.replaceState(null, '', next);
     } catch { /* Safari file:// */ }
 
-    const inner = qs('#rmInner');
-    if (!inner) return;
-    const detail = qs('#rmDetail', inner) || inner;
-
-    const currentIdx = getCurrentStepIndex(rm);
-    const allDone = currentIdx === -1 && rm.steps.length > 0;
-
-    detail.innerHTML =
-      heroHTML(rm) +
-      (allDone ? completionHTML(rm) : currentStepHTML(rm)) +
-      '<ol class="rm-steps" role="list" id="rmpanel-' + esc(rm.id) + '" role="tabpanel" aria-labelledby="rmtab-' + esc(rm.id) + '">' +
-        rm.steps.map((s, i) => stepHTML(rm, s, i, currentIdx)).join('') +
-      '</ol>' +
-      subPathsHTML(rm);
-  }
-
-  /* ---------- Render: States ---------- */
-  function skeletonHTML() {
-    return '<div class="rm-skel"><div class="rm-skel-line w-40"></div><div class="rm-skel-line w-90"></div><div class="rm-skel-line w-70"></div></div>' +
-           '<div class="rm-skel"><div class="rm-skel-line w-40"></div><div class="rm-skel-line w-90"></div><div class="rm-skel-line w-70"></div></div>' +
-           '<div class="rm-skel"><div class="rm-skel-line w-40"></div><div class="rm-skel-line w-90"></div><div class="rm-skel-line w-70"></div></div>';
-  }
-  function emptyHTML() {
-    return '<div class="rm-empty">' +
-      '<div class="rm-empty-icon" aria-hidden="true">🗺️</div>' +
-      '<p class="rm-empty-title">مفيش مسارات لسه</p>' +
-      '<p class="rm-empty-desc">لما نضيف كورسات، المسارات هتظهر هنا تلقائيًا</p>' +
-    '</div>';
-  }
-  function errorHTML() {
-    return '<div class="rm-empty" role="alert">' +
-      '<div class="rm-empty-icon" aria-hidden="true">⚠️</div>' +
-      '<p class="rm-empty-title">مش قادرين نحمّل تقدّمك</p>' +
-      '<p class="rm-empty-desc">حصلت مشكلة في الاتصال. جرّب تاني — تقدّمك محفوظ على السحابة.</p>' +
-      (loadError ? '<div class="rm-empty-code">' + esc(loadError) + '</div>' : '') +
-      '<div class="rm-state-actions">' +
-        '<button type="button" class="rm-btn open" data-rm-retry><i class="bi bi-arrow-clockwise"></i>حاول تاني</button>' +
-      '</div>' +
-    '</div>';
-  }
-  function guestBannerHTML() {
-    if (currentUser) return '';
-    return '<div class="rm-guest" role="status">' +
-      '<i class="bi bi-info-circle" aria-hidden="true"></i>' +
-      '<span>سجّل دخولك عشان تقدّمك يتحفظ وترجع تكمل من حيث ما وقفت.</span>' +
-      '<a href="auth.html">تسجيل الدخول</a>' +
-    '</div>';
+    const detail = qs('#rmDetail', qs('#rmInner') || document);
+    if (!detail) return;
+    const pr = getPathProgress(rm);
+    detail.innerHTML = heroHTML(rm, pr) + filtersHTML(pr) + stepsListHTML(rm);
   }
 
   /* ---------- Render: All ---------- */
@@ -1115,32 +804,134 @@
     const inner = qs('#rmInner');
     if (!inner) return;
 
-    if (loadState === 'loading') {
-      inner.innerHTML = '<div class="rm-header"><h2>خرائط التعلم 🗺️</h2><p>بنجهّز مساراتك…</p></div>' + skeletonHTML();
-      return;
-    }
-    if (loadState === 'error') { inner.innerHTML = errorHTML(); return; }
-    if (!ROADMAPS.length) { inner.innerHTML = emptyHTML(); return; }
+    if (loadState === 'loading') { inner.innerHTML = headerHTML(true) + skeletonHTML(); return; }
+    if (loadState === 'error')   { inner.innerHTML = headerHTML() + errorHTML(); return; }
+    if (!ROADMAPS.length)        { inner.innerHTML = headerHTML() + emptyHTML(); return; }
+
+    const st = computeStats();
+    const badges = computeBadges(st);
+    const searching = !!searchQuery.trim();
 
     inner.innerHTML =
-      '<div class="rm-header">' +
-        '<h2>خرائط التعلم 🗺️</h2>' +
-        '<p>مسارات مرتبة بخطوات واضحة — اختار مسارك وابدأ، وتقدّمك بيتحفظ معاك</p>' +
-      '</div>' +
+      headerHTML() +
+      statsBarHTML(st, badges) +
       guestBannerHTML() +
-      tabsHTML() +
-      '<div id="rmDetail"></div>';
+      searchHTML() +
+      (searching
+        ? searchResultsHTML()
+        : tabsHTML() + '<div id="rmDetail"></div>');
 
-    renderRoadmap(activeTabId || ROADMAPS[0].id);
+    if (!searching) renderRoadmap(activeTabId || ROADMAPS[0].id);
   }
 
-  /* ---------- Event Delegation ---------- */
+  /* ---------- شهادة الإتمام ---------- */
+  function openCert(rmId) {
+    const rm = ROADMAPS.find((r) => r.id === rmId);
+    if (!rm) return;
+    const pr = getPathProgress(rm);
+    if (pr.pct < 100) { toast('كمّل المسار الأول عشان تاخد شهادتك 😉'); return; }
+
+    qs('#rmCertOverlay')?.remove();
+    const st = computeStats();
+    let savedName = '';
+    try { savedName = localStorage.getItem('nexora_cert_name') || ''; } catch {}
+    const name = savedName || (currentUser && currentUser.displayName) || '';
+    let dateStr;
+    try { dateStr = new Date().toLocaleDateString('ar-EG', { year:'numeric', month:'long', day:'numeric' }); }
+    catch { dateStr = new Date().toISOString().slice(0, 10); }
+
+    const ov = document.createElement('div');
+    ov.id = 'rmCertOverlay';
+    ov.className = 'rm-cert-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'شهادة إتمام المسار');
+    ov.innerHTML =
+      '<div class="rm-cert-card">' +
+        '<button type="button" class="rm-cert-close" data-rm-cert-close aria-label="إغلاق">✕</button>' +
+        '<div class="rm-cert-brand">NEXORA ACADEMY</div>' +
+        '<h3 class="rm-cert-title">شهادة إتمام</h3>' +
+        '<p class="rm-cert-sub">تشهد منصة Nexora بأن</p>' +
+        '<input id="rmCertName" class="rm-cert-name" placeholder="اكتب اسمك هنا" maxlength="60" value="' + esc(name) + '" />' +
+        '<p class="rm-cert-sub">قد أتمّ بنجاح جميع خطوات مسار</p>' +
+        '<div class="rm-cert-path"><span aria-hidden="true">' + rm.icon + '</span> ' + esc(rm.title) + '</div>' +
+        '<div class="rm-cert-meta">' + rm.steps.length + ' كورس • ' + fmtNum(st.xp) + ' XP • ' + esc(dateStr) + '</div>' +
+        '<div class="rm-cert-actions">' +
+          '<button type="button" class="rm-btn cert" data-rm-cert-print><i class="bi bi-printer" aria-hidden="true"></i>طباعة / حفظ PDF</button>' +
+          '<button type="button" class="rm-btn grey" data-rm-cert-close>إغلاق</button>' +
+        '</div>' +
+      '</div>';
+
+    ov.addEventListener('click', (e) => {
+      if (e.target === ov || e.target.closest('[data-rm-cert-close]')) { ov.remove(); return; }
+      if (e.target.closest('[data-rm-cert-print]')) printCert();
+    });
+    document.body.appendChild(ov);
+
+    const inp = qs('#rmCertName', ov);
+    inp.addEventListener('input', () => {
+      try { localStorage.setItem('nexora_cert_name', inp.value); } catch {}
+    });
+    inp.focus();
+  }
+
+  function printCert() {
+    document.body.classList.add('rm-printing');
+    const cleanup = () => document.body.classList.remove('rm-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    setTimeout(() => {
+      try { window.print(); } catch {}
+      setTimeout(cleanup, 1500);
+    }, 60);
+  }
+
+  /* ---------- تصدير / استيراد ---------- */
+  function exportProgress() {
+    const data = { app:'nexora-roadmap', v:1, exportedAt:new Date().toISOString(), steps: progress, notes };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'nexora-roadmap-progress.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 800);
+    toast('✅ اتصدّر ملف التقدّم', 'ok');
+  }
+
+  function importProgressFile(file) {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = JSON.parse(String(reader.result || '{}'));
+        if (!data || typeof data !== 'object' || !data.steps) throw new Error('bad-file');
+        Object.keys(data.steps).forEach((rid) => {
+          progress[rid] = Object.assign({}, progress[rid], data.steps[rid]);
+        });
+        Object.keys(data.notes || {}).forEach((rid) => {
+          notes[rid] = Object.assign({}, notes[rid], data.notes[rid]);
+        });
+        await persistAll();
+        renderAll();
+        toast('✅ تم استيراد تقدّمك', 'ok');
+      } catch {
+        toast('⚠️ الملف مش صالح', 'err');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /* ---------- Event Delegation (مفتاح الإصلاح) ---------- */
+  let _searchTimer = null;
+
   function bindInnerEvents() {
     const inner = qs('#rmInner');
     if (!inner || inner.__rmBound) return;
     inner.__rmBound = true;
 
+    /* Click delegation */
     inner.addEventListener('click', async (e) => {
+      /* Tabs */
       const tab = e.target.closest('[data-rm-tab]');
       if (tab) {
         const id = tab.dataset.rmTab;
@@ -1154,11 +945,20 @@
           });
           renderRoadmap(id);
           const detail = qs('#rmDetail', inner);
-          if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (detail) detail.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' });
         }
         return;
       }
 
+      /* فلاتر الخطوات */
+      const fchip = e.target.closest('[data-rm-filter]');
+      if (fchip) {
+        filterMode = fchip.dataset.rmFilter;
+        renderRoadmap(activeTabId);
+        return;
+      }
+
+      /* Retry */
       if (e.target.closest('[data-rm-retry]')) {
         loadState = 'loading';
         renderAll();
@@ -1167,44 +967,85 @@
         return;
       }
 
+      /* قفز للخطوة الجاية */
+      const jump = e.target.closest('[data-rm-jump]');
+      if (jump) {
+        const v = String(jump.dataset.rmJump || '');
+        const ci = v.lastIndexOf(':');
+        if (ci > 0) {
+          activeTabId = v.slice(0, ci);
+          const idx = v.slice(ci + 1);
+          searchQuery = '';
+          filterMode = 'all';
+          renderAll();
+          requestAnimationFrame(() => {
+            const el = document.getElementById('rmstep-' + activeTabId + '-' + idx);
+            if (el) el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'center' });
+          });
+        }
+        return;
+      }
+
+      /* شهادة */
+      const certBtn = e.target.closest('[data-rm-cert]');
+      if (certBtn) { openCert(certBtn.dataset.rmCert); return; }
+
+      /* Done */
       const doneBtn = e.target.closest('[data-rm-done]');
       if (doneBtn) {
-        const rmId = doneBtn.dataset.rmDone;
-        const idx = Number(doneBtn.dataset.rmIdx);
         doneBtn.setAttribute('aria-busy', 'true');
-        const res = await saveStep(rmId, idx, true);
-        if (!res.ok && res.reason === 'guest') {
-          alert('سجّل دخولك الأول عشان نحفظ تقدّمك.');
-        }
+        const res = await saveStep(doneBtn.dataset.rmDone, Number(doneBtn.dataset.rmIdx), true);
+        if (res.local) toast('💾 اتحفظ على جهازك — سجّل دخولك عشان يتزامن');
+        else if (!res.ok) toast('⚠️ حصلت مشكلة في الحفظ — اتحفظ محليًا مؤقتًا', 'err');
         renderAll();
         return;
       }
 
+      /* Undone */
       const undoneBtn = e.target.closest('[data-rm-undone]');
       if (undoneBtn) {
-        const rmId = undoneBtn.dataset.rmUndone;
-        const idx = Number(undoneBtn.dataset.rmIdx);
         undoneBtn.setAttribute('aria-busy', 'true');
-        const res = await saveStep(rmId, idx, false);
-        if (!res.ok && res.reason === 'guest') {
-          alert('سجّل دخولك الأول عشان نحفظ تقدّمك.');
-        }
+        const res = await saveStep(undoneBtn.dataset.rmUndone, Number(undoneBtn.dataset.rmIdx), false);
+        if (res.local) toast('💾 اتحفظ على جهازك — سجّل دخولك عشان يتزامن');
+        else if (!res.ok) toast('⚠️ حصلت مشكلة في الحفظ — اتحفظ محليًا مؤقتًا', 'err');
         renderAll();
         return;
       }
 
-      const shareBtn = e.target.closest('[data-rm-share]');
-      if (shareBtn) {
-        const rm = ROADMAPS.find((r) => r.id === shareBtn.dataset.rmShare);
-        if (rm) {
-          const phone = (window.MCL && MCL.CONTACT_PHONE) || '01096295395';
-          const intl = String(phone).replace(/^0/, '20');
-          const text = `🎉 أكملت مسار ${rm.title} على Nexora Academy!`;
-          window.open(`https://wa.me/${intl}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      /* ملاحظات: فتح/قفل */
+      const nt = e.target.closest('[data-rm-note-toggle]');
+      if (nt) {
+        const area = nt.parentElement?.querySelector('.rm-note-area');
+        if (area) {
+          const nowHidden = area.classList.toggle('hidden');
+          nt.setAttribute('aria-expanded', String(!nowHidden));
+          if (!nowHidden) area.focus();
         }
         return;
       }
 
+      /* تصدير / استيراد / تصفير */
+      if (e.target.closest('[data-rm-export]')) { exportProgress(); return; }
+      if (e.target.closest('[data-rm-import-btn]')) { qs('#rmImportFile', inner)?.click(); return; }
+      if (e.target.closest('[data-rm-reset]')) {
+        if (confirm('متأكد؟ هتتمسح كل الخطوات المكتملة والملاحظات. (صدّر نسخة قبلها لو محتاجها)')) {
+          progress = {}; notes = {};
+          await persistAll();
+          renderAll();
+          toast('🗑️ تم تصفير التقدّم', 'ok');
+        }
+        return;
+      }
+
+      /* مسح البحث */
+      if (e.target.closest('[data-rm-search-clear]')) {
+        searchQuery = '';
+        renderAll();
+        qs('[data-rm-search]', inner)?.focus();
+        return;
+      }
+
+      /* فتح كورس: SPA الأول مع fallback لـlibrary.html */
       const openBtn = e.target.closest('[data-rm-open]');
       if (openBtn) {
         const courseId = openBtn.dataset.rmOpen;
@@ -1215,6 +1056,39 @@
       }
     });
 
+    /* Input delegation: بحث + ملاحظات */
+    inner.addEventListener('input', (e) => {
+      const noteTa = e.target.closest('[data-rm-note]');
+      if (noteTa) {
+        saveNoteDebounced(noteTa.dataset.rmNote, Number(noteTa.dataset.rmIdx), noteTa.value);
+        return;
+      }
+      const si = e.target.closest('[data-rm-search]');
+      if (!si) return;
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => {
+        searchQuery = si.value || '';
+        renderAll();
+        if (searchQuery.trim()) {
+          const ni = qs('[data-rm-search]', inner);
+          if (ni) {
+            ni.focus();
+            try { ni.setSelectionRange(ni.value.length, ni.value.length); } catch {}
+          }
+        }
+      }, 220);
+    });
+
+    /* استيراد الملف */
+    inner.addEventListener('change', (e) => {
+      const fi = e.target.closest('#rmImportFile');
+      if (fi && fi.files && fi.files[0]) {
+        importProgressFile(fi.files[0]);
+        fi.value = '';
+      }
+    });
+
+    /* Keyboard nav للـtabs */
     inner.addEventListener('keydown', (e) => {
       const tab = e.target.closest('[data-rm-tab]');
       if (!tab) return;
@@ -1228,6 +1102,11 @@
       else if (e.key === 'End') next = tabs.length - 1;
       else if (e.key === 'Enter' || e.key === ' ') { tab.click(); return; }
       if (next >= 0) { e.preventDefault(); tabs[next].focus(); }
+    });
+
+    /* Esc يقفل الشهادة */
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') qs('#rmCertOverlay')?.remove();
     });
   }
 
@@ -1302,9 +1181,7 @@
     if (window.__NEXORA_CATALOG__ && (window.__NEXORA_CATALOG__.courses || []).length) {
       console.info('[RM] الكتالوج موجود مسبقًا — نبنيه فورًا');
       rebuildRoadmaps();
-      if (qs('#view-roadmap') && !qs('#view-roadmap').classList.contains('hidden')) {
-        renderAll();
-      }
+      if (qs('#view-roadmap') && !qs('#view-roadmap').classList.contains('hidden')) renderAll();
       return true;
     }
     return false;
@@ -1330,7 +1207,10 @@
         await loadProgress();
         renderAll();
       } else {
-        progress = {};
+        /* زائر: نحمّل تقدّمه المحلي */
+        const g = readLocal();
+        progress = g.steps || {};
+        notes = g.notes || {};
         loadState = 'ready';
         if (qs('#view-roadmap') && !qs('#view-roadmap').classList.contains('hidden')) renderAll();
       }
@@ -1348,7 +1228,7 @@
     if (qs('#view-roadmap') && !qs('#view-roadmap').classList.contains('hidden')) renderAll();
   });
 
-  /* Deep-link */
+  /* Deep-link مباشر لـ#roadmap/... */
   window.addEventListener('hashchange', () => {
     const m = (location.hash || '').match(/^#roadmap\/(.+)$/);
     if (m && ROADMAPS.find((r) => r.id === m[1])) {
@@ -1379,19 +1259,9 @@
   window.NexoraRoadmap = {
     reload: () => { rebuildRoadmaps(); renderAll(); },
     refresh: async () => { await loadProgress(); renderAll(); },
-    go: (pathId) => { activeTabId = pathId; renderAll(); },
-    getProgress: () => ({ ...progress }),
-    getRoadmaps: () => ROADMAPS,
-    getCurrentUser: () => currentUser,
-    debug: () => ({
-      roadmaps: ROADMAPS.map((r) => ({
-        id: r.id,
-        title: r.title,
-        stepsCount: r.steps.length,
-        subPathsCount: (r.subPaths || []).length
-      })),
-      matches: _lastDebugInfo,
-      progress
-    })
+    go: (pathId) => { activeTabId = pathId; searchQuery = ''; filterMode = 'all'; renderAll(); },
+    search: (q) => { searchQuery = String(q || ''); renderAll(); },
+    stats: () => computeStats(),
+    certificate: (pathId) => openCert(pathId)
   };
 })();

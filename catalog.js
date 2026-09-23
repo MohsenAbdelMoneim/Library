@@ -1,6 +1,11 @@
 /* ==========================================================
-   catalog.js — v21
-   ✅ v21: إصلاح تكرار الإشعارات (bindAll مرة واحدة بس)
+   catalog.js — v22
+   ✅ v22: شريط السلة بيختفي لما تسيب الكتالوج ويرجع لما ترجع
+   ✅ v22: تاني كليك على «في السلة ✓» بيفتح درج السلة
+   ✅ v22: رسالة الإزالة بتيجي بس لما الإزالة تتحقق فعلًا
+   ✅ v22: واتساب بيقبل price أو cashPrice (مفيش NaN بعد اليوم)
+   ✅ v22: Empty states + إخفاء صفوف السعر الصفري + aria-pressed
+   ✅ v22: إزالة الزرار الميّت + listener دفاعي لأي تغيير في السلة
    ✅ v21: قلب ❤️ + شريط سلة سفلي + واتساب
    ✅ v21: بيقرأ من window.__NEXORA_CATALOG__ (Firestore)
    ========================================================== */
@@ -8,7 +13,7 @@
 'use strict';
 
 (function () {
-  console.log('%c Nexora Catalog — v21 ', 'background:#7c5cff;color:#fff;font-weight:bold');
+  console.log('%c Nexora Catalog — v22 ', 'background:#7c5cff;color:#fff;font-weight:bold');
 
   const PHONE = '01096295395';
   const WA = 'https://wa.me/201096295395';
@@ -28,6 +33,7 @@
 .nex-tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
 .nex-tab{white-space:nowrap;padding:10px 18px;border-radius:12px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .nex-tab:hover{color:var(--ink,#ececf1)}
+.nex-tab:focus-visible{outline:2px solid #4f7cff;outline-offset:2px}
 .nex-tab.active{background:linear-gradient(135deg,#4f7cff,#7c5cff);border-color:transparent;color:#fff}
 .nex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
 .nex-card{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;position:relative;transition:.2s}
@@ -37,6 +43,10 @@
 .nex-cat{font-size:10.5px;font-weight:700;color:#7ea2ff;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);padding:3px 10px;border-radius:999px;align-self:flex-start}
 .nex-title{font-size:17px;font-weight:800;color:var(--ink,#ececf1);line-height:1.4}
 .nex-desc{font-size:12.5px;color:var(--mut,#9c9cab);line-height:1.7}
+.nex-empty{grid-column:1/-1;text-align:center;padding:60px 20px;background:var(--panel,#101015);border:1px dashed var(--edge2,#2e2e39);border-radius:18px}
+.nex-empty-icon{font-size:48px;margin-bottom:12px}
+.nex-empty-title{font-size:16px;font-weight:800;margin-bottom:6px;color:var(--ink,#ececf1)}
+.nex-empty-desc{font-size:12.5px;color:var(--mut,#9c9cab);line-height:1.8}
 .nex-prices{margin-top:auto;padding-top:14px;border-top:1px solid var(--edge,#212129);display:flex;flex-direction:column;gap:8px}
 .price-cash{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .price-label{font-size:10.5px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);padding:2px 8px;border-radius:6px}
@@ -47,11 +57,13 @@
 .nex-cta{display:flex;gap:8px;margin-top:4px;align-items:center}
 .nex-heart{flex:0 0 44px;height:44px;border-radius:12px;border:1px solid var(--edge2,#2e2e39);background:var(--bg,#0a0a0d);color:var(--dim,#66666f);display:inline-flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .nex-heart:hover{border-color:#f4636e;color:#f4636e;transform:scale(1.05)}
+.nex-heart:focus-visible{outline:2px solid #f4636e;outline-offset:2px}
 .nex-heart.on{background:rgba(244,99,110,.15);border-color:#f4636e;color:#f4636e}
 .nex-heart.on i{animation:heartPop .35s cubic-bezier(.34,1.56,.64,1)}
 @keyframes heartPop{0%{transform:scale(.6)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
 .nex-buy{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none;transition:.15s;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .nex-buy:hover{opacity:.9}
+.nex-buy:focus-visible{outline:2px solid #4f7cff;outline-offset:2px}
 .nex-buy.gold{background:linear-gradient(135deg,#f0b53e,#e8961e);color:#161204}
 .nex-buy.added{background:linear-gradient(135deg,#4ade80,#22c55e);color:#052e12}
 .nex-contact{font-size:11.5px;color:var(--mut,#9c9cab);text-align:center}
@@ -90,31 +102,44 @@
     if (!shopReady() || typeof window.NexoraShop.inCart !== 'function') return false;
     try { return window.NexoraShop.inCart(id); } catch (e) { return false; }
   }
+  function toast(msg, type) {
+    if (typeof window.showToast === 'function') {
+      try { window.showToast(msg, type || 'info'); } catch { /* تجاهل */ }
+    }
+  }
+
+  /* ✅ v22: سعر مرن — بيقبل price أو cashPrice */
+  function itemPrice(it) {
+    return Number(it.price ?? it.cashPrice ?? it.installmentTotal ?? 0) || 0;
+  }
 
   function courseCardHTML(c) {
     const isIn = inCart(c.id);
     const btnLabel = isIn ? 'في السلة ✓' : 'أضف للسلة 🛒';
     const btnClass = isIn ? 'nex-buy added' : 'nex-buy';
-    const heartClass = isIn ? 'nex-heart on' : 'nex-heart';
-    const heartIcon = isIn ? 'bi bi-heart-fill' : 'bi bi-heart';
+    const hasCash = Number(c.cashPrice) > 0;
+    const hasInst = Number(c.installmentCount) > 0;
     return `
     <article class="nex-card">
       <span class="nex-cat">${esc(c.category || '')}</span>
       <h3 class="nex-title">${esc(c.title)}</h3>
-      <p class="nex-desc">${esc(c.description || '')}</p>
+      ${c.description ? `<p class="nex-desc">${esc(c.description)}</p>` : ''}
       <div class="nex-prices">
+        ${hasCash ? `
         <div class="price-cash">
           <span class="price-label">دفع كاش</span>
           <span class="price-value">${fmt(c.cashPrice)}</span>
-        </div>
+        </div>` : ''}
+        ${hasInst ? `
         <div class="price-inst">
           <span class="price-label">التقسيط متاح</span>
-          <span class="price-value-sm">${fmt(c.installmentAmount)} × ${c.installmentCount} دفعات = ${fmt(c.installmentTotal)}</span>
-        </div>
+          <span class="price-value-sm">${fmt(c.installmentAmount)} × ${esc(c.installmentCount)} دفعات = ${fmt(c.installmentTotal)}</span>
+        </div>` : ''}
         <div class="nex-cta">
           <button type="button" class="${btnClass}" data-add-cart-course="${esc(c.id)}">${btnLabel}</button>
-          <button type="button" class="${heartClass}" data-heart="${esc(c.id)}" title="إضافة/إزالة" aria-label="إضافة/إزالة">
-            <i class="${heartIcon}"></i>
+          <button type="button" class="${isIn ? 'nex-heart on' : 'nex-heart'}" data-heart="${esc(c.id)}"
+                  aria-pressed="${isIn}" title="إضافة/إزالة من السلة" aria-label="إضافة/إزالة من السلة">
+            <i class="${isIn ? 'bi bi-heart-fill' : 'bi bi-heart'}"></i>
           </button>
         </div>
         <p class="nex-contact">للاستفسار عن التقسيط: <a href="tel:${PHONE}" dir="ltr">${PHONE}</a></p>
@@ -131,8 +156,8 @@
     const isIn = inCart(p.id);
     const btnLabel = isIn ? 'في السلة ✓' : 'أضف للسلة 🛒';
     const btnClass = `nex-buy ${p.featured ? 'gold' : ''} ${isIn ? 'added' : ''}`;
-    const heartClass = isIn ? 'nex-heart on' : 'nex-heart';
-    const heartIcon = isIn ? 'bi bi-heart-fill' : 'bi bi-heart';
+    const hasCash = Number(p.cashPrice) > 0;
+    const hasInst = Number(p.installmentCount) > 0;
     return `
     <article class="nex-card ${p.featured ? 'featured' : ''}">
       ${p.featured ? '<span class="nex-badge-top">الباقة الأشمل</span>' : ''}
@@ -140,23 +165,34 @@
       <h3 class="nex-title">${esc(p.title)}</h3>
       <div class="nex-pack-list">${courseTitles.map((t) => '✓ ' + esc(t)).join('<br>')}</div>
       <div class="nex-prices">
+        ${hasCash ? `
         <div class="price-cash">
           <span class="price-label">دفع كاش</span>
           <span class="price-value">${fmt(p.cashPrice)}</span>
-        </div>
+        </div>` : ''}
+        ${hasInst ? `
         <div class="price-inst">
           <span class="price-label">التقسيط متاح</span>
-          <span class="price-value-sm">${fmt(p.installmentAmount)} × ${p.installmentCount} دفعات = ${fmt(p.installmentTotal)}</span>
-        </div>
+          <span class="price-value-sm">${fmt(p.installmentAmount)} × ${esc(p.installmentCount)} دفعات = ${fmt(p.installmentTotal)}</span>
+        </div>` : ''}
         <div class="nex-cta">
           <button type="button" class="${btnClass}" data-add-cart-pack="${esc(p.id)}">${btnLabel}</button>
-          <button type="button" class="${heartClass}" data-heart="${esc(p.id)}" title="إضافة/إزالة" aria-label="إضافة/إزالة">
-            <i class="${heartIcon}"></i>
+          <button type="button" class="${isIn ? 'nex-heart on' : 'nex-heart'}" data-heart="${esc(p.id)}"
+                  aria-pressed="${isIn}" title="إضافة/إزالة من السلة" aria-label="إضافة/إزالة من السلة">
+            <i class="${isIn ? 'bi bi-heart-fill' : 'bi bi-heart'}"></i>
           </button>
         </div>
         <p class="nex-contact">التقسيط متاح — <a href="tel:${PHONE}" dir="ltr">تواصل معنا</a></p>
       </div>
     </article>`;
+  }
+
+  function emptyGridHTML(icon, title, desc) {
+    return `<div class="nex-empty">
+      <div class="nex-empty-icon" aria-hidden="true">${icon}</div>
+      <p class="nex-empty-title">${esc(title)}</p>
+      <p class="nex-empty-desc">${esc(desc)}</p>
+    </div>`;
   }
 
   function buildCatalogViewHTML() {
@@ -168,8 +204,18 @@
         <button class="nex-tab active" data-nex-tab="paid" role="tab" aria-selected="true">الكورسات المدفوعة</button>
         <button class="nex-tab" data-nex-tab="packs" role="tab" aria-selected="false">الباقات المميزة</button>
       </div>`;
-    const paidGrid = `<div class="nex-grid" data-nex-panel="paid">${courses.map(courseCardHTML).join('')}</div>`;
-    const packsGrid = `<div class="nex-grid hidden" data-nex-panel="packs">${packages.map(packCardHTML).join('')}</div>`;
+    /* ✅ v22: empty states بدل جريد فاضي */
+    const paidGrid = `<div class="nex-grid" data-nex-panel="paid">${
+      courses.length
+        ? courses.map(courseCardHTML).join('')
+        : emptyGridHTML('📚', 'مفيش كورسات لسه',
+            'الكورسات بتتحمّل من السحابة — لو اتأخرت، حدّث الصفحة أو اتصل بنا.')
+    }</div>`;
+    const packsGrid = `<div class="nex-grid hidden" data-nex-panel="packs">${
+      packages.length
+        ? packages.map(packCardHTML).join('')
+        : emptyGridHTML('📦', 'مفيش باقات حاليًا', 'الباقات المميزة هتظهر هنا أول ما تتضاف.')
+    }</div>`;
     return `<div class="nex-catalog">${tabs}${paidGrid}${packsGrid}</div>`;
   }
 
@@ -221,26 +267,26 @@
     const section = qs('#view-catalog');
     if (!section) return;
 
-    if (section.__cartBound) return; /* ✅ لو مربوطة، مانعملش حاجة */
+    if (section.__cartBound) return;
     section.__cartBound = true;
 
     section.addEventListener('click', (e) => {
       const cBtn = e.target.closest('[data-add-cart-course]');
       if (cBtn) {
         e.preventDefault(); e.stopPropagation();
-        handleAddToCart(cBtn.dataset.addCartCourse, cBtn);
+        handleAddToCart(cBtn.dataset.addCartCourse);
         return;
       }
       const pBtn = e.target.closest('[data-add-cart-pack]');
       if (pBtn) {
         e.preventDefault(); e.stopPropagation();
-        handleAddToCart(pBtn.dataset.addCartPack, pBtn);
+        handleAddToCart(pBtn.dataset.addCartPack);
         return;
       }
       const heart = e.target.closest('[data-heart]');
       if (heart) {
         e.preventDefault(); e.stopPropagation();
-        handleHeart(heart.dataset.heart, heart);
+        handleHeart(heart.dataset.heart);
         return;
       }
     });
@@ -248,34 +294,55 @@
     buildCartBar();
   }
 
-  function handleAddToCart(id, btn) {
+  function openCartDrawer() {
+    if (window.NexoraShop && typeof window.NexoraShop.openCart === 'function') {
+      try { window.NexoraShop.openCart(); } catch { /* تجاهل */ }
+    }
+  }
+
+  function handleAddToCart(id) {
     if (!id) return;
     if (!shopReady()) {
-      if (typeof window.showToast === 'function') window.showToast('السلة مش جاهزة', 'warn');
+      toast('السلة مش جاهزة', 'warn');
       return;
     }
-    const wasIn = inCart(id);
-    if (!wasIn) {
-      window.NexoraShop.addToCart(id);
-      if (typeof window.showToast === 'function') window.showToast('اتضاف للسلة 🛒', 'success');
+    if (inCart(id)) {
+      /* ✅ v22: بدل الزرار الميّت — التاني كليك بيفتح السلة */
+      openCartDrawer();
+      syncAllHearts();
+      syncAllCartBtns();
+      updateCartBar();
+      return;
     }
-    /* ✅ لو كان في السلة → مفيش حاجة (زرار أضف للسلة مش بيشيل) */
+    window.NexoraShop.addToCart(id);
+    toast('اتضاف للسلة 🛒', 'success');
     syncAllHearts();
     syncAllCartBtns();
     updateCartBar();
   }
 
-  function handleHeart(id, heartBtn) {
+  function handleHeart(id) {
     if (!id) return;
     if (!shopReady()) return;
 
     const wasIn = inCart(id);
     if (!wasIn) {
       window.NexoraShop.addToCart(id);
-      if (typeof window.showToast === 'function') window.showToast('اتضاف للسلة ❤️', 'success');
+      toast('اتضاف للسلة ❤️', 'success');
     } else {
-      if (typeof window.NexoraShop.toggleCart === 'function') window.NexoraShop.toggleCart(id);
-      if (typeof window.showToast === 'function') window.showToast('اتشال من السلة', 'info');
+      /* ✅ v22: الرسالة بتيجي بس لما الإزالة تتحقق فعلًا */
+      if (typeof window.NexoraShop.toggleCart === 'function') {
+        try {
+          window.NexoraShop.toggleCart(id);
+          if (!inCart(id)) toast('اتشالت من السلة', 'info');
+        } catch (e) {
+          console.warn('[CATALOG] toggleCart:', e);
+          toast('معرفناش نشيلها — جرب من السلة نفسها', 'warn');
+        }
+      } else {
+        openCartDrawer();
+        toast('شيلها من السلة من هنا', 'info');
+      }
     }
 
     syncAllHearts();
@@ -288,20 +355,15 @@
       const id = btn.dataset.heart;
       const isIn = inCart(id);
       btn.classList.toggle('on', isIn);
+      btn.setAttribute('aria-pressed', String(isIn));
       const ic = btn.querySelector('i');
       if (ic) ic.className = isIn ? 'bi bi-heart-fill' : 'bi bi-heart';
     });
   }
 
   function syncAllCartBtns() {
-    qsa('#view-catalog [data-add-cart-course]').forEach((btn) => {
-      const id = btn.dataset.addCartCourse;
-      const isIn = inCart(id);
-      btn.classList.toggle('added', isIn);
-      btn.textContent = isIn ? 'في السلة ✓' : 'أضف للسلة 🛒';
-    });
-    qsa('#view-catalog [data-add-cart-pack]').forEach((btn) => {
-      const id = btn.dataset.addCartPack;
+    qsa('#view-catalog [data-add-cart-course], #view-catalog [data-add-cart-pack]').forEach((btn) => {
+      const id = btn.dataset.addCartCourse || btn.dataset.addCartPack;
       const isIn = inCart(id);
       btn.classList.toggle('added', isIn);
       btn.textContent = isIn ? 'في السلة ✓' : 'أضف للسلة 🛒';
@@ -319,14 +381,14 @@
     bar.innerHTML = `
       <div class="nex-cartbar-inner">
         <div class="nex-cartbar-info">
-          <span class="nex-cartbar-count" id="nexCartCount">0 كورس</span>
+          <span class="nex-cartbar-count" id="nexCartCount">0 عنصر</span>
           <span class="nex-cartbar-total" id="nexCartTotal">0 جنيه<small>الإجمالي</small></span>
         </div>
         <button type="button" class="nex-cartbar-btn wa" id="nexCartWA">
           <i class="bi bi-whatsapp"></i>
           اشتري الآن
         </button>
-        <button type="button" class="nex-cartbar-btn" id="nexCartView" style="display:none">
+        <button type="button" class="nex-cartbar-btn" id="nexCartView">
           <i class="bi bi-cart3"></i>
           السلة
         </button>
@@ -338,11 +400,7 @@
     document.body.appendChild(bar);
 
     qs('#nexCartWA')?.addEventListener('click', sendToWhatsApp);
-    qs('#nexCartView')?.addEventListener('click', () => {
-      if (window.NexoraShop && typeof window.NexoraShop.openCart === 'function') {
-        window.NexoraShop.openCart();
-      }
-    });
+    qs('#nexCartView')?.addEventListener('click', openCartDrawer);
     qs('#nexCartClear')?.addEventListener('click', () => {
       if (!confirm('مسح كل عناصر السلة؟')) return;
       if (window.NexoraShop && typeof window.NexoraShop.clearCart === 'function') {
@@ -351,7 +409,7 @@
       updateCartBar();
       syncAllHearts();
       syncAllCartBtns();
-      if (typeof window.showToast === 'function') window.showToast('تم مسح السلة', 'info');
+      toast('تم مسح السلة', 'info');
     });
 
     updateCartBar();
@@ -362,32 +420,55 @@
     if (!bar) return;
     if (!shopReady()) { bar.classList.remove('show'); return; }
 
-    const count = window.NexoraShop.getCartCount ? window.NexoraShop.getCartCount() : 0;
-    const total = window.NexoraShop.getCartTotal ? window.NexoraShop.getCartTotal() : 0;
+    const items = window.NexoraShop.getCartItems ? window.NexoraShop.getCartItems() : [];
+    const count = items.length || (window.NexoraShop.getCartCount ? window.NexoraShop.getCartCount() : 0);
+    /* ✅ v22: الإجمالي من العناصر نفسها بسعر مرن — fallback للـshop */
+    let total = 0;
+    if (items.length) total = items.reduce((s, it) => s + itemPrice(it), 0);
+    else if (window.NexoraShop.getCartTotal) total = window.NexoraShop.getCartTotal() || 0;
 
+    const hasPack = items.some((it) => it.type === 'pack');
     const countEl = qs('#nexCartCount');
     const totalEl = qs('#nexCartTotal');
-    if (countEl) countEl.textContent = count + ' كورس';
+    if (countEl) countEl.textContent = count + (hasPack ? ' عنصر' : ' كورس');
     if (totalEl) totalEl.innerHTML = fmt(total) + '<small>الإجمالي</small>';
 
-    if (count > 0) bar.classList.add('show');
+    /* ✅ v22: بنظهره بس لو إحنا في الكتالوج أصلاً */
+    const catalogVisible = qs('#view-catalog') && !qs('#view-catalog').classList.contains('hidden');
+    if (count > 0 && catalogVisible) bar.classList.add('show');
     else bar.classList.remove('show');
+  }
+
+  /* ✅ v22: إخفاء الشريط فورًا عند مغادرة الكتالوج لأي فيو تاني */
+  function bindGlobalNavWatch() {
+    if (document.__catNavWatch) return;
+    document.__catNavWatch = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav]');
+      if (!b) return;
+      if (b.dataset.nav === 'view:catalog') {
+        /* رجعنا للكتالوج — نشوف السلة */
+        requestAnimationFrame(updateCartBar);
+      } else {
+        qs('#nexCartBar')?.classList.remove('show');
+      }
+    }, true);
   }
 
   function sendToWhatsApp() {
     if (!shopReady()) return;
     const items = window.NexoraShop.getCartItems ? window.NexoraShop.getCartItems() : [];
     if (!items.length) {
-      if (typeof window.showToast === 'function') window.showToast('السلة فاضية', 'warn');
+      toast('السلة فاضية', 'warn');
       return;
     }
-    const total = window.NexoraShop.getCartTotal ? window.NexoraShop.getCartTotal() : 0;
+    const total = items.reduce((s, it) => s + itemPrice(it), 0);
 
     let msg = 'أهلاً 👋 عايز أشترك في:\n\n';
     items.forEach((it, i) => {
       const icon = it.type === 'pack' ? '📦' : '🎓';
-      msg += (i + 1) + '. ' + icon + ' ' + it.title + '\n';
-      msg += '   السعر: ' + fmt(it.price) + '\n\n';
+      msg += (i + 1) + '. ' + icon + ' ' + (it.title || it.id) + '\n';
+      msg += '   السعر: ' + fmt(itemPrice(it)) + '\n\n';
     });
     msg += '━━━━━━━━━━━━━━\n';
     msg += '💰 *الإجمالي: ' + fmt(total) + '*\n\n';
@@ -412,7 +493,7 @@
       section.querySelectorAll('[data-nex-panel]').forEach((p) =>
         p.classList.toggle('hidden', p.dataset.nexPanel !== activeTab));
     }
-    /* ✅ لا نلمس __cartBound — الـ listener لسه مربوط */
+    /* __cartBound على الـsection نفسه — الـlistener عايش */
     syncAllHearts();
     syncAllCartBtns();
     updateCartBar();
@@ -433,7 +514,7 @@
   }
 
   function showCatalog() {
-    if (!qs('#view-catalog')) ensureCatalogDOM();
+    if (!qs('#view-catalog') && !ensureCatalogDOM()) return;
     qsa('main#content > section:not(#view-catalog)').forEach((s) => s.classList.add('hidden'));
     const cat = qs('#view-catalog');
     if (cat) cat.classList.remove('hidden');
@@ -502,6 +583,7 @@
     ensureCatalogDOM();
     ensureNavEntries();
     bindCatalogNav();
+    bindGlobalNavWatch();
     hookRenderSidebar();
     observeSideNav();
   }
@@ -509,6 +591,13 @@
   window.addEventListener('nexora:shop-ready', () => {
     console.info('[CATALOG] shop.js جاهز');
     if (!qs('#view-catalog')) ensureCatalogDOM();
+    syncAllHearts();
+    syncAllCartBtns();
+    updateCartBar();
+  });
+
+  /* ✅ v22: listener دفاعي — لو shop.js بيطلق حدث تغيير، نزامن فورًا */
+  window.addEventListener('nexora:cart-changed', () => {
     syncAllHearts();
     syncAllCartBtns();
     updateCartBar();

@@ -1,32 +1,33 @@
 /* ==========================================================
-   gate.js — v16.2
-   بوابة الحماية + Firebase Auth + إدارة المشتركين
-   ✅ v16.2: إصلاح اختفاء المشتركين بعد الإضافة
-   ✅ v16.2: حماية من Overwrite لـ localStorage (cloud sync)
-   ✅ v16.2: Logging كامل في saveLocalSubs
-   ✅ v16.2: تأكيد نجاح الحفظ في saveSubscriber
-   ✅ v16.1: إصلاح مشكلة الإشعارات الثابتة
+   gate.js — v17
+   ✅ v17: إصلاح حاجز !adminPass اللي كان بيمنع دخول العملاء بالرقم
+   ✅ v17: إصلاح early-return في renderChips (شيب المالك كان بيتجمد)
+   ✅ v17: Fallback مباشر لـFirestore لما رقم العميل مش موجود محليًا
+   ✅ v17: حالة المزامنة بعد كل حفظ (✅ سحابي / ⚠️ محلي مع السبب والحل)
+   ✅ v17: حماية وضع المالك على إضافة/حذف/استيراد المشتركين
+   ✅ v17: حفظ تلقائي لتغييرات السحابة الواردة في localStorage
+   ✅ v17: «تحميل نسخة السحابة» بيسحب من Firestore مباشرة
+   ✅ v17: retry لشيبات الهيدر لو الـheader اتأخر في الظهور
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c MCL Gate — v16.2 ', 'background:#4ade80;color:#052e12;font-weight:bold');
+  console.log('%c MCL Gate — v17 ', 'background:#4ade80;color:#052e12;font-weight:bold');
 
   const ADMIN_KEY = 'my-course-library:admin';
   const SUBSCRIBER_KEY = 'my-course-library:subscriber';
   const SUBS_LOCAL_KEY = 'my-course-library:subs-local';
   const SUBS_EXPORTED_KEY = 'my-course-library:subs-exported';
 
-  /* كلمة السر من config.js */
   const ADMIN_PASSWORD = (window.__OWNER_PASSWORD__ || '').trim();
 
   if (!ADMIN_PASSWORD) {
-    console.warn('[GATE] ⚠️ __OWNER_PASSWORD__ مش محدد في config.js — وضع المالك معطّل.');
+    console.warn('[GATE] ⚠️ __OWNER_PASSWORD__ مش محدد في config.js — وضع المالك معطّل (دخول العملاء بالرقم شغال عادي).');
   }
 
   const MCL = window.MCL = {
-    version: '16.2',
+    version: '17.0',
     get ADMIN_PASSWORD() { return ADMIN_PASSWORD; },
     CONTACT_PHONE: '01096295395',
     WHATSAPP_INTL: '201096295395',
@@ -83,7 +84,7 @@
   }
 
   /* ==========================================================
-     ✅ إصلاح الإشعارات: auto-dismiss مضمون
+     الإشعارات — auto-dismiss مضمون
      ========================================================== */
   function notify(msg, type = 'info', duration = 4200, action = null) {
     const safeDuration = Math.max(1500, Number(duration) || 4200);
@@ -295,6 +296,14 @@
         if (user) {
           console.info('[GATE] ✅ طالب مسجل دخول:', user.email);
           await loadFirebaseEnrollments(user.uid);
+
+          /* ✅ v17: لو ده المالك — push احتياطي بعد ما البيانات ت-load
+             (ده بيضمن إن أي تعديل اتأجل أول ما المالك يفتح الموقع ينشر) */
+          if (isOwnerEmail() && window.CloudSync && typeof window.CloudSync.pushNow === 'function') {
+            setTimeout(() => {
+              try { window.CloudSync.pushNow(); } catch { /* تجاهل */ }
+            }, 3000);
+          }
         } else {
           fbEnrollments = [];
           fbReady = true;
@@ -307,6 +316,70 @@
       console.warn('[GATE] watchFirebaseAuth:', e.message);
       fbReady = true;
     }
+  }
+
+  /* ==========================================================
+     ✅ v17: قراءة الاشتراكات من Firestore مباشرة (Fallback)
+     ========================================================== */
+  async function fetchSubsFromCloud() {
+    if (typeof firebase === 'undefined' || !firebase.firestore) return null;
+    try {
+      const doc = await firebase.firestore().doc('config/subscriptions').get({ source: 'server' });
+      if (!doc.exists) return null;
+      const raw = doc.data().subscriptions;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const out = {};
+      for (const [k, v] of Object.entries(raw)) {
+        const p = normPhone(k);
+        if (!isEgyptPhone(p)) continue;
+        if (v === 'all') { out[p] = 'all'; continue; }
+        if (Array.isArray(v) && v.every((x) => typeof x === 'string' && x.trim())) {
+          out[p] = v.map((t) => t.trim());
+        }
+      }
+      return out;
+    } catch (e) {
+      console.warn('[GATE] قراءة السحابة فشلت:', e.code);
+      return null;
+    }
+  }
+
+  /* ==========================================================
+     ✅ v17: تشخيص ليه المزامنة مش شغالة
+     ========================================================== */
+  function cloudBlockReason() {
+    if (!window.CloudSync) return 'cloud.js مش محمّل — راجع ترتيب السكربتات في index.html';
+    if (!(window.__OWNER_PASSWORD__ || '').trim()) return 'window.__OWNER_PASSWORD__ مش موجود في config.js';
+    const blk = window.CloudSync.lastAuthBlock;
+    if (blk) return String(blk);
+    if (!window.CloudSync.ready) return 'لسه بنبدأ الاتصال…';
+    return 'غير معروف — اكتب CloudSync.status() في الـConsole';
+  }
+
+  function showSyncHelp() {
+    notify('خطوات النشر: 1) config.js لازم فيه window.__OWNER_PASSWORD__ — ' +
+      '2) اعمل خروج لأي حساب طالب مسجل — ' +
+      '3) ادخل من زرار «دخول المالك» بكلمة المرور — ' +
+      '4) أول ما يتصل بالسحابة، كل التعديلات المؤجلة هينشر تلقائيًا.',
+      'info', 15000);
+  }
+
+  /* ✅ v17: إشعار موحّد بعد أي حفظ — بيقولك فورًا هل هينشر ولا لأ وليه */
+  function notifyCloudState(actionText) {
+    const cs = window.CloudSync;
+    if (cs && cs.authed) {
+      notify(actionText + ' — وبينشر على السحابة الآن ✅', 'success', 5000);
+    } else {
+      notify('⚠️ ' + actionText + ' — اتحفظ محليًا بس! السبب: ' + cloudBlockReason(),
+        'error', 10000,
+        { label: 'إيه الحل؟', onClick: showSyncHelp });
+    }
+  }
+
+  function assertOwnerMode() {
+    if (isAdminActive() || isOwnerEmail()) return true;
+    notify('العملية دي لوضع المالك فقط — سجّل دخول المالك الأول.', 'error');
+    return false;
   }
 
   /* ---------- نموذج الحماية ---------- */
@@ -482,73 +555,84 @@
       }
     });
 
-    const host = qs('header .ms-auto') || qs('header');
-    if (host) {
-      let chip = qs('#lockChip');
-      if (!chip) {
-        chip = document.createElement('button');
-        chip.id = 'lockChip';
-        chip.type = 'button';
-        chip.className = 'lock-chip locked';
-        chip.innerHTML = '<i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>' +
-                         '<span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>';
-        host.insertBefore(chip, host.firstChild);
-      }
-      chip.addEventListener('click', () => {
-        if (isAdminActive() || isOwnerEmail()) { notify('أنت في وضع المالك — كل الكورسات متاحة.', 'info'); return; }
-        if (fbUser && hasAnyEnrollment()) { notify(`عندك ${fbEnrollments.length} كورس متاح في حسابك.`, 'info'); return; }
-        const p = getSubscriberPhone();
-        if (p) notify(`اشتراكك مفعّل برقم ${maskPhone(p)}.`, 'info');
-        else openLockModal({ mode: 'gate' });
-      });
-
-      let subChip = qs('#subChip');
-      if (!subChip) {
-        subChip = document.createElement('button');
-        subChip.id = 'subChip';
-        subChip.type = 'button';
-        subChip.className = 'lock-chip';
-        subChip.innerHTML = '<i class="bi bi-person-badge text-[12px]" aria-hidden="true"></i>' +
-                            '<span id="subChipText" class="hidden sm:inline">دخول مشترك</span>';
-        chip.after(subChip);
-      }
-      subChip.addEventListener('click', () => {
-        if (fbUser) {
-          if (confirm('تسجيل الخروج من حسابك؟')) {
-            firebase.auth().signOut().then(() => location.reload());
-          }
-          return;
-        }
-        const p = getSubscriberPhone();
-        if (p) {
-          setSubscriberPhone(null);
-          emit();
-          if (typeof MCL.renderAll === 'function') MCL.renderAll();
-          notify('خرجت من الاشتراك — كورسات Drive مقفلة تاني.', 'info');
-        } else openLockModal({ mode: 'gate' });
-      });
-
-      let adminChip = qs('#adminChip');
-      if (!adminChip) {
-        adminChip = document.createElement('button');
-        adminChip.id = 'adminChip';
-        adminChip.type = 'button';
-        adminChip.className = 'lock-chip';
-        adminChip.innerHTML = '<i class="bi bi-shield-lock text-[12px]" aria-hidden="true"></i>' +
-                              '<span id="adminChipText" class="hidden sm:inline">دخول المالك</span>';
-        subChip.after(adminChip);
-      }
-      adminChip.addEventListener('click', () => {
-        if (isAdminActive()) {
-          setAdminMode(false);
-          emit();
-          if (typeof MCL.renderAll === 'function') MCL.renderAll();
-          notify('تم الخروج من وضع المالك.', 'info');
-        } else openLockModal({ mode: 'login' });
-      });
-    }
+    /* ✅ v17: شيبات الهيدر مع retry لو الـheader اتأخر */
+    bindHeaderChips();
 
     ensureSubsViewDOM();
+  }
+
+  /* ✅ v17: فصلنا الشيبات في دالة ليها retry */
+  function bindHeaderChips(retries = 12) {
+    const host = qs('header .ms-auto') || qs('header');
+    if (!host) {
+      if (retries > 0) setTimeout(() => bindHeaderChips(retries - 1), 500);
+      else console.warn('[GATE] header مش موجود — شيبات الدخول مش هتظهر');
+      return;
+    }
+    if (qs('#lockChip') && qs('#subChip') && qs('#adminChip')) return; /* موجودين بالفعل */
+
+    let chip = qs('#lockChip');
+    if (!chip) {
+      chip = document.createElement('button');
+      chip.id = 'lockChip';
+      chip.type = 'button';
+      chip.className = 'lock-chip locked';
+      chip.innerHTML = '<i class="bi bi-lock-fill text-[12px]" aria-hidden="true"></i>' +
+                       '<span id="lockChipText" class="hidden sm:inline">Drive مقفل</span>';
+      host.insertBefore(chip, host.firstChild);
+    }
+    chip.addEventListener('click', () => {
+      if (isAdminActive() || isOwnerEmail()) { notify('أنت في وضع المالك — كل الكورسات متاحة.', 'info'); return; }
+      if (fbUser && hasAnyEnrollment()) { notify(`عندك ${fbEnrollments.length} كورس متاح في حسابك.`, 'info'); return; }
+      const p = getSubscriberPhone();
+      if (p) notify(`اشتراكك مفعّل برقم ${maskPhone(p)}.`, 'info');
+      else openLockModal({ mode: 'gate' });
+    });
+
+    let subChip = qs('#subChip');
+    if (!subChip) {
+      subChip = document.createElement('button');
+      subChip.id = 'subChip';
+      subChip.type = 'button';
+      subChip.className = 'lock-chip';
+      subChip.innerHTML = '<i class="bi bi-person-badge text-[12px]" aria-hidden="true"></i>' +
+                          '<span id="subChipText" class="hidden sm:inline">دخول مشترك</span>';
+      chip.after(subChip);
+    }
+    subChip.addEventListener('click', () => {
+      if (fbUser) {
+        if (confirm('تسجيل الخروج من حسابك؟')) {
+          firebase.auth().signOut().then(() => location.reload());
+        }
+        return;
+      }
+      const p = getSubscriberPhone();
+      if (p) {
+        setSubscriberPhone(null);
+        emit();
+        if (typeof MCL.renderAll === 'function') MCL.renderAll();
+        notify('خرجت من الاشتراك — كورسات Drive مقفلة تاني.', 'info');
+      } else openLockModal({ mode: 'gate' });
+    });
+
+    let adminChip = qs('#adminChip');
+    if (!adminChip) {
+      adminChip = document.createElement('button');
+      adminChip.id = 'adminChip';
+      adminChip.type = 'button';
+      adminChip.className = 'lock-chip';
+      adminChip.innerHTML = '<i class="bi bi-shield-lock text-[12px]" aria-hidden="true"></i>' +
+                            '<span id="adminChipText" class="hidden sm:inline">دخول المالك</span>';
+      subChip.after(adminChip);
+    }
+    adminChip.addEventListener('click', () => {
+      if (isAdminActive()) {
+        setAdminMode(false);
+        emit();
+        if (typeof MCL.renderAll === 'function') MCL.renderAll();
+        notify('تم الخروج من وضع المالك.', 'info');
+      } else openLockModal({ mode: 'login' });
+    });
   }
 
   /* ---------- نافذة الدخول ---------- */
@@ -643,14 +727,18 @@
     if (panel) { panel.classList.remove('shake'); void panel.offsetWidth; panel.classList.add('shake'); }
   }
 
-  /* ---------- المعالج المركزي ---------- */
-  function handleLockSubmit(form) {
+  /* ==========================================================
+     ✅ v17: المعالج المركزي — async + إصلاح حاجز adminPass
+     ========================================================== */
+  async function handleLockSubmit(form) {
     const input = (form && form.querySelector('#lockPassword')) || qs('#lockPassword');
     const adminPass = norm(ADMIN_PASSWORD);
     const pending = pendingAction;
     let ok = false, msg = '';
 
-    if (!adminPass) {
+    /* ✅ الإصلاح الأهم: الحاجز ده على وضع المالك بس —
+       قبل كده كان بيمنع حتى دخول العملاء بالرقم لما الباسورد ناقص! */
+    if (lockMode === 'login' && !adminPass) {
       showLockError('وضع المالك معطّل — إعدادات ناقصة. كلّم المالك.');
       console.error('[GATE] __OWNER_PASSWORD__ غير محدد في config.js');
       return;
@@ -663,7 +751,7 @@
       const raw = norm(input ? input.value : '');
       const val = normPhone(raw);
 
-      if (raw === adminPass) {
+      if (adminPass && raw === adminPass) {
         setAdminMode(true);
         ok = true;
         msg = 'وضع المالك مفعّل — كل الأدوات والكورسات متاحة.';
@@ -674,6 +762,29 @@
         setSubscriberPhone(val);
         ok = true;
         msg = 'تم تفعيل اشتراكك — كورساتك متاحة حتى تقفل الصفحة.';
+      } else {
+        /* ✅ v17: Fallback — ندوّر على الرقم في Firestore مباشرة
+           (لو النشر حصل من جهاز تاني ولسه ماوصلش للجهاز ده) */
+        const submitBtn = qs('#lockSubmitBtn');
+        if (submitBtn) submitBtn.setAttribute('aria-busy', 'true');
+        const cloud = await fetchSubsFromCloud();
+        if (submitBtn) submitBtn.removeAttribute('aria-busy');
+
+        if (cloud && cloud[val]) {
+          Object.assign(MCL.subscriptions, cloud);
+          saveLocalSubs();
+          setSubscriberPhone(val);
+          ok = true;
+          msg = 'تم تفعيل اشتراكك 🎉';
+          console.info('[GATE] ☁️ الرقم اتلقط من Firestore مباشرة');
+        } else {
+          showLockError('الرقم مش مسجّل في الاشتراكات — لو دفعت، كلمنا وهنفعّله فورًا.');
+          notify('رقمك مش مسجّل؟', 'warn', 7000, {
+            label: 'واتساب',
+            onClick() { window.open(waLink('أهلاً 👋 ده رقمي: ' + val + ' — دفعت الاشتراك وعايز تفعيله'), '_blank', 'noopener,noreferrer'); }
+          });
+          return;
+        }
       }
     }
 
@@ -717,11 +828,18 @@
     return null;
   }
 
-  /* ✅ v16.2: Logging كامل + إرجاع نتيجة */
+  /* ✅ v17: تتبع آخر نسخة اتكتبت — عشان الـpoll يميّز تغييرات السحابة */
+  let lastPersistedSnap = null;
+  function recordPersisted() {
+    try { lastPersistedSnap = JSON.stringify(MCL.subscriptions || {}); }
+    catch { lastPersistedSnap = null; }
+  }
+
   function saveLocalSubs() {
     try {
       const json = JSON.stringify(MCL.subscriptions);
       localStorage.setItem(SUBS_LOCAL_KEY, json);
+      recordPersisted();
       console.info('[GATE] 💾 اتحفظ في localStorage:',
         Object.keys(MCL.subscriptions).length, 'مشترك');
       return true;
@@ -762,7 +880,6 @@
     return diff;
   }
 
-  /* ✅ v16.2: حماية من Overwrite (لو فيه تعديلات محلية مش متزامنة) */
   async function loadSubscriptions() {
     let fileSubs = null;
     try {
@@ -779,7 +896,6 @@
     const hasUnsynced = isOwner && unsyncedCount() > 0;
 
     if (hasUnsynced) {
-      /* ✅ فيه تعديلات محلية مش متزامنة → ندمج بدل ما نستبدل */
       console.warn('[GATE] ⚠️ فيه', unsyncedCount(),
         'تعديل محلي مش متزامن — ندمج بدل الاستبدال');
       const merged = { ...(fileSubs || {}), ...(local || {}) };
@@ -788,7 +904,7 @@
       console.info('[GATE] الاشتراكات بعد الدمج:', Object.keys(merged).length);
     } else if (local) {
       MCL.subscriptions = local;
-      console.info('[GATE] الاشتراكات: النسخة المحلية للمالك —', Object.keys(local).length, 'مشترك');
+      console.info('[GATE] الاشتراكات: النسخة المحلية —', Object.keys(local).length, 'مشترك');
     } else if (fileSubs) {
       MCL.subscriptions = fileSubs;
       console.info('[GATE] الاشتراكات المحمّلة من الملف:', Object.keys(fileSubs).length);
@@ -796,6 +912,7 @@
       MCL.subscriptions = {};
       console.info('[GATE] مفيش اشتراكات — كل كورسات Drive مقفلة.');
     }
+    recordPersisted();
     emit();
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
   }
@@ -852,17 +969,19 @@
         const txt = qs('#subChipText');
         if (txt) txt.textContent = (fbUser.displayName || 'حسابي').slice(0, 12);
         subChip.title = 'انقر للخروج من حسابك';
-        return;
+      } else {
+        const p = getSubscriberPhone();
+        subChip.classList.toggle('unlocked', !!p);
+        const ic = subChip.querySelector('i');
+        if (ic) ic.className = (p ? 'bi bi-person-check' : 'bi bi-person-badge') + ' text-[12px]';
+        const txt = qs('#subChipText');
+        if (txt) txt.textContent = p ? maskPhone(p) : 'دخول مشترك';
+        subChip.title = p ? 'انقر للخروج من الاشتراك' : 'دخول المشتركين';
       }
-      const p = getSubscriberPhone();
-      subChip.classList.toggle('unlocked', !!p);
-      const ic = subChip.querySelector('i');
-      if (ic) ic.className = (p ? 'bi bi-person-check' : 'bi bi-person-badge') + ' text-[12px]';
-      const txt = qs('#subChipText');
-      if (txt) txt.textContent = p ? maskPhone(p) : 'دخول مشترك';
-      subChip.title = p ? 'انقر للخروج من الاشتراك' : 'دخول المشتركين';
     }
 
+    /* ✅ v17 إصلاح: الشيب ده كان بيتخطى تمامًا لما فيه طالب مسجل (early return)
+       وده كان بيخلي cloud.js ميعرفش يحس بحالة المالك */
     const adminChip = qs('#adminChip');
     if (adminChip) {
       adminChip.classList.toggle('unlocked', admin);
@@ -955,16 +1074,30 @@
     });
   }
 
+  /* ✅ v17: البانر بقى بيعرف يقول ليه المزامنة واقفة وليه */
   function updateSyncBanner() {
     const banner = qs('#subsSyncBanner');
-    if (!banner) return;
-    const diff = unsyncedCount();
-    const cloudOk = window.CloudSync && CloudSync.authed;
     const txt = qs('#subsSyncText');
-    if (diff > 0 && !cloudOk && txt) {
+    if (!banner || !txt) return;
+    const cs = window.CloudSync;
+    const diff = unsyncedCount();
+
+    if (cs && cs.authed) {
+      if (diff > 0) {
+        txt.innerHTML = '☁️ <b>متصل بالسحابة</b> — <b>' + diff + '</b> تعديل بينشروا تلقائيًا خلال ثواني.';
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+      return;
+    }
+
+    if (diff > 0) {
       txt.innerHTML =
-        `<b>${diff}</b> تعديل محلي ومش متزامن مع السحابة (وضع المالك مش متصل سحابيًا).
-         لو ظهرت رسالة اتصال سحابية في الـConsole هيتبعتوا تلقائيًا، أو استخدم التصدير كنسخة احتياطية.`;
+        '⚠️ <b>' + diff + '</b> تعديل محلي مش نازل للسحابة! السبب: <b>' +
+        escapeHtml(cloudBlockReason()) + '</b><br>' +
+        'الحل: سجّل دخول المالك — أول ما الاتصال ينجح هينشر كل التعديلات المؤجلة تلقائيًا. ' +
+        'أو استخدم التصدير كنسخة احتياطية.';
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
@@ -1039,8 +1172,10 @@
     if (cancelBtn) cancelBtn.classList.add('hidden');
   }
 
-  /* ✅ v16.2: تأكيد نجاح الحفظ */
+  /* ✅ v17: حماية وضع المالك + إشعار حالة المزامنة بعد الحفظ */
   function saveSubscriber() {
+    if (!assertOwnerMode()) return;
+
     const phoneInput = qs('#subsPhone');
     const phone = normPhone(phoneInput ? phoneInput.value : '');
     if (!isEgyptPhone(phone)) { notify('رقم الموبايل لازم يكون 11 رقم يبدأ بـ 01.', 'error'); return; }
@@ -1060,15 +1195,13 @@
     }
     if (isEdit && subsEditingPhone !== phone) delete MCL.subscriptions[subsEditingPhone];
 
-    /* ✅ الحفظ مع تحقق */
     const saved = saveLocalSubs();
     if (!saved) {
-      /* saveLocalSubs بتعرض إشعار خطأ بنفسها */
       console.error('[GATE] فشل حفظ الاشتراك — الحفظ مش موجود في localStorage');
       return;
     }
 
-    /* ✅ تأكيد إضافي: نقرأ من localStorage ونتأكد إن الرقم موجود */
+    /* تحقق إضافي: نقرأ من localStorage ونتأكد إن الرقم موجود */
     const verify = loadLocalSubs();
     if (!verify || !verify[phone]) {
       notify('⚠️ الرقم مظهرش بعد الحفظ — جرّب تحدّث الصفحة أو افتحها في وضع عادي.', 'error', 9000);
@@ -1081,14 +1214,11 @@
     if (typeof MCL.renderAll === 'function') MCL.renderAll();
     resetSubsForm();
 
-    /* ✅ إشعار نجاح + تأكيد في Console */
     console.info('[GATE] ✅ تم حفظ المشترك', phone, '— إجمالي:',
       Object.keys(MCL.subscriptions).length);
 
-    notify(isEdit
-      ? `تم تحديث اشتراك ${phone} — بينشر على السحابة تلقائيًا.`
-      : `تمت إضافة ${phone} — بينشر على السحابة تلقائيًا. ابعت لعميلك إنه يكتب رقمه.`,
-      'success', 6000);
+    /* ✅ بدل الرسالة الوهمية «بينشر تلقائيًا» — بقولك الحقيقة */
+    notifyCloudState(isEdit ? `تم تحديث اشتراك ${phone}` : `تمت إضافة ${phone}`);
   }
 
   function editSubscriber(phone) {
@@ -1118,6 +1248,7 @@
   }
 
   function deleteSubscriber(phone) {
+    if (!assertOwnerMode()) return;
     appConfirm({
       title: 'إلغاء اشتراك',
       message: `سيتم إلغاء اشتراك الرقم ${phone} — وبينشر على السحابة تلقائيًا بعد ثواني.`,
@@ -1129,30 +1260,45 @@
         renderSubsView();
         emit();
         if (typeof MCL.renderAll === 'function') MCL.renderAll();
-        notify(`تم إلغاء اشتراك ${phone} — بينشر على السحابة تلقائيًا.`, 'warn', 5500);
+        notifyCloudState(`تم إلغاء اشتراك ${phone}`);
       }
     });
   }
 
+  /* ✅ v17: بيسحب من Firestore مباشرة الأول */
   function reloadFromServer() {
+    if (!assertOwnerMode()) return;
     appConfirm({
       title: 'تحميل نسخة السحابة',
       message: 'سيتم تجاهل كل تعديلاتك المحلية وتحميل نسخة الاشتراكات من السحابة. متأكد؟',
       confirmLabel: 'تحميل من السحابة',
       danger: true,
-      onConfirm() {
+      onConfirm: async () => {
         try {
           localStorage.removeItem(SUBS_LOCAL_KEY);
           localStorage.removeItem(SUBS_EXPORTED_KEY);
         } catch { /* تجاهل */ }
-        loadSubscriptions();
-        resetSubsForm();
-        notify('تم تحميل نسخة السحابة ومسح التعديلات المحلية.', 'info');
+
+        const cloud = await fetchSubsFromCloud();
+        if (cloud && Object.keys(cloud).length) {
+          MCL.subscriptions = cloud;
+          saveLocalSubs();
+          renderSubsView();
+          emit();
+          if (typeof MCL.renderAll === 'function') MCL.renderAll();
+          resetSubsForm();
+          notify('تم تحميل ' + Object.keys(cloud).length + ' اشتراك من Firestore مباشرة ✅', 'success');
+        } else {
+          loadSubscriptions();
+          resetSubsForm();
+          notify('تم التحميل من subscriptions.json (Firestore فاضي أو مش متاح).', 'info');
+        }
       }
     });
   }
 
   function importSubsFile(file) {
+    if (!assertOwnerMode()) return;
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -1169,13 +1315,45 @@
             renderSubsView();
             emit();
             if (typeof MCL.renderAll === 'function') MCL.renderAll();
-            notify('تم استيراد الاشتراكات — بينشروا على السحابة تلقائيًا.', 'success');
+            notifyCloudState('تم استيراد الاشتراكات');
           }
         });
       } catch { notify('الملف ليس JSON صالحًا.', 'error'); }
     };
     reader.readAsText(file);
   }
+
+  /* ==========================================================
+     ✅ v17: Polls — حفظ تغييرات السحابة + تعليم المتزامن
+     ========================================================== */
+
+  /* أي تغيير في MCL.subscriptions مجاش عن طريق saveLocalSubs → جاي من السحابة
+     → نحفظه في localStorage عشان الـrefresh ميرجعش لنسخة قديمة */
+  setInterval(() => {
+    let cur = null;
+    try { cur = JSON.stringify(MCL.subscriptions || {}); } catch { return; }
+    if (!cur || cur === lastPersistedSnap) return;
+    const lw = (window.CloudSync && window.CloudSync.lastLocalSubsWrite) || 0;
+    if (Date.now() - lw < 2000) return; /* لسه في كتابة محلية شغالة */
+    try {
+      localStorage.setItem(SUBS_LOCAL_KEY, cur);
+      lastPersistedSnap = cur;
+    } catch { /* تجاهل */ }
+  }, 3000);
+
+  /* لما المالك يكون متصل والpush نجح، نعلّم snapshot كمُزامَن
+     عشان بانر "غير متزامن" ميفضلش ظاهر على الفاضي */
+  setInterval(() => {
+    const cs = window.CloudSync;
+    if (!cs || !cs.authed || cs.pendingSubs) return;
+    const lw = cs.lastLocalSubsWrite || 0;
+    if (!lw || Date.now() - lw < 4000) return;
+    if ((cs.lastPushTime || 0) < lw) return;
+    if (unsyncedCount() > 0) {
+      try { localStorage.setItem(SUBS_EXPORTED_KEY, sortSnapshot(MCL.subscriptions)); } catch { /* تجاهل */ }
+      renderSubsView();
+    }
+  }, 5000);
 
   /* ---------- تشغيل ---------- */
   ensureGateDOM();

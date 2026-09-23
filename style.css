@@ -1,7 +1,16 @@
 /* ==========================================================
    My Course Library — style.css
    طبقة التنسيق المخصصة فوق Tailwind CSS (Dark فقط)
-   ✅ v17: إصلاحات للـ Navbar الجديد + تحسينات أداء
+   ✅ v18: نظام z-index موحّد — مصدر حقيقة واحد من غير !important
+   ✅ v18: إصلاح باگ body padding (env() كان بيطبّق على كل الصفحات)
+   ✅ v18: padding النافبار بقى opt-in (body.has-topnav) + :has تحسين تدريجي
+   ✅ v18: fallback overflow-x:hidden للمتصفحات القديمة
+   ========================================================== */
+
+/* ==========================================================
+   📐 مقياس z-index الموحّد — ممنوع !important على z-index:
+   header 30 < bottom-nav 35 < overlay 40 < sidebar 50
+   < cartbar 55 < modals 60-68 < toasts 70 < splash/print 9999
    ========================================================== */
 
 :root {
@@ -20,6 +29,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* ✅ v18: fallback للمتصفحات اللي مش بتدعم clip (iOS < 16) */
+  overflow-x: hidden;
   overflow-x: clip;
 }
 
@@ -27,6 +38,7 @@ body {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   text-rendering: optimizeLegibility;
   max-width: 100%;
+  overflow-x: hidden;
   overflow-x: clip;
 }
 
@@ -61,13 +73,24 @@ body {
   color: var(--acc); font-size: 15px;
 }
 
-/* ---------- ✅ Nexora Navbar (v3) ---------- */
+/* ==========================================================
+   ✅ v18: Navbar العلوي — منطق الـpadding اتصلح بالكامل
+   ----------------------------------------------------------
+   القديم كان:
+   1) padding-top: 64px لكل الصفحات (غلط — library مش محتاجاه)
+   2) :has() للإلغاء (بسيب المتصفحات القديمة مكسورة)
+   3) @supports env() بيعيد الـpadding لكل الصفحات (أسوأ باگ)
+   الجديد:
+   - الافتراضي 0
+   - الصفحات اللي فيها #nexNavbar بتاخد padding عبر
+     :has() (الحديث) أو كلاس .has-topnav (الضمان للمتصفحات القديمة)
+   ========================================================== */
 #nexNavbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 40;
+  z-index: 30; /* ✅ حسب المقياس الموحّد */
   background: rgba(10, 10, 13, .85);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -76,24 +99,33 @@ body {
 }
 #nexNavbar a { text-decoration: none; color: inherit; }
 #nexNavbar button { font-family: inherit; }
-#nexNavbar #navMobileMenu {
-  transition: opacity .2s ease;
+#nexNavbar #navMobileMenu { transition: opacity .2s ease; }
+
+/* الافتراضي: مفيش padding نهائيًا */
+body { padding-top: 0; }
+
+/* ✅ الضمان الأساسي: كلاس صريح — nav.js بيضيفه (سطر واحد) */
+body.has-topnav {
+  padding-top: calc(64px + env(safe-area-inset-top, 0px));
 }
 
-/* نمنع الـ Navbar يغطي المحتوى */
-body {
-  padding-top: 64px;
+/* ✅ تحسين تدريجي: لو :has مدعوم، مش محتاجين الكلاس أصلًا */
+@supports selector(:has(*)) {
+  body:has(#nexNavbar):not(.no-topnav) {
+    padding-top: calc(64px + env(safe-area-inset-top, 0px));
+  }
 }
 
-/* لكن لو فيه Navbar قديم (header.sticky) نلغي الـ padding */
-body:has(header.sticky) {
-  padding-top: 0;
-}
-
-/* لو مش فيه Navbar، مانضيفش padding */
-body:not(:has(#nexNavbar)):not(:has(header.sticky)) {
-  padding-top: 0;
-}
+/* ==========================================================
+   ✅ v18: الطبقات العلوية — كلها بمقياس واحد
+   ========================================================== */
+#sidebar { z-index: 50; }           /* فوق الأوفرلاي (40) */
+#overlay { z-index: 40; }           /* تعتيم الدرج */
+.bottom-nav { z-index: 35; }        /* تحت الأوفرلاي — بيختفي مع الدرج ✅ */
+#nexCartBar { z-index: 55; }        /* فوق الناف السفلي، تحت المودالز */
+#toasts { z-index: 70; }            /* فوق كل المودالز */
+/* المودالز: من كلاسات الـHTML نفسها (z-[60] / z-[65] / z-[68])
+   — ✅ شلنا .modal { z-index: 200 } اللي كانت بتلغيها */
 
 /* ---------- التنقل الجانبي ---------- */
 .nav-item {
@@ -303,7 +335,11 @@ code {
 
 #dropZone.drag { border-color: rgba(240, 181, 62, .7); background: rgba(240, 181, 62, .05); }
 
-/* ---------- احترام تقليل الحركة ---------- */
+/* ---------- احترام تقليل الحركة ----------
+   ⚠️ ملاحظة: مع reduced-motion أنيميشن toastOut بتتلغي،
+   فلو بتستخدم app.js (remove بيعتمد animationend) التوست
+   بيتشال لما خامس ييجي — مقبول، والحل الجذري في JS:
+   setTimeout fallback جنب الـanimationend */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
@@ -350,10 +386,9 @@ code {
 }
 
 /* ==========================================================
-   Nexora Mobile-First Enhancements — v17
+   Nexora Mobile-First Enhancements — v18
    ========================================================== */
 
-/* تحسين التفاعل باللمس */
 .btn-accent,
 .btn-ghost,
 .btn-danger,
@@ -393,6 +428,8 @@ button.stat,
   .cat-chip     { font-size: 10px; padding: 3px 8px; }
   .line-clamp-2 { -webkit-line-clamp: 3; }
 
+  /* ⚠️ منتقيات هيكلية (nth-child) — لو غيّرت ترتيب عناصر
+     view-library راجع القواعد دي */
   #view-library > div:nth-child(2) {
     flex-direction: column;
     align-items: stretch !important;
@@ -418,6 +455,7 @@ button.stat,
     -webkit-overflow-scrolling: touch;
   }
 
+  /* التوستات فوق على الموبايل — فوق الناف السفلي والسلة */
   #toasts {
     position: fixed;
     bottom: auto;
@@ -426,11 +464,10 @@ button.stat,
     right: 8px;
     width: auto;
     max-width: none;
-    z-index: 50;
+    z-index: 70;
   }
 
   #sidebar {
-    z-index: 60;
     box-shadow: -8px 0 32px rgba(0, 0, 0, .6);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -441,40 +478,15 @@ button.stat,
   #statsBar { grid-template-columns: repeat(4, 1fr); }
 }
 
-/* ===== دعم iPhone notch ===== */
-@supports (padding: env(safe-area-inset-top)) {
-  #nexNavbar {
-    padding-top: env(safe-area-inset-top);
-  }
-  body {
-    padding-top: calc(64px + env(safe-area-inset-top, 0px));
-  }
-}
-
 /* ==========================================================
-   إصلاحات إضافية v17
+   ✅ v18: شريط السلة + الناف السفلي — موضع واحد بس للحقيقة
+   (اتشالت الـ!important المتضاربة — القيم هنا متطابقة مع
+   library.html فمفيش حرب كاشascade)
    ========================================================== */
-
-/* ✅ نمنع الشريط الأفقي */
-html, body { max-width: 100%; }
-
-/* ✅ نمنع شريط السلة يغطي Bottom Nav */
-.nex-cartbar { bottom: 0 !important; }
+.nex-cartbar { bottom: 0; }
 @media (max-width: 1024px) {
-  .nex-cartbar { bottom: 64px !important; }
-}
-
-/* ✅ نمنع Bottom Nav يغطي شريط السلة */
-@media (max-width: 1024px) {
-  .bottom-nav { z-index: 100 !important; }
-  body { padding-bottom: 72px !important; }
-}
-
-/* ✅ أي عنصر بـ z-index عالي */
-#sidebar { z-index: 100; }
-.modal { z-index: 200; }
-#toasts { z-index: 300; }
-#nexCartBar { z-index: 90; }
-@media (max-width: 1024px) {
-  #nexCartBar { z-index: 95; }
+  .nex-cartbar {
+    /* فوق الناف السفلي + الـsafe-area بتاع النوتش */
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
 }

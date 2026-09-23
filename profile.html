@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0d">
   <meta name="description" content="الملف الشخصي — Nexora Academy">
+  <!-- ✅ صفحة خاصة بعد الدخول — مايتفهرسش -->
+  <meta name="robots" content="noindex">
   <title>الملف الشخصي — Nexora Academy</title>
 
   <link rel="icon" href="favicon.png" type="image/png">
@@ -43,7 +45,6 @@
     img, svg { max-width: 100%; height: auto; display: block; }
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
-    /* ✅ Skip link */
     .skip-link {
       position: absolute; top: -100px; inset-inline-start: 16px;
       background: var(--accent); color: #052e12; padding: 10px 16px;
@@ -51,7 +52,6 @@
     }
     .skip-link:focus { top: 16px; }
 
-    /* Focus visible */
     a:focus-visible, button:focus-visible {
       outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 12px;
     }
@@ -168,7 +168,7 @@
       display: inline-flex; align-items: center; gap: 8px;
       height: 44px; padding: 0 20px; border-radius: 12px;
       font-size: 13px; font-weight: 700; transition: .15s;
-      font-family: inherit;
+      font-family: inherit; cursor: pointer;
     }
     .btn-profile.primary {
       background: linear-gradient(135deg, var(--blue), var(--purple));
@@ -365,6 +365,12 @@
 </head>
 <body>
 
+  <noscript>
+    <div style="background:#e5484d;color:#fff;padding:14px;text-align:center;font-family:sans-serif">
+      الملف الشخصي محتاج تشغيل JavaScript — فعّله من إعدادات المتصفح.
+    </div>
+  </noscript>
+
   <a href="#main" class="skip-link">تخطى إلى المحتوى</a>
 
   <main class="container" id="main">
@@ -430,7 +436,7 @@
             <span class="badge-chip" id="pActive">
               <i class="bi bi-patch-check-fill" aria-hidden="true"></i>حساب نشط
             </span>
-            <span class="badge-chip warn" id="pRole">
+            <span class="badge-chip info" id="pRole">
               <i class="bi bi-person" aria-hidden="true"></i>طالب
             </span>
             <span class="badge-chip info" id="pJoined" style="display:none;">
@@ -516,7 +522,7 @@
         <nav aria-label="تواصل معنا">
           <h4>تواصل معنا</h4>
           <ul>
-            <li><a href="tel:01096295395" dir="ltr"><i class="bi bi-telephone" aria-hidden="true"></i> 01096295395</a></li>
+            <li><a href="tel:+201096295395" dir="ltr"><i class="bi bi-telephone" aria-hidden="true"></i> 01096295395</a></li>
             <li><a href="https://wa.me/201096295395" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp" aria-hidden="true"></i> واتساب</a></li>
           </ul>
         </nav>
@@ -529,32 +535,62 @@
   </footer>
 
   <!-- Scripts -->
+  <!-- ✅ catalog-loader.js اتضاف — كان ناقص فأسماء الكورسات كانت بتظهر كـIDs -->
   <script src="config.js?v=18" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer></script>
+  <script src="catalog-loader.js?v=18" defer></script>
   <script src="nav.js?v=18" defer></script>
 
-  <script defer>
-  (function () {
-    'use strict';
+<script>
+(function () {
+  'use strict';
 
-    /* ===== Helpers ===== */
+  /* ==========================================================
+     ✅ التشخيص: افتح Console واكتب __profileDebug()
+     هيقولك بالظبط إيه اللي ناقص
+     ========================================================== */
+  window.__profileDebug = function () {
+    const info = {
+      firebaseSDK: typeof firebase !== 'undefined' ? '✅ محمّل' : '❌ مش محمّل',
+      configFromConfigJS: window.__FIREBASE_CONFIG__ ? '✅ موجود' : '⚠️ مش موجود — هستخدم النسخة الاحتياطية',
+      configFileLoaded: [...document.querySelectorAll('script[src*="config"]')].map(s => s.src),
+      firebaseScripts: [...document.querySelectorAll('script[src*="firebasejs"]')].map(s => ({
+        src: s.src.split('/').pop(),
+        loaded: true /* لو فشل مش هنعمل boot أصلًا */
+      }))
+    };
+    console.table(info.firebaseScripts);
+    console.log(info);
+    return info;
+  };
+
+  /* ---------- Boot بعد الـdefer scripts ---------- */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+
+  function boot() { init(); }
+
+  function init() {
     const $  = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
       (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-    /* ✅ Timeout wrapper للـQueries */
+    const SYNTH_DOMAIN = '@students.nexora.local';
+    const isSyntheticEmail = (email) => String(email || '').toLowerCase().endsWith(SYNTH_DOMAIN);
+
     function withTimeout(promise, ms = 8000) {
       return Promise.race([
         promise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), ms))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
       ]);
     }
 
-    /* ✅ Firestore Timestamp → ms */
     function toMs(value) {
       if (!value) return null;
       if (typeof value.toDate === 'function') return value.toDate().getTime();
@@ -567,7 +603,6 @@
       return null;
     }
 
-    /* ✅ أيام بشكل آمن */
     function safeDays(ms) {
       if (!ms) return 0;
       const diff = Date.now() - ms;
@@ -584,7 +619,7 @@
       const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add('visible');   // ✅ target مش entry
+            entry.target.classList.add('visible');
             observer.unobserve(entry.target);
           }
         });
@@ -594,21 +629,24 @@
         observer.observe(el);
       });
     }
+    window.addEventListener('pagehide', () => {
+      $$('.reveal').forEach((el) => el.classList.remove('will-reveal'));
+    });
 
-    /* ===== Firebase Check ===== */
-    const cfg = window.__FIREBASE_CONFIG__;
-    if (typeof firebase === 'undefined' || !cfg) {
-      $('#loadingState').style.display = 'none';
-      $('#errorState').style.display = 'block';
-      $('#errorMsg').textContent = 'الإعدادات ناقصة. تواصل مع الدعم.';
-      return;
-    }
-    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    /* ==========================================================
+       ✅✅ الإصلاح: fallback config — نفس اللي في باقي الملفات
+       لو config.js ناقص أو بايظ، الصفحة تشتغل عادي برضه
+       ========================================================== */
+    const cfg = window.__FIREBASE_CONFIG__ || {
+      apiKey: "AIzaSyBxPZmpUaRmRLkjwg2z-Vcbg-Z6s3G_V6A",
+      authDomain: "gymzone-f53f1.firebaseapp.com",
+      projectId: "gymzone-f53f1",
+      storageBucket: "gymzone-f53f1.firebasestorage.app",
+      messagingSenderId: "138864850130",
+      appId: "1:138864850130:web:ae594e26d4eb36518ba90b"
+    };
 
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    /* ===== States ===== */
+    /* ===== الحالات ===== */
     const loadingState   = $('#loadingState');
     const guestState     = $('#guestState');
     const errorState     = $('#errorState');
@@ -617,32 +655,49 @@
     const retryBtn       = $('#retryBtn');
 
     function showLoading() {
-      loadingState.style.display = 'block';
-      loadingState.setAttribute('aria-busy', 'true');
-      guestState.style.display = 'none';
-      errorState.style.display = 'none';
-      profileContent.style.display = 'none';
+      if (loadingState) { loadingState.style.display = 'block'; loadingState.setAttribute('aria-busy', 'true'); }
+      if (guestState) guestState.style.display = 'none';
+      if (errorState) errorState.style.display = 'none';
+      if (profileContent) profileContent.style.display = 'none';
     }
     function showGuest() {
-      loadingState.style.display = 'none';
-      guestState.style.display = 'block';
-      errorState.style.display = 'none';
-      profileContent.style.display = 'none';
+      if (loadingState) loadingState.style.display = 'none';
+      if (guestState) guestState.style.display = 'block';
+      if (errorState) errorState.style.display = 'none';
+      if (profileContent) profileContent.style.display = 'none';
     }
     function showError(msg) {
-      loadingState.style.display = 'none';
-      guestState.style.display = 'none';
-      errorState.style.display = 'block';
-      profileContent.style.display = 'none';
-      if (msg) errorMsg.textContent = msg;
+      if (loadingState) loadingState.style.display = 'none';
+      if (guestState) guestState.style.display = 'none';
+      if (errorState) errorState.style.display = 'block';
+      if (profileContent) profileContent.style.display = 'none';
+      if (msg && errorMsg) errorMsg.textContent = msg;
     }
     function showProfile() {
-      loadingState.style.display = 'none';
-      guestState.style.display = 'none';
-      errorState.style.display = 'none';
-      profileContent.style.display = 'block';
-      loadingState.setAttribute('aria-busy', 'false');
+      if (loadingState) { loadingState.style.display = 'none'; loadingState.setAttribute('aria-busy', 'false'); }
+      if (guestState) guestState.style.display = 'none';
+      if (errorState) errorState.style.display = 'none';
+      if (profileContent) profileContent.style.display = 'block';
     }
+
+    /* ==========================================================
+       ✅ فحص SDK بعد الـfallback — لو Firebase نفسه مش محمّل
+       يبقى فيه مشكلة شبكة/CDN مش مشكلة إعدادات
+       ========================================================== */
+    if (typeof firebase === 'undefined') {
+      console.error('[PROFILE] Firebase SDK مش محمّل — افتح Network وشوف 404 من gstatic');
+      if (loadingState) loadingState.style.display = 'none';
+      if (errorState) {
+        errorState.style.display = 'block';
+        if (errorMsg) errorMsg.textContent =
+          'مشكلة في تحميل مكتبة Firebase — اتأكد من اتصالك بالإنترنت واعمل تحديث للصفحة.';
+      }
+      return;
+    }
+
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
     /* ===== Catalog ===== */
     function getCatalogMap() {
@@ -654,21 +709,20 @@
 
     /* ===== Course Card ===== */
     function courseCardHTML(enroll, catalogMap) {
-      const c = catalogMap[enroll.courseId] || { title: enroll.courseId, category: '—' };
-      /* ✅ progress: ندعم 0-100 و 0-1 */
+      const c = catalogMap[enroll.courseId] || null;
+      const title = esc(enroll.courseTitle || (c && c.title) || enroll.courseId || 'كورس');
+      const cat = esc((c && c.category) || enroll.category || '');
+
       let pct = Number(enroll.progress);
       if (!Number.isFinite(pct)) pct = 0;
       if (pct > 0 && pct <= 1) pct = Math.round(pct * 100);
       pct = Math.max(0, Math.min(100, Math.round(pct)));
       const done = pct >= 100;
+      const showProgress = !done && pct > 0;
 
-      const title = esc(c.title || 'كورس');
-      const wa = (() => {
-        const phone = (window.MCL && MCL.CONTACT_PHONE) || '01096295395';
-        const intl = String(phone).replace(/^0/, '20');
-        return 'https://wa.me/' + intl + '?text=' +
-               encodeURIComponent('أهلاً 👋 بخصوص كورس «' + (c.title || '') + '»');
-      })();
+      const waPhone = (window.MCL && MCL.CONTACT_PHONE) || '01096295395';
+      const wa = 'https://wa.me/' + String(waPhone).replace(/^0/, '20') +
+                 '?text=' + encodeURIComponent('أهلاً 👋 بخصوص كورس «' + (enroll.courseTitle || (c && c.title) || '') + '»');
 
       return `
         <article class="course-item">
@@ -676,9 +730,10 @@
             ${done ? 'مكتمل 🏆' : 'متاح ليك ✅'}
           </span>
           <h3>${title}</h3>
-          <p class="cat">${esc(c.category || '')}</p>
-          ${!done ? `
-            <div class="progress-wrap" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+          ${cat ? `<p class="cat">${cat}</p>` : ''}
+          ${showProgress ? `
+            <div class="progress-wrap" role="progressbar" aria-label="تقدّمك في ${title}"
+                 aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
               <div class="progress-fill" style="width:${pct}%"></div>
             </div>
             <div class="progress-label">
@@ -691,61 +746,21 @@
               <i class="bi bi-play-circle" aria-hidden="true"></i>
               ${done ? 'راجع الكورس' : 'ابدأ التعلم'}
             </a>
+            <a href="${wa}" target="_blank" rel="noopener noreferrer"
+               class="btn-course open" style="flex:0 0 44px;background:#25D366;color:#04310f"
+               aria-label="تواصل بخصوص ${title}">
+              <i class="bi bi-whatsapp" aria-hidden="true"></i>
+            </a>
           </div>
         </article>`;
     }
 
-    /* ===== Render Profile ===== */
-    function renderProfile(user, profileData, enrollments, orders, pathsCount) {
-      const catalogMap = getCatalogMap();
-      const rawName = (profileData && profileData.name) || user.displayName || '';
-      const fullName = rawName.trim() || 'مستخدم';
-      const firstName = fullName.split(' ')[0] || 'مستخدم';
-      const phone = (profileData && profileData.phone)
-                    || (user.email ? user.email.split('@')[0] : '')
-                    || '—';
-
-      $('#pAvatar').textContent = fullName.charAt(0).toUpperCase();
-      $('#pName').textContent = fullName;
-      $('#pPhone').textContent = phone;
-
-      /* ✅ Badges ديناميكية */
-      const pActive = $('#pActive');
-      if (user.emailVerified) {
-        pActive.innerHTML = '<i class="bi bi-patch-check-fill" aria-hidden="true"></i>إيميل موثّق';
-      } else {
-        pActive.classList.remove('badge-chip');
-        pActive.classList.add('badge-chip', 'warn');
-        pActive.innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i>إيميل غير موثّق';
-      }
-
-      /* ✅ تاريخ التسجيل */
-      const createdMs = toMs(profileData && profileData.createdAt);
-      if (createdMs) {
-        $('#pJoined').style.display = 'inline-flex';
-        try {
-          const d = new Date(createdMs);
-          $('#pJoinedText').textContent = d.toLocaleDateString('ar-EG', {
-            year: 'numeric', month: 'short', day: 'numeric'
-          });
-        } catch {
-          $('#pJoinedText').textContent = '—';
-        }
-      }
-
-      /* ✅ Stats */
-      const totalEnrolls = enrollments.length;
-      const totalOrders = orders.length;
-      const daysSince = safeDays(createdMs);
-
-      $('#sEnrolls').textContent = totalEnrolls;
-      $('#sOrders').textContent = totalOrders;
-      $('#sPaths').textContent = pathsCount || 0;
-      $('#sDays').textContent = daysSince;
-      $('#enrollsCount').textContent = totalEnrolls + ' كورس';
-
-      /* ✅ Courses Grid */
+    /* إعادة رسم لو الكتالوج وصل متأخر */
+    let lastEnrolls = null;
+    function renderGrid(enrollments) {
       const grid = $('#coursesGrid');
+      if (!grid) return;
+      const catalogMap = getCatalogMap();
       if (enrollments.length) {
         grid.innerHTML = enrollments.map((e) => courseCardHTML(e, catalogMap)).join('');
       } else {
@@ -760,6 +775,62 @@
             </a>
           </div>`;
       }
+    }
+    const redrawIfVisible = () => {
+      if (lastEnrolls && profileContent && profileContent.style.display !== 'none') {
+        renderGrid(lastEnrolls);
+      }
+    };
+    window.addEventListener('nexora:catalog-ready', redrawIfVisible);
+    window.addEventListener('nexora:catalog-update', redrawIfVisible);
+
+    /* ===== Render Profile ===== */
+    function renderProfile(user, profileData, enrollments, orders, pathsCount) {
+      const rawName = (profileData && profileData.name) || user.displayName || '';
+      const fullName = rawName.trim() || 'مستخدم';
+      const firstName = fullName.split(' ')[0] || 'مستخدم';
+      const phone = (profileData && profileData.phone)
+                    || (user.email ? user.email.split('@')[0] : '')
+                    || '—';
+
+      $('#pAvatar').textContent = fullName.charAt(0).toUpperCase();
+      $('#pName').textContent = fullName;
+      $('#pPhone').textContent = phone;
+
+      /* ✅ طلاب الأرقام: الإيميل اصطناعي — بنعرض «حساب نشط» مش تحذير */
+      const pActive = $('#pActive');
+      if (pActive) {
+        pActive.classList.remove('warn');
+        if (!isSyntheticEmail(user.email) && user.emailVerified) {
+          pActive.innerHTML = '<i class="bi bi-patch-check-fill" aria-hidden="true"></i>إيميل موثّق';
+        } else {
+          pActive.innerHTML = '<i class="bi bi-patch-check-fill" aria-hidden="true"></i>حساب نشط';
+        }
+      }
+
+      const createdMs = toMs(profileData && profileData.createdAt)
+        || toMs(user.metadata && user.metadata.creationTime);
+
+      if (createdMs) {
+        const joined = $('#pJoined');
+        if (joined) joined.style.display = 'inline-flex';
+        try {
+          const d = new Date(createdMs);
+          const txt = $('#pJoinedText');
+          if (txt) txt.textContent = d.toLocaleDateString('ar-EG', {
+            year: 'numeric', month: 'short', day: 'numeric'
+          });
+        } catch { /* تجاهل */ }
+      }
+
+      $('#sEnrolls').textContent = enrollments.length;
+      $('#sOrders').textContent = orders.length;
+      $('#sPaths').textContent = pathsCount || 0;
+      $('#sDays').textContent = safeDays(createdMs);
+      $('#enrollsCount').textContent = enrollments.length + ' كورس';
+
+      lastEnrolls = enrollments;
+      renderGrid(enrollments);
 
       showProfile();
 
@@ -768,20 +839,22 @@
     }
 
     /* ===== Logout ===== */
-    $('#logoutBtn')?.addEventListener('click', async () => {
-      if (!confirm('تسجيل الخروج؟')) return;
-      try { await auth.signOut(); } catch (e) { console.warn('signOut:', e); }
-      location.href = 'landing.html';
-    });
+    const logoutBtn = $('#logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        if (!confirm('تسجيل الخروج؟')) return;
+        try { await auth.signOut(); } catch (e) { console.warn('signOut:', e); }
+        location.href = 'landing.html';
+      });
+    }
 
     /* ===== Retry ===== */
-    retryBtn?.addEventListener('click', () => location.reload());
+    if (retryBtn) retryBtn.addEventListener('click', () => location.reload());
 
     /* ===== Load Profile Data ===== */
     async function loadProfileData(user) {
       showLoading();
 
-      /* ✅ 3 Queries متوازية + Timeout */
       const [profileRes, enrollsRes, ordersRes, progressRes] = await Promise.allSettled([
         withTimeout(db.collection('students').doc(user.uid).get()),
         withTimeout(db.collection('enrollments')
@@ -794,7 +867,6 @@
         withTimeout(db.collection('roadmapProgress').doc(user.uid).get())
       ]);
 
-      /* استخرج البيانات */
       const profileData = profileRes.status === 'fulfilled' && profileRes.value.exists
         ? profileRes.value.data()
         : null;
@@ -807,7 +879,6 @@
         ? ordersRes.value.docs.map((d) => ({ id: d.id, ...d.data() }))
         : [];
 
-      /* ✅ عدد المسارات اللي فيها تقدّم */
       let pathsCount = 0;
       if (progressRes.status === 'fulfilled' && progressRes.value.exists) {
         const steps = progressRes.value.data().steps || {};
@@ -816,9 +887,12 @@
         ).length;
       }
 
-      /* ✅ لو أهم Query فشلت (enrollments) → error state */
       if (enrollsRes.status === 'rejected') {
-        showError('مش قادرين نحمّل كورساتك. تأكد من الاتصال وجرّب تاني.');
+        const reason = enrollsRes.reason && enrollsRes.reason.message;
+        console.error('[PROFILE] enrollments فشلت:', enrollsRes.reason);
+        showError(reason === 'timeout'
+          ? 'الاتصال بطيء — تأكد من النت وجرّب تاني.'
+          : 'مش قادرين نحمّل كورساتك. تأكد من الاتصال وجرّب تاني.');
         return;
       }
 
@@ -826,7 +900,10 @@
     }
 
     /* ===== Auth Listener ===== */
+    let authResolved = false;
+
     auth.onAuthStateChanged(async (user) => {
+      authResolved = true;
       if (!user) { showGuest(); return; }
       try {
         await loadProfileData(user);
@@ -835,7 +912,14 @@
         showError('حصل خطأ غير متوقع. جرّب تاني.');
       }
     });
-  })();
-  </script>
+
+    setTimeout(() => {
+      if (!authResolved) {
+        showError('الاتصال بغيمة البيانات بطيء — اتأكد من النت وجرّب تاني.');
+      }
+    }, 12000);
+  }
+})();
+</script>
 </body>
 </html>

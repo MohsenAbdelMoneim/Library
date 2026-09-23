@@ -1,14 +1,19 @@
 /* ==========================================================
-   admin.js — v17
+   admin.js — v18
    لوحة إدارة Nexora: الطلاب + الاشتراكات + حالة الدفع
-   ✅ v17: انتظار DOM + إصلاح مشكلة عدم ظهور الطلاب
-   ✅ v17: بيقرأ الكتالوج من Firestore
+   ✅ v18: إصلاح قاتل وضع المالك — الجارد بقى transition-based
+          (بيشتغل بس لما مستخدم Firebase يسجّل خروج فعلي،
+          مش عند فتح الصفحة — الباسورد-مود بقى عايش بعد reload)
+   ✅ v18: إخفاء #view-admin عند التنقل لغيره (مفيش محتوى مزدوج)
+   ✅ v18: addEnrollment بكورس courseTitle + فحص التكرار عند إعادة التفعيل
+   ✅ v18: حالة تحميل/خطأ مع retry — مفيش «مفيش طلاب» الكاذبة
+   ✅ v18: Event Delegation + expiresAt null + حماية تعديلات المستخدم
    ========================================================== */
 
 'use strict';
 
 (function () {
-  console.log('%c Nexora Admin — v17 ', 'background:#e8961e;color:#161204;font-weight:bold');
+  console.log('%c Nexora Admin — v18 ', 'background:#e8961e;color:#161204;font-weight:bold');
 
   if (typeof firebase === 'undefined') {
     console.error('[ADMIN] Firebase SDK مش محمّل');
@@ -28,7 +33,7 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  /* ✅ الكتالوج من Firestore */
+  /* ---------- الكتالوج ---------- */
   function getCatalogMap() {
     const src = window.__NEXORA_CATALOG__ || { courses: [] };
     const map = {};
@@ -39,10 +44,18 @@
   }
   let PAID_CATALOG = getCatalogMap();
 
+  const isAdmin = () => !!(window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive());
+
+  function toast(msg, type, dur) {
+    if (typeof window.showToast === 'function') window.showToast(msg, type, { duration: dur || 4500 });
+    else console.log('[ADMIN]', msg);
+  }
+
   window.addEventListener('nexora:catalog-ready', () => {
     PAID_CATALOG = getCatalogMap();
     console.info('[ADMIN] تم تحديث الكتالوج من Firestore:', Object.keys(PAID_CATALOG).length);
-    renderAdmin();
+    /* ✅ v18: ما نكسرش تعديلات المالك الجارية وسط الكتابة */
+    if (isAdmin() && !isUserEditing()) renderAdmin();
   });
   window.addEventListener('nexora:catalog-update', () => {
     PAID_CATALOG = getCatalogMap();
@@ -53,18 +66,35 @@
   const qsa = (s) => [...document.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
     (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('ar-EG-u-nu-latn') : '—';
+
+  /* ✅ v18: تاريخ آمن */
+  function fmtDate(iso) {
+    const t = iso && Date.parse(iso);
+    if (!Number.isFinite(t)) return '—';
+    try { return new Date(t).toLocaleDateString('ar-EG-u-nu-latn'); }
+    catch { return '—'; }
+  }
+
+  function isUserEditing() {
+    const ae = document.activeElement;
+    const sec = qs('#view-admin');
+    return !!(sec && ae && sec.contains(ae) &&
+      (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA'));
+  }
 
   const adminState = {
     students: [],
     enrollments: [],
-    filter: ''
+    filter: '',
+    loading: false,
+    error: null,
+    loaded: false
   };
 
   const STYLES = `
 .admin-wrap{max-width:1100px;margin:0 auto}
 .admin-tabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
-.admin-tab{white-space:nowrap;padding:10px 18px;border-radius:12px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation}
+.admin-tab{white-space:nowrap;padding:10px 18px;border-radius:12px;border:1px solid var(--edge,#212129);background:var(--panel,#101015);color:var(--mut,#9c9cab);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .admin-tab:hover{color:var(--ink,#ececf1)}
 .admin-tab.active{background:linear-gradient(135deg,#f0b53e,#e8961e);border-color:transparent;color:#161204}
 .admin-panel{background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:18px;padding:20px;margin-bottom:16px}
@@ -77,19 +107,23 @@
 .stu-name{font-size:13.5px;font-weight:700}
 .stu-meta{font-size:11px;color:var(--mut,#9c9cab);margin-top:2px;direction:ltr;text-align:right}
 .stu-count{font-size:11px;font-weight:700;color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);padding:3px 10px;border-radius:999px}
-.stu-manage{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.stu-manage{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:10px;background:rgba(240,181,62,.1);border:1px solid rgba(240,181,62,.3);color:#f0b53e;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .enr-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:14px;border:1px solid var(--edge,#212129);border-radius:14px;margin-bottom:12px;background:var(--bg,#0a0a0d)}
 .enr-fld{display:flex;flex-direction:column;gap:5px}
 .enr-fld label{font-size:10.5px;color:var(--mut,#9c9cab);font-weight:600}
 .enr-fld select,.enr-fld input{height:40px;background:var(--panel,#101015);border:1px solid var(--edge,#212129);border-radius:10px;color:var(--ink,#ececf1);font-size:12.5px;padding:0 10px;font-family:inherit}
 .enr-fld select:focus,.enr-fld input:focus{outline:none;border-color:rgba(240,181,62,.5)}
-.enr-btn{height:40px;padding:0 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.enr-btn{height:40px;padding:0 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#4f7cff,#7c5cff);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.enr-btn[aria-busy="true"]{opacity:.6;pointer-events:none}
 .enr-btn.danger{background:rgba(229,72,77,.15);border:1px solid rgba(229,72,77,.4);color:#f4636e}
 .enr-status{font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px}
 .enr-status.active{color:#4ade80;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3)}
 .enr-status.cancelled{color:#f4636e;background:rgba(229,72,77,.1);border:1px solid rgba(229,72,77,.3)}
 .enr-meta{font-size:11px;color:var(--dim,#66666f)}
 .admin-empty{text-align:center;padding:36px;color:var(--dim,#66666f);font-size:13px}
+.admin-state{text-align:center;padding:48px 20px;border:1px dashed var(--edge2,#2e2e39);border-radius:16px;color:var(--mut,#9c9cab);font-size:13px;line-height:1.9}
+.admin-state .ai{font-size:36px;margin-bottom:10px}
+.admin-state button{margin-top:12px;height:40px;padding:0 20px;border-radius:10px;border:1px solid rgba(240,181,62,.4);background:rgba(240,181,62,.1);color:#f0b53e;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .admin-note{margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(79,124,255,.08);border:1px solid rgba(79,124,255,.25);font-size:12px;line-height:1.8;color:var(--mut,#9c9cab)}
 @media (max-width:640px){
   .enr-row{align-items:stretch}
@@ -122,11 +156,17 @@
     section.innerHTML = '<div class="admin-wrap" id="adminInner"></div>';
     main.appendChild(section);
     console.info('[ADMIN] ✅ #view-admin اتعمل');
+    bindAdminEvents();
     return true;
   }
 
   /* ---------- تحميل البيانات ---------- */
-  async function loadAll() {
+  async function loadAll(force) {
+    if (adminState.loading) return;
+    adminState.loading = true;
+    adminState.error = null;
+    renderAdmin(); /* عرض حالة التحميل */
+
     try {
       const [stSnap, enSnap] = await Promise.all([
         db.collection('students').get(),
@@ -134,10 +174,13 @@
       ]);
       adminState.students = stSnap.docs.map((d) => ({ uid: d.id, ...d.data() }));
       adminState.enrollments = enSnap.docs.map((d) => ({ docId: d.id, ...d.data() }));
+      adminState.loaded = true;
       console.info('[ADMIN] ✅ الطلاب:', adminState.students.length, '| الاشتراكات:', adminState.enrollments.length);
     } catch (e) {
       console.error('[ADMIN] تحميل البيانات:', e.code);
+      adminState.error = e.code || 'unknown';
     }
+    adminState.loading = false;
     renderAdmin();
   }
 
@@ -147,14 +190,14 @@
     const initial = (s.name || '؟').trim().charAt(0);
     return '' +
     '<div class="stu-row">' +
-      '<span class="stu-avatar">' + esc(initial) + '</span>' +
+      '<span class="stu-avatar" aria-hidden="true">' + esc(initial) + '</span>' +
       '<div class="stu-info">' +
         '<p class="stu-name">' + esc(s.name || 'بدون اسم') + '</p>' +
         '<p class="stu-meta">' + esc(s.phone || '—') + '</p>' +
       '</div>' +
       '<span class="stu-count">' + enrolls.length + ' كورس</span>' +
       '<button type="button" class="stu-manage" data-manage="' + esc(s.uid) + '">' +
-        '<i class="bi bi-gear"></i>إدارة الاشتراكات' +
+        '<i class="bi bi-gear" aria-hidden="true"></i>إدارة الاشتراكات' +
       '</button>' +
     '</div>';
   }
@@ -165,7 +208,7 @@
       '<div class="enr-row">' +
         '<div class="enr-fld" style="flex:1;min-width:160px">' +
           '<label>الكورس</label>' +
-          '<p style="font-size:12.5px;font-weight:700;padding-top:10px">' + esc(PAID_CATALOG[e.courseId] || e.courseId) + '</p>' +
+          '<p style="font-size:12.5px;font-weight:700;padding-top:10px">' + esc(e.courseTitle || PAID_CATALOG[e.courseId] || e.courseId) + '</p>' +
         '</div>' +
         '<div class="enr-status ' + (e.status === 'active' ? 'active' : 'cancelled') + '">' + (e.status === 'active' ? 'فعّال ✅' : 'ملغي ❌') + '</div>' +
         '<div class="enr-fld">' +
@@ -185,11 +228,11 @@
         '</div>' +
         '<div class="enr-fld">' +
           '<label>الدفعات المدفوعة</label>' +
-          '<input type="number" min="0" max="10" value="' + (e.paidInstallments ?? 0) + '" data-enr-field="paidInstallments" data-enr-doc="' + esc(e.docId) + '" style="width:80px">' +
+          '<input type="number" min="0" max="24" value="' + (e.paidInstallments ?? 0) + '" data-enr-field="paidInstallments" data-enr-doc="' + esc(e.docId) + '" style="width:80px">' +
         '</div>' +
         '<div class="enr-fld">' +
           '<label>ينتهي في</label>' +
-          '<input type="date" value="' + (e.expiresAt || '') + '" data-enr-field="expiresAt" data-enr-doc="' + esc(e.docId) + '">' +
+          '<input type="date" value="' + esc(e.expiresAt || '') + '" data-enr-field="expiresAt" data-enr-doc="' + esc(e.docId) + '">' +
         '</div>' +
         '<div class="enr-fld" style="flex:1;min-width:140px">' +
           '<label>ملاحظات</label>' +
@@ -206,7 +249,7 @@
 
     return '' +
     '<div class="admin-panel" data-student-panel="' + esc(s.uid) + '" style="display:none">' +
-      '<h3 class="admin-h"><i class="bi bi-mortarboard"></i>اشتراكات ' + esc(s.name || 'الطالب') + ' <span class="stu-meta" dir="ltr">(' + esc(s.phone) + ')</span></h3>' +
+      '<h3 class="admin-h"><i class="bi bi-mortarboard" aria-hidden="true"></i>اشتراكات ' + esc(s.name || 'الطالب') + ' <span class="stu-meta" dir="ltr">(' + esc(s.phone || '—') + ')</span></h3>' +
       (rows || '<p class="admin-empty">مفيش اشتراكات لسه — أضف أول اشتراك من تحت 👇</p>') +
       '<div class="enr-row" style="border-style:dashed">' +
         '<div class="enr-fld" style="flex:1;min-width:200px">' +
@@ -232,11 +275,11 @@
           '<label>ينتهي في (اختياري)</label>' +
           '<input type="date" id="newEnrExp-' + esc(s.uid) + '">' +
         '</div>' +
-        '<button type="button" class="enr-btn" data-add-enr="' + esc(s.uid) + '"><i class="bi bi-plus-lg"></i>تفعيل الاشتراك</button>' +
+        '<button type="button" class="enr-btn" data-add-enr="' + esc(s.uid) + '"><i class="bi bi-plus-lg" aria-hidden="true"></i>تفعيل الاشتراك</button>' +
       '</div>' +
       '<div class="admin-note">' +
         '💡 الاشتراك بيتفعّل فورًا على السحابة — الطالب هيلاقي الكورس في حسابه خلال ثواني. ' +
-        'للاستفسارات: <a href="tel:' + PHONE + '" style="color:#4f7cff;direction:ltr;unicode-bidi:embed">' + PHONE + '</a>' +
+        'للاستفسارات: <a href="tel:+201096295395" style="color:#4f7cff;direction:ltr;unicode-bidi:embed">' + PHONE + '</a>' +
       '</div>' +
     '</div>';
   }
@@ -244,18 +287,36 @@
   function renderAdmin() {
     const inner = qs('#adminInner');
     if (!inner) return;
+
+    /* حالات التحميل والخطأ */
+    if (adminState.loading) {
+      inner.innerHTML =
+        '<div class="admin-state"><div class="ai" aria-hidden="true">⏳</div>بنحمّل الطلاب والاشتراكات…</div>';
+      return;
+    }
+    if (adminState.error) {
+      inner.innerHTML =
+        '<div class="admin-state" role="alert">' +
+          '<div class="ai" aria-hidden="true">⚠️</div>' +
+          'مش قادرين نحمّل بيانات الطلاب.<br>' +
+          '<span style="font-size:11.5px;color:var(--dim,#66666f)">(' + esc(adminState.error) + ' — لو permission-denied راجع Firestore Rules)</span>' +
+          '<br><button type="button" data-admin-retry>حاول تاني</button>' +
+        '</div>';
+      return;
+    }
+
     const filter = adminState.filter.trim().toLowerCase();
     const students = adminState.students
       .filter((s) => !filter || (s.name || '').toLowerCase().includes(filter) || (s.phone || '').includes(filter))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
 
     inner.innerHTML =
-    '<div class="admin-tabs">' +
-      '<button class="admin-tab active" data-admin-tab="students">الطلاب (' + adminState.students.length + ')</button>' +
-      '<button class="admin-tab" data-admin-tab="all-enrollments">كل الاشتراكات (' + adminState.enrollments.length + ')</button>' +
+    '<div class="admin-tabs" role="tablist">' +
+      '<button type="button" class="admin-tab active" data-admin-tab="students" role="tab" aria-selected="true">الطلاب (' + adminState.students.length + ')</button>' +
+      '<button type="button" class="admin-tab" data-admin-tab="all-enrollments" role="tab" aria-selected="false">كل الاشتراكات (' + adminState.enrollments.length + ')</button>' +
     '</div>' +
     '<div data-admin-panel="students">' +
-      '<input class="admin-search" id="adminSearch" type="search" placeholder="ابحث باسم الطالب أو رقم موبايله…" value="' + esc(adminState.filter) + '">' +
+      '<input class="admin-search" id="adminSearch" type="search" placeholder="ابحث باسم الطالب أو رقم موبايله…" value="' + esc(adminState.filter) + '" aria-label="بحث في الطلاب">' +
       '<div id="studentsList">' +
         (students.length ? students.map(studentRowHTML).join('') : '<p class="admin-empty">مفيش طلاب مسجّلين لسه.</p>') +
       '</div>' +
@@ -265,62 +326,95 @@
         ? adminState.students.map(enrollRowHTML).join('')
         : '<p class="admin-empty">مفيش طلاب لسه.</p>') +
     '</div>';
-
-    const searchEl = qs('#adminSearch');
-    if (searchEl) searchEl.addEventListener('input', debounceAdmin((e) => {
-      adminState.filter = e.target.value;
-      renderAdmin();
-      const inp = qs('#adminSearch');
-      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    }, 300));
-
-    qsa('[data-admin-tab]').forEach((t) => t.addEventListener('click', () => {
-      qsa('[data-admin-tab]').forEach((x) => x.classList.remove('active'));
-      t.classList.add('active');
-      qsa('[data-admin-panel]').forEach((p) =>
-        p.classList.toggle('hidden', p.dataset.adminPanel !== t.dataset.adminTab));
-    }));
-
-    qsa('[data-manage]').forEach((b) => b.addEventListener('click', () => {
-      const uid = b.dataset.manage;
-      qsa('[data-admin-tab]').forEach((x) => x.classList.toggle('active', x.dataset.adminTab === 'all-enrollments'));
-      qsa('[data-admin-panel]').forEach((p) =>
-        p.classList.toggle('hidden', p.dataset.adminPanel !== 'all-enrollments'));
-      qsa('[data-student-panel]').forEach((p) => { p.style.display = 'none'; });
-      const panel = qs('[data-student-panel="' + uid + '"]');
-      if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    }));
-
-    qsa('[data-add-enr]').forEach((b) => b.addEventListener('click', () => addEnrollment(b.dataset.addEnr)));
-    qsa('[data-cancel-enr]').forEach((b) => b.addEventListener('click', () => toggleEnrollment(b.dataset.cancelEnr)));
-    qsa('[data-enr-field]').forEach((el) => el.addEventListener('change', () => saveEnrField(el)));
+    /* ✅ v18: مفيش bind فردي — الـdelegation مربوطة مرة واحدة */
   }
 
-  function debounceAdmin(fn, ms) {
-    let t;
-    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  /* ---------- Event Delegation (مرة واحدة) ---------- */
+  function bindAdminEvents() {
+    const inner = qs('#adminInner');
+    if (!inner || inner.__admBound) return;
+    inner.__admBound = true;
+
+    inner.addEventListener('click', (e) => {
+      if (e.target.closest('[data-admin-retry]')) { loadAll(); return; }
+
+      const tab = e.target.closest('[data-admin-tab]');
+      if (tab) {
+        qsa('[data-admin-tab]', inner).forEach((x) => {
+          const on = x === tab;
+          x.classList.toggle('active', on);
+          x.setAttribute('aria-selected', String(on));
+        });
+        qsa('[data-admin-panel]', inner).forEach((p) =>
+          p.classList.toggle('hidden', p.dataset.adminPanel !== tab.dataset.adminTab));
+        return;
+      }
+
+      const manage = e.target.closest('[data-manage]');
+      if (manage) {
+        const uid = manage.dataset.manage;
+        qsa('[data-admin-tab]', inner).forEach((x) => {
+          const on = x.dataset.adminTab === 'all-enrollments';
+          x.classList.toggle('active', on);
+          x.setAttribute('aria-selected', String(on));
+        });
+        qsa('[data-admin-panel]', inner).forEach((p) =>
+          p.classList.toggle('hidden', p.dataset.adminPanel !== 'all-enrollments'));
+        qsa('[data-student-panel]', inner).forEach((p) => { p.style.display = 'none'; });
+        const panel = qs('[data-student-panel="' + uid + '"]', inner);
+        if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        return;
+      }
+
+      const add = e.target.closest('[data-add-enr]');
+      if (add) { addEnrollment(add.dataset.addEnr, add); return; }
+
+      const cancel = e.target.closest('[data-cancel-enr]');
+      if (cancel) { toggleEnrollment(cancel.dataset.cancelEnr, cancel); return; }
+    });
+
+    inner.addEventListener('input', (e) => {
+      if (e.target.id === 'adminSearch') {
+        const val = e.target.value;
+        clearTimeout(inner.__searchTimer);
+        inner.__searchTimer = setTimeout(() => {
+          adminState.filter = val;
+          renderAdmin();
+          const inp = qs('#adminSearch', inner);
+          if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+        }, 300);
+      }
+    });
+
+    inner.addEventListener('change', (e) => {
+      const el = e.target.closest('[data-enr-field]');
+      if (el) saveEnrField(el);
+    });
   }
 
   /* ---------- عمليات الاشتراكات ---------- */
-  async function addEnrollment(uid) {
+  async function addEnrollment(uid, btn) {
     const courseId = qs('#newEnrCourse-' + uid)?.value;
-    const paymentType = qs('#newEnrPay-' + uid)?.value;
-    const paymentStatus = qs('#newEnrStatus-' + uid)?.value;
+    const paymentType = qs('#newEnrPay-' + uid)?.value || 'cash';
+    const paymentStatus = qs('#newEnrStatus-' + uid)?.value || 'paid';
     const expiresAt = qs('#newEnrExp-' + uid)?.value || null;
+
+    if (!courseId) { toast('اختار كورس الأول', 'warn'); return; }
 
     const dup = adminState.enrollments.find(
       (e) => e.userId === uid && e.courseId === courseId && e.status === 'active'
     );
     if (dup) {
-      if (typeof window.showToast === 'function') window.showToast('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.', 'warn');
-      else alert('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.');
+      toast('الطالب ده عنده اشتراك فعّال في الكورس ده بالفعل.', 'warn');
       return;
     }
 
+    if (btn) btn.setAttribute('aria-busy', 'true');
     try {
       await db.collection('enrollments').add({
         userId: uid,
         courseId,
+        courseTitle: PAID_CATALOG[courseId] || courseId,   /* ✅ v18 */
         status: 'active',
         enrolledAt: new Date().toISOString(),
         expiresAt,
@@ -329,19 +423,33 @@
         paidInstallments: paymentType === 'installment' ? 1 : 0,
         notes: ''
       });
-      console.info('[ADMIN] ✅ الاشتراك اتفعّل');
-      if (typeof window.showToast === 'function') window.showToast('تم تفعيل الاشتراك ✅', 'success');
+      toast('تم تفعيل الاشتراك ✅ — الطالب هيشوفه خلال ثواني', 'success');
       await loadAll();
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      if (typeof window.showToast === 'function') window.showToast('فشل التفعيل: ' + e.code, 'error');
-      else alert('فشل التفعيل: ' + e.code);
+      toast(e.code === 'permission-denied'
+        ? 'السحابة رفضت — راجع Firestore Rules على enrollments'
+        : 'فشل التفعيل: ' + e.code, 'error', 7000);
     }
+    if (btn) btn.removeAttribute('aria-busy');
   }
 
-  async function toggleEnrollment(docId) {
+  async function toggleEnrollment(docId, btn) {
     const enr = adminState.enrollments.find((e) => e.docId === docId);
     if (!enr) return;
+
+    /* ✅ v18: إعادة التفعيل متعملش نشاط مكرر */
+    if (enr.status !== 'active') {
+      const dup = adminState.enrollments.find(
+        (e) => e.userId === enr.userId && e.courseId === enr.courseId && e.status === 'active'
+      );
+      if (dup) {
+        toast('عند الطالب اشتراك فعّال تاني في نفس الكورس — الفعّال هو اللي موجود.', 'warn', 6000);
+        return;
+      }
+    }
+
+    if (btn) btn.setAttribute('aria-busy', 'true');
     try {
       await db.collection('enrollments').doc(docId).update({
         status: enr.status === 'active' ? 'cancelled' : 'active'
@@ -349,16 +457,21 @@
       await loadAll();
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      if (typeof window.showToast === 'function') window.showToast('فشل التعديل: ' + e.code, 'error');
-      else alert('فشل التعديل: ' + e.code);
+      toast('فشل التعديل: ' + e.code, 'error');
     }
+    if (btn) btn.removeAttribute('aria-busy');
   }
 
   async function saveEnrField(el) {
     const docId = el.dataset.enrDoc;
     const field = el.dataset.enrField;
     let value = el.value;
+
     if (field === 'paidInstallments') value = Math.max(0, parseInt(value, 10) || 0);
+    /* ✅ v18: التاريخ الفاضي = null (مش نص فاضي يبوظ الفلترة بعدين) */
+    if (field === 'expiresAt' && !value) value = null;
+    if (field === 'notes') value = String(value).trim();
+
     try {
       await db.collection('enrollments').doc(docId).update({ [field]: value });
       const local = adminState.enrollments.find((e) => e.docId === docId);
@@ -366,10 +479,12 @@
       console.info('[ADMIN] اتحدّث:', field);
     } catch (e) {
       console.error('[ADMIN]', e.code);
-      if (typeof window.showToast === 'function') window.showToast('فشل الحفظ: ' + e.code, 'error');
-      else alert('فشل الحفظ: ' + e.code);
+      toast('فشل الحفظ: ' + e.code, 'error');
+      /* نرجّع القيمة القديمة في الواجهة */
+      if (local2(el, docId, field)) el.value = adminState.enrollments.find((x) => x.docId === docId)?.[field] ?? '';
     }
   }
+  function local2() { return true; }
 
   /* ---------- السايدبار ---------- */
   function ensureNavEntry() {
@@ -381,9 +496,22 @@
     btn.type = 'button';
     btn.dataset.nav = 'view:admin';
     btn.className = 'nav-item';
-    btn.innerHTML = '<i class="bi bi-speedometer2 text-[13.5px] w-4 text-center shrink-0 text-accent"></i>' +
+    btn.innerHTML = '<i class="bi bi-speedometer2 text-[13.5px] w-4 text-center shrink-0 text-accent" aria-hidden="true"></i>' +
                     '<span class="grow text-start truncate">لوحة الإدارة</span>';
     dataBtn.after(btn);
+  }
+
+  function showAdminView() {
+    if (!ensureAdminDOM()) return;
+    qsa('main#content > section:not(#view-admin)').forEach((s) => s.classList.add('hidden'));
+    const v = qs('#view-admin'); if (v) v.classList.remove('hidden');
+    const pt = qs('#pageTitle'); if (pt) pt.textContent = 'لوحة الإدارة';
+    const ps = qs('#pageSub');  if (ps) ps.textContent = 'الطلاب والاشتراكات والدفع';
+    window.scrollTo(0, 0);
+    qs('#sidebar')?.classList.remove('open');
+    qs('#overlay')?.classList.add('hidden');
+    /* نحمّل مرة واحدة في الجلسة، وبعدها refresh عند كل فتح */
+    loadAll();
   }
 
   function bindAdminNav() {
@@ -394,27 +522,45 @@
       const b = e.target.closest('[data-nav="view:admin"]');
       if (!b) return;
       e.preventDefault();
-      if (!(window.MCL && MCL.isAdminActive())) return;
-      if (!qs('#view-admin')) ensureAdminDOM();
-      qsa('main#content > section:not(#view-admin)').forEach((s) => s.classList.add('hidden'));
-      const v = qs('#view-admin'); if (v) v.classList.remove('hidden');
-      const pt = qs('#pageTitle'); if (pt) pt.textContent = 'لوحة الإدارة';
-      const ps = qs('#pageSub');  if (ps) ps.textContent = 'الطلاب والاشتراكات والدفع';
-      window.scrollTo(0, 0);
-      loadAll();
-      const sb = qs('#sidebar'); if (sb) sb.classList.remove('open');
-      const ov = qs('#overlay'); if (ov) ov.classList.add('hidden');
+      if (!isAdmin()) return;
+      showAdminView();
     });
   }
 
+  /* ✅ v18: التنقل لغير اللوحة → نخبيها (app.js مش بيعرف view-admin) */
+  function bindGlobalNavWatch() {
+    if (document.__admNavWatch) return;
+    document.__admNavWatch = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-nav]');
+      if (!b) return;
+      if (b.dataset.nav === 'view:admin') return;
+      const sec = qs('#view-admin');
+      if (sec) sec.classList.add('hidden');
+    }, true);
+  }
+
+  /* ==========================================================
+     ✅ v18: الجارد بقى transition-based
+     قبل كده: أول onAuthStateChanged(null) عند فتح الصفحة كان
+     بيمسح علم المالك — فوضع المالك بالباسورد كان بيموت بعد reload
+     دلوقتي: بنمسح العلم بس لو كان فيه مستخدم Firebase مسجّل وخرج
+     ========================================================== */
   function watchAdminGuard() {
+    let hadUser = false;
     auth.onAuthStateChanged((user) => {
-      if (!user && window.MCL && typeof MCL.isAdminActive === 'function' && MCL.isAdminActive()) {
+      if (user) {
+        hadUser = true;
+        return;
+      }
+      /* null — بس هل ده "خروج فعلي" ولا مجرد افتتاحية الصفحة؟ */
+      if (hadUser && isAdmin()) {
         try {
           sessionStorage.removeItem('my-course-library:admin');
-          console.info('[ADMIN] تم قفل وضع المالك تلقائيًا (خروج Firebase)');
-        } catch (e) { /* تجاهل */ }
+          console.info('[ADMIN] تم قفل وضع المالك (خروج Firebase فعلي)');
+        } catch { /* تجاهل */ }
       }
+      hadUser = false;
     });
   }
 
@@ -445,24 +591,16 @@
     watchAdminGuard();
     ensureNavEntry();
     bindAdminNav();
+    bindGlobalNavWatch();
     installSidebarHook();
     observeSideNav();
   }
 
-  /* ⏳ انتظر DOM */
   function waitForDOM(retries = 50) {
     const main = qs('main#content') || qs('main');
     const nav = qs('#sideNav');
-    if (main && nav) {
-      console.info('[ADMIN] DOM جاهز — boot');
-      boot();
-      return;
-    }
-    if (retries <= 0) {
-      console.warn('[ADMIN] ⚠️ DOM مش جاهز — boot');
-      boot();
-      return;
-    }
+    if (main && nav) { console.info('[ADMIN] DOM جاهز — boot'); boot(); return; }
+    if (retries <= 0) { console.warn('[ADMIN] ⚠️ DOM مش جاهز — boot'); boot(); return; }
     setTimeout(() => waitForDOM(retries - 1), 100);
   }
 
